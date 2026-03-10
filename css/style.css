@@ -215,7 +215,7 @@ button {
     color: #8e9297;
 }
 
-#search-results {
+.search-results-list {
     max-height: 150px;
     overflow-y: auto;
     background-color: #202225;
