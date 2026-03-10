@@ -10,8 +10,8 @@
 
     <div id="top-bar" class="mc-panel ui-element">
         <button id="btn-toggle-titles" class="mc-button">Скрыть названия</button>
-        <button id="btn-toggle-summary" class="mc-button">Статистика наград</button>
-        <div class="controls-hint">Перемещение: ЛКМ | Настройки квеста: ПКМ | Связать: Shift+ЛКМ</div>
+        <button id="btn-toggle-summary" class="mc-button">Показать награды</button>
+        <div class="controls-hint">Перемещение: ЛКМ | Настройки: ПКМ | Связать: Shift+ЛКМ</div>
     </div>
 
     <div id="rewards-summary" class="mc-panel ui-element hidden">
@@ -58,7 +58,7 @@
 
     <div id="add-mod-modal" class="modal hidden">
         <div class="mc-panel modal-content">
-            <h2 class="mc-title">Новая ветка</h2>
+            <h2 id="mod-modal-title" class="mc-title">Настройки ветки</h2>
             <div class="form-group">
                 <label>Название ветки:</label>
                 <input type="text" id="new-mod-name" class="mc-input" placeholder="Например: IC2">
@@ -69,8 +69,8 @@
                 <div id="mod-icon-preview" class="preview-box"></div>
             </div>
             <div class="modal-actions">
-                <button id="btn-save-mod" class="mc-button">Добавить</button>
-                <button id="btn-close-mod" class="mc-button">Отмена</button>
+                <button id="btn-save-mod" class="mc-button">Сохранить</button>
+                <button id="btn-close-mod" class="mc-button btn-cancel">Отмена</button>
             </div>
         </div>
     </div>
@@ -78,30 +78,33 @@
     <div id="quest-edit-modal" class="modal hidden">
         <div class="mc-panel modal-content large">
             <h2 class="mc-title">Настройки квеста</h2>
+            <div class="form-group">
+                <label>Название квеста:</label>
+                <input type="text" id="quest-title" class="mc-input">
+            </div>
+            
             <div class="form-row">
                 <div class="form-group half">
-                    <label>Название квеста:</label>
-                    <input type="text" id="quest-title" class="mc-input">
+                    <label>Требования (Условия):</label>
+                    <div id="reqs-list" class="item-list-container"></div>
+                    <button id="btn-add-req" class="mc-button mt-5">+ Добавить условие</button>
                 </div>
                 <div class="form-group half">
-                    <label>Требуемый предмет (Условие):</label>
-                    <button id="btn-select-req" class="mc-button">Выбрать предмет</button>
-                    <div id="quest-req-preview" class="preview-box flex-preview"></div>
+                    <label>Награды:</label>
+                    <div id="rewards-list" class="item-list-container"></div>
+                    <button id="btn-add-reward" class="mc-button mt-5">+ Добавить награду</button>
                 </div>
             </div>
+            
             <div class="form-group">
                 <label>Описание задания:</label>
                 <textarea id="quest-desc" class="mc-input"></textarea>
             </div>
-            <div class="form-group">
-                <label>Награды:</label>
-                <div id="rewards-list" class="mc-slot-container"></div>
-                <button id="btn-add-reward" class="mc-button" style="margin-top: 10px;">+ Добавить награду</button>
-            </div>
+            
             <div class="modal-actions">
                 <button id="btn-save-quest" class="mc-button">Сохранить</button>
                 <button id="btn-delete-quest" class="mc-button danger">Удалить квест</button>
-                <button id="btn-close-quest" class="mc-button">Отмена</button>
+                <button id="btn-close-quest" class="mc-button btn-cancel">Отмена</button>
             </div>
         </div>
     </div>
@@ -116,7 +119,7 @@
             </div>
             <div id="picker-results" class="search-results-list"></div>
             <div class="modal-actions">
-                <button id="btn-picker-cancel" class="mc-button">Отмена</button>
+                <button id="btn-picker-cancel" class="mc-button btn-cancel">Отмена</button>
             </div>
         </div>
     </div>
