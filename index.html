@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quest Editor</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="auth-modal" class="modal">
+        <div class="modal-content">
+            <h2>Вход в редактор</h2>
+            <p>Режим просмотра доступен всем. Для редактирования введите ключ.</p>
+            <input type="password" id="auth-key" placeholder="Секретный ключ...">
+            <button id="btn-login">Войти</button>
+            <button id="btn-guest">Режим просмотра</button>
+        </div>
+    </div>
+
+    <div id="app-container">
+        <aside id="sidebar">
+            <div class="sidebar-header">
+                <h3>Моды</h3>
+                <button id="btn-add-mod" class="admin-only">+</button>
+            </div>
+            <ul id="mod-list">
+                </ul>
+        </aside>
+
+        <main id="canvas-container">
+            <div id="quest-canvas">
+                </div>
+            <button id="btn-save-cloud" class="admin-only save-btn">💾 Сохранить изменения</button>
+        </main>
+    </div>
+
+    <div id="quest-edit-modal" class="modal hidden">
+        <div class="modal-content large">
+            <h2>Редактирование квеста</h2>
+            <input type="text" id="quest-title" placeholder="Название квеста">
+            <textarea id="quest-desc" placeholder="Комментарий / Описание"></textarea>
+            
+            <div class="item-selection">
+                <h3>Условие (Предмет)</h3>
+                <input type="text" id="item-search" placeholder="Поиск по database.json...">
+                <div id="search-results"></div>
+                <div id="selected-item-preview"></div>
+                <input type="text" id="custom-item-name" placeholder="Кастомное название предмета (необязательно)">
+            </div>
+
+            <button id="btn-save-quest">Применить</button>
+            <button id="btn-close-quest">Отмена</button>
+        </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
