@@ -1,4 +1,3 @@
-// js/auth.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { firebaseConfig } from './firebase-config.js';
@@ -13,14 +12,26 @@ export const Auth = {
     init() {
         const modal = document.getElementById('auth-modal');
         
-        onAuthStateChanged(authInst, (user) => {
+        onAuthStateChanged(authInst, async (user) => {
             if (user) {
-                this.user = { username: user.email.split('@')[0] };
-                modal.classList.add('hidden');
-                this.applyPermissions();
-                if (!sessionStorage.getItem('just_logged_in')) {
-                    sessionStorage.setItem('just_logged_in', 'true');
-                    DB.logAction('Выполнил вход в систему');
+                const username = user.email.split('@')[0];
+                const allowedUsers = await DB.getUsers();
+
+                // Главный админ (DesOope) или юзер из белого списка
+                if (username.toLowerCase() === 'desoope' || allowedUsers.includes(username)) {
+                    this.user = { username };
+                    modal.classList.add('hidden');
+                    this.applyPermissions();
+                    if (!sessionStorage.getItem('just_logged_in')) {
+                        sessionStorage.setItem('just_logged_in', 'true');
+                        DB.logAction('Выполнил вход в редактор');
+                    }
+                } else {
+                    // Если юзера удалили из списка
+                    alert('Доступ запрещен. Ваш аккаунт был удален администратором.');
+                    signOut(authInst);
+                    this.user = null;
+                    this.applyPermissions();
                 }
             } else {
                 this.user = null;
@@ -35,8 +46,7 @@ export const Auth = {
             if (!login || !pass) return;
 
             try {
-                const email = `${login}@quest.local`;
-                await signInWithEmailAndPassword(authInst, email, pass);
+                await signInWithEmailAndPassword(authInst, `${login}@quest.local`, pass);
             } catch (e) {
                 alert('Неверный логин или пароль!');
             }
@@ -60,19 +70,25 @@ export const Auth = {
             await createUserWithEmailAndPassword(tempAuth, `${newLogin}@quest.local`, newPass);
             await signOut(tempAuth);
             
-            DB.logAction(`Создал нового пользователя: ${newLogin}`);
-            alert(`Пользователь ${newLogin} успешно создан!`);
+            // Обязательно добавляем в белый список БД
+            await DB.addUser(newLogin);
+            DB.logAction(`Создал нового редактора: ${newLogin}`);
+            alert(`Пользователь ${newLogin} успешно создан и добавлен в белый список!`);
         } catch (e) {
-            alert('Ошибка создания: ' + e.message);
+            // Если аккаунт уже есть в Firebase Auth, просто вернем его в белый список
+            if(e.code === 'auth/email-already-in-use') {
+                await DB.addUser(newLogin);
+                DB.logAction(`Восстановил доступ пользователю: ${newLogin}`);
+                alert(`Пользователь ${newLogin} восстановлен в белом списке!`);
+            } else {
+                alert('Ошибка создания: ' + e.message);
+            }
         }
     },
 
     applyPermissions() {
         const adminElements = document.querySelectorAll('.admin-only');
         adminElements.forEach(el => el.style.display = this.user ? 'flex' : 'none');
-        
-        const saveBtn = document.getElementById('btn-save-cloud');
-        if(saveBtn) saveBtn.style.display = this.user ? 'block' : 'none';
         
         const superAdminElements = document.querySelectorAll('.super-admin-only');
         superAdminElements.forEach(el => {
