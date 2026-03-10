@@ -27,7 +27,7 @@ export const Editor = {
         this.bindItemPickerEvents();
         this.bindTopBarEvents();
         this.renderSidebar();
-        this.renderCanvas(); // Рендерим холст сразу при инициализации
+        this.renderCanvas(); 
     },
 
     bindTopBarEvents() {
@@ -105,7 +105,6 @@ export const Editor = {
                 this.renderCanvas(true); 
             }
 
-            // НАДЕЖНАЯ ПРОВЕРКА ДЛЯ ТУЛТИПА
             const hoveredNode = e.target.closest('.quest-node');
             const isMenuHidden = contextMenu.classList.contains('hidden');
             
@@ -268,7 +267,13 @@ export const Editor = {
         
         let reqHtml = '';
         if (quest.reqs && quest.reqs.length > 0) {
-            quest.reqs.forEach(r => { reqHtml += `<div class="tt-item"><img src="${ItemsDB.getImageUrl(r.item.image)}">${r.count}x ${ItemsDB.formatMC(r.customName || r.item.name)}</div>`; });
+            quest.reqs.forEach(r => { 
+                // Показываем забирается ли предмет
+                const consumeTag = r.consume !== false 
+                    ? '<span style="color:#ff5555; font-size:12px; margin-left:6px;">[Забрать]</span>' 
+                    : '<span style="color:#aaaaaa; font-size:12px; margin-left:6px;">[Наличие]</span>';
+                reqHtml += `<div class="tt-item"><img src="${ItemsDB.getImageUrl(r.item.image)}">${r.count}x ${ItemsDB.formatMC(r.customName || r.item.name)}${consumeTag}</div>`; 
+            });
         } else reqHtml = 'Нет требований';
         document.getElementById('tt-reqs').innerHTML = reqHtml;
 
@@ -312,8 +317,10 @@ export const Editor = {
         this.tempReqs.forEach((r, idx) => {
             const countInp = document.getElementById(`req-count-${idx}`);
             const nameInp = document.getElementById(`req-name-${idx}`);
+            const consumeCb = document.getElementById(`req-consume-${idx}`);
             if (countInp) r.count = countInp.value;
             if (nameInp) r.customName = nameInp.value;
+            if (consumeCb) r.consume = consumeCb.checked;
         });
         this.tempRewards.forEach((r, idx) => {
             const countInp = document.getElementById(`rew-count-${idx}`);
@@ -336,8 +343,9 @@ export const Editor = {
 
         document.getElementById('btn-add-req').addEventListener('click', () => {
             this.saveTempState();
+            // По умолчанию галочка "consume" включена
             this.openItemPicker((item) => { 
-                this.tempReqs.push({ item: item, count: 1, customName: item.name }); 
+                this.tempReqs.push({ item: item, count: 1, customName: item.name, consume: true }); 
                 this.renderQuestEditForm(); 
             });
         });
@@ -351,7 +359,7 @@ export const Editor = {
         });
 
         document.getElementById('btn-save-quest').addEventListener('click', () => {
-            this.saveTempState(); // БЕЗОПАСНЫЙ СБОР ДАННЫХ! КРАШЕЙ БОЛЬШЕ НЕ БУДЕТ.
+            this.saveTempState(); 
             
             const mod = this.getActiveMod();
             const title = document.getElementById('quest-title').value || 'Новый квест';
@@ -423,7 +431,16 @@ export const Editor = {
         this.tempReqs.forEach((r, idx) => {
             const div = document.createElement('div');
             div.className = 'reward-row';
-            div.innerHTML = `<div class="mc-slot"><img src="${ItemsDB.getImageUrl(r.item.image)}" width="24" height="24"></div><input type="number" id="req-count-${idx}" class="mc-input" value="${r.count}"><input type="text" id="req-name-${idx}" class="mc-input custom-name-input" value="${r.customName}"><button class="mc-button danger" data-idx="${idx}">X</button>`;
+            const isChecked = r.consume !== false ? 'checked' : '';
+            div.innerHTML = `
+                <div class="mc-slot"><img src="${ItemsDB.getImageUrl(r.item.image)}" width="24" height="24"></div>
+                <input type="number" id="req-count-${idx}" class="mc-input" value="${r.count}" title="Количество">
+                <input type="text" id="req-name-${idx}" class="mc-input custom-name-input" value="${r.customName}" title="Название">
+                <label class="mc-checkbox" title="Забирать предмет при сдаче квеста?">
+                    <input type="checkbox" id="req-consume-${idx}" ${isChecked}> Забрать
+                </label>
+                <button class="mc-button danger" data-idx="${idx}">X</button>
+            `;
             div.querySelector('.danger').addEventListener('click', () => { this.tempReqs.splice(idx, 1); this.renderQuestEditForm(); });
             reqBox.appendChild(div);
         });
@@ -433,7 +450,12 @@ export const Editor = {
         this.tempRewards.forEach((r, idx) => {
             const div = document.createElement('div');
             div.className = 'reward-row';
-            div.innerHTML = `<div class="mc-slot"><img src="${ItemsDB.getImageUrl(r.item.image)}" width="24" height="24"></div><input type="number" id="rew-count-${idx}" class="mc-input" value="${r.count}"><input type="text" id="rew-name-${idx}" class="mc-input custom-name-input" value="${r.customName}"><button class="mc-button danger" data-idx="${idx}">X</button>`;
+            div.innerHTML = `
+                <div class="mc-slot"><img src="${ItemsDB.getImageUrl(r.item.image)}" width="24" height="24"></div>
+                <input type="number" id="rew-count-${idx}" class="mc-input" value="${r.count}">
+                <input type="text" id="rew-name-${idx}" class="mc-input custom-name-input" value="${r.customName}">
+                <button class="mc-button danger" data-idx="${idx}">X</button>
+            `;
             div.querySelector('.danger').addEventListener('click', () => { this.tempRewards.splice(idx, 1); this.renderQuestEditForm(); });
             rewBox.appendChild(div);
         });
