@@ -1,0 +1,267 @@
+/* Сброс базовых стилей */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    background-color: #1e2124;
+    color: #dcddde;
+    overflow: hidden; /* Запрещаем скролл всей страницы */
+}
+
+/* =========================================
+   Макет приложения
+========================================= */
+#app-container {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+}
+
+/* Левая колонка (Моды) */
+#sidebar {
+    width: 250px;
+    background-color: #2c2f33;
+    border-right: 2px solid #141517;
+    display: flex;
+    flex-direction: column;
+    z-index: 10;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.3);
+}
+
+.sidebar-header {
+    padding: 15px;
+    background-color: #23272a;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #141517;
+}
+
+#btn-add-mod {
+    background-color: #43b581;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    width: 30px;
+    height: 30px;
+    font-size: 20px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#btn-add-mod:hover {
+    background-color: #3ca374;
+}
+
+#mod-list {
+    list-style: none;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.mod-item {
+    padding: 12px 15px;
+    border-bottom: 1px solid #23272a;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.mod-item:hover, .mod-item.active {
+    background-color: #40444b;
+    border-left: 4px solid #7289da;
+}
+
+/* Холст квестов */
+#canvas-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden; /* Скрываем то, что выходит за рамки */
+}
+
+#quest-canvas {
+    width: 100%;
+    height: 100%;
+    background-color: #282b30;
+    /* Рисуем сетку как в редакторах */
+    background-image: 
+        linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+    background-size: 40px 40px; /* Размер ячеек сетки */
+    position: relative;
+}
+
+.save-btn {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    padding: 10px 20px;
+    background-color: #7289da;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    transition: background-color 0.2s;
+}
+
+.save-btn:hover {
+    background-color: #5b6eae;
+}
+
+/* =========================================
+   Модальные окна
+========================================= */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal.hidden {
+    display: none !important;
+}
+
+.modal-content {
+    background-color: #36393f;
+    padding: 30px;
+    border-radius: 8px;
+    width: 400px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+}
+
+.modal-content.large {
+    width: 600px;
+}
+
+.modal h2 {
+    margin-bottom: 15px;
+    color: #fff;
+}
+
+.modal p {
+    margin-bottom: 20px;
+    color: #b9bbbe;
+    font-size: 14px;
+}
+
+/* Поля ввода и кнопки в модалках */
+input[type="text"],
+input[type="password"],
+textarea {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    background-color: #202225;
+    border: 1px solid #202225;
+    border-radius: 4px;
+    color: #dcddde;
+    font-size: 14px;
+}
+
+input:focus, textarea:focus {
+    outline: none;
+    border-color: #7289da;
+}
+
+textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+button {
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    margin-right: 10px;
+}
+
+#btn-login, #btn-save-quest {
+    background-color: #7289da;
+    color: white;
+}
+
+#btn-guest, #btn-close-quest {
+    background-color: #4f545c;
+    color: white;
+}
+
+/* =========================================
+   Поиск предметов (Выпадающий список)
+========================================= */
+.item-selection {
+    background-color: #2f3136;
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 15px;
+}
+
+.item-selection h3 {
+    font-size: 14px;
+    margin-bottom: 10px;
+    color: #8e9297;
+}
+
+#search-results {
+    max-height: 150px;
+    overflow-y: auto;
+    background-color: #202225;
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+
+.search-result-item {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    cursor: pointer;
+    border-bottom: 1px solid #2f3136;
+}
+
+.search-result-item:hover {
+    background-color: #36393f;
+}
+
+.search-result-item img {
+    margin-right: 10px;
+    image-rendering: pixelated; /* Чтобы майнкрафт-иконки не мылились */
+}
+
+.search-result-item small {
+    color: #7289da;
+    margin-left: 5px;
+}
+
+#selected-item-preview {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+    color: #43b581;
+}
+
+#selected-item-preview img {
+    margin-right: 15px;
+    image-rendering: pixelated;
+    border: 2px solid #43b581;
+    border-radius: 4px;
+    padding: 2px;
+    background-color: #202225;
+}
+
+/* Утилиты */
+.admin-only {
+    display: none; /* По умолчанию скрыто, auth.js покажет если надо */
+}
