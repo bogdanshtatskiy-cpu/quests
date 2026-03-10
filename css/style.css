@@ -67,7 +67,6 @@ textarea.mc-input { resize: none; height: 80px; }
 .quest-line { stroke: #00aaaa; stroke-width: 4; fill: none; }
 #nodes-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
 
-/* Тёмное окно статистики в углу */
 #rewards-summary {
     position: absolute; top: 55px; right: 10px; width: 250px;
     background-color: rgba(16, 16, 20, 0.95); border: 2px solid #373737;
@@ -82,6 +81,8 @@ textarea.mc-input { resize: none; height: 80px; }
 .summary-item { display: flex; align-items: center; margin-bottom: 5px; font-size: 14px; }
 .summary-item img { width: 20px; height: 20px; image-rendering: pixelated; margin-right: 8px; }
 #btn-toggle-summary-size { padding: 2px 8px; font-size: 12px; }
+#rewards-summary.minimized #rewards-summary-list { display: none; }
+#rewards-summary.minimized { padding: 5px 10px; }
 
 .quest-node { position: absolute; background-color: #8b8b8b; border: 3px solid; border-top-color: #373737; border-left-color: #373737; border-bottom-color: #ffffff; border-right-color: #ffffff; display: flex; justify-content: center; align-items: center; cursor: pointer; pointer-events: auto; padding: 3px; }
 .quest-node.selected { border-color: #55ffff; box-shadow: 0 0 10px #55ffff; }
@@ -110,17 +111,21 @@ body.show-titles .quest-node .node-title { display: block; }
 .menu-item.delete { color: #aa0000; border-bottom: none; }
 .menu-item.delete:hover { background-color: #ffaaaa; }
 
+/* Увеличили модальное окно квеста */
 .modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.8); display: flex; justify-content: center; align-items: center; z-index: 2000; }
-.modal-content { width: 450px; padding: 20px; }
-.modal-content.large { width: 800px; }
+.modal-content { width: 450px; padding: 20px; max-height: 95vh; overflow-y: auto; }
+.modal-content.large { width: 900px; }
+
 .form-row { display: flex; gap: 20px; }
 .form-group { margin-bottom: 15px; flex: 1; }
 .form-group.half { width: 50%; }
 .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
 .modal-actions { display: flex; justify-content: space-between; margin-top: 20px; border-top: 2px solid #555; padding-top: 15px; }
 
-.item-list-container { max-height: 180px; overflow-y: auto; background-color: #1e1e1e; border: 2px solid #555; padding: 5px; }
+.item-list-container { overflow-y: auto; background-color: #1e1e1e; border: 2px solid #555; padding: 5px; }
+.item-list-container.big-list { max-height: 250px; min-height: 100px; }
 .mt-5 { margin-top: 10px; width: 100%; }
+
 .reward-row { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; background: #333; padding: 5px; border: 1px solid #555; }
 .reward-row input[type="number"] { width: 60px; text-align: center; }
 .reward-row .custom-name-input { flex: 1; text-align: left; }
