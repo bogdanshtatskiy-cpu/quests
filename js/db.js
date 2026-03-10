@@ -26,7 +26,7 @@ export const DB = {
             if (docSnap.exists()) {
                 return docSnap.data().mods;
             }
-            return []; // База пуста
+            return [];
         } catch (e) {
             console.error("Ошибка загрузки квестов:", e);
             return [];
