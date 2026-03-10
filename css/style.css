@@ -17,6 +17,11 @@ body {
     user-select: none;
 }
 
+/* ГЛОБАЛЬНЫЙ КЛАСС СКРЫТИЯ (Вот из-за него была проблема!) */
+.hidden {
+    display: none !important;
+}
+
 /* GUI Minecraft */
 .mc-panel {
     background-color: #c6c6c6;
@@ -131,10 +136,8 @@ textarea.mc-input { resize: none; height: 80px; }
 .quest-node.size-md { width: 52px; height: 52px; }
 .quest-node.size-lg { width: 68px; height: 68px; }
 
-/* Изображение внутри растягивается под рамку */
 .quest-node img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; pointer-events: none; }
 
-/* Позиция названия зависит от размера */
 .quest-node .node-title {
     position: absolute; left: 50%; transform: translateX(-50%);
     background: rgba(0,0,0,0.8); color: #fff; padding: 3px 6px; border-radius: 3px;
@@ -162,7 +165,6 @@ body.show-titles .quest-node .node-title { display: block; }
 
 /* Контекстное меню */
 .context-menu { position: absolute; z-index: 1000; padding: 0; min-width: 200px; box-shadow: 4px 4px 0px rgba(0,0,0,0.5); }
-.context-menu.hidden { display: none !important; }
 .menu-item { padding: 10px 15px; cursor: pointer; font-size: 16px; color: #404040; text-shadow: 1px 1px 0 #fff; border-bottom: 2px solid #a0a0a0; background-color: #c6c6c6; }
 .menu-item:hover { background-color: #a0a0a0; color: #000; }
 .menu-item.delete { color: #aa0000; border-bottom: none; }
@@ -170,7 +172,6 @@ body.show-titles .quest-node .node-title { display: block; }
 
 /* Модальные окна */
 .modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.8); display: flex; justify-content: center; align-items: center; z-index: 2000; }
-.modal.hidden { display: none !important; }
 .modal-content { width: 450px; padding: 20px; }
 .modal-content.large { width: 800px; }
 
