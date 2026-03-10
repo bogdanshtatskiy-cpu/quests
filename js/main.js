@@ -1,15 +1,11 @@
 // js/main.js
-import { Auth } from './auth.js';
 import { ItemsDB } from './items.js';
 import { Editor } from './editor.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // 1. Инициализируем систему доступов
-    Auth.init();
-
-    // 2. Загружаем базу предметов из JSON
+    // Ждем загрузки базы данных
     await ItemsDB.load();
-
-    // 3. Запускаем движок редактора
+    
+    // Запускаем движок редактора квестов
     Editor.init();
 });
