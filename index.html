@@ -19,6 +19,14 @@
         <div class="controls-hint">ЛКМ: Двигать | ПКМ: Настройки | Shift+ЛКМ: Связать</div>
     </div>
 
+    <div id="rewards-summary" class="hidden ui-element">
+        <div class="summary-header">
+            <h3 class="mc-title">Награды ветки</h3>
+            <button id="btn-toggle-summary-size" class="mc-button">▼</button>
+        </div>
+        <div id="rewards-summary-list"></div>
+    </div>
+
     <div id="node-context-menu" class="mc-panel context-menu hidden">
         <div class="menu-item admin-only" id="menu-edit">Редактировать</div>
         <div class="menu-item admin-only" id="menu-link">Соединить (Shift+ЛКМ)</div>
@@ -48,7 +56,7 @@
         <div class="tt-section" id="tt-rewards-container"><span class="tt-label">Награда:</span><div id="tt-rewards"></div></div>
     </div>
 
-    <div id="auth-modal" class="modal">
+    <div id="auth-modal" class="modal hidden">
         <div class="mc-panel modal-content">
             <h2 class="mc-title">Вход в редактор</h2>
             <input type="text" id="auth-login" class="mc-input" placeholder="Логин (например: DesOope)">
