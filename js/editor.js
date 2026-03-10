@@ -3,9 +3,6 @@ import { ItemsDB } from './items.js';
 
 export const Editor = {
     data: { mods: [] }, 
-    /* Структура квеста: 
-       { id, x, y, title, desc, reqs: [{item, count, customName}], rewards: [{item, count, customName}], parents: [] }
-    */
     activeModId: null,
     
     // Canvas state
@@ -16,12 +13,13 @@ export const Editor = {
     draggedQuestId: null, mouseStartX: 0, mouseStartY: 0, nodeStartX: 0, nodeStartY: 0, hasMovedNode: false,
     linkingFromNodeId: null, contextNodeId: null, editingNodeId: null,
     
+    // Tooltip state
+    hoveredQuestId: null,
+    
     // Pickers and Modal State
     pickerCallback: null,
     tempReqs: [],
     tempRewards: [],
-    
-    // Mod Modal State
     editingModId: null,
     tempModIcon: null,
 
@@ -30,26 +28,16 @@ export const Editor = {
         this.bindModModalEvents();
         this.bindQuestModalEvents();
         this.bindItemPickerEvents();
-        this.bindTopBarEvents();
-        this.renderSidebar();
-    },
-
-    bindTopBarEvents() {
+        
         document.getElementById('btn-toggle-titles').addEventListener('click', () => {
             document.body.classList.toggle('show-titles');
         });
 
-        const btnSummary = document.getElementById('btn-toggle-summary');
-        const summaryPanel = document.getElementById('rewards-summary');
-        
-        btnSummary.addEventListener('click', () => {
-            summaryPanel.classList.toggle('hidden');
-            btnSummary.innerText = summaryPanel.classList.contains('hidden') ? 'Показать награды' : 'Скрыть награды';
-        });
+        this.renderSidebar();
     },
 
     // ==========================================
-    // ХОЛСТ: Перемещение, Зум
+    // ХОЛСТ: Перемещение, Зум, Подсказки
     // ==========================================
     bindCanvasEvents() {
         const container = document.getElementById('canvas-container');
@@ -75,18 +63,16 @@ export const Editor = {
             }
         });
 
-        window.addEventListener('mousemove', (e) => {
-            // При любом перемещении (drag/pan) прячем тултип чтобы не моргал
-            if (this.isPanning || this.draggedQuestId) {
-                tooltip.classList.add('hidden');
-            }
-
+        // ГЛОБАЛЬНЫЙ обработчик движения мыши (решает проблему с зависающим окном)
+        container.addEventListener('mousemove', (e) => {
+            // 1. Логика перетаскивания холста
             if (this.isPanning) {
                 this.panX = this.initialPanX + (e.clientX - this.panStartX);
                 this.panY = this.initialPanY + (e.clientY - this.panStartY);
                 this.updateTransform();
             }
             
+            // 2. Логика перетаскивания узла
             if (this.draggedQuestId) {
                 const quest = this.getActiveMod().quests.find(q => q.id === this.draggedQuestId);
                 const dx = (e.clientX - this.mouseStartX) / this.scale;
@@ -98,9 +84,26 @@ export const Editor = {
                 this.renderCanvas();
             }
 
-            if (!tooltip.classList.contains('hidden')) {
+            // 3. Логика Tooltip (всплывающего окна)
+            const hoveredNode = e.target.closest('.quest-node');
+            
+            if (hoveredNode && !this.isPanning && !this.draggedQuestId) {
+                const questId = hoveredNode.dataset.id;
+                
+                // Рендерим контент только если навели на новый квест (чтобы не лагало)
+                if (this.hoveredQuestId !== questId) {
+                    this.hoveredQuestId = questId;
+                    const quest = this.getActiveMod().quests.find(q => q.id === questId);
+                    if (quest) this.showTooltip(quest);
+                }
+                
+                // Двигаем окно за мышкой
                 tooltip.style.left = (e.clientX + 15) + 'px';
                 tooltip.style.top = (e.clientY + 15) + 'px';
+            } else {
+                // Если мышка не на квесте ИЛИ мы тащим/двигаем - скрываем 100%
+                this.hoveredQuestId = null;
+                tooltip.classList.add('hidden');
             }
         });
 
@@ -151,7 +154,7 @@ export const Editor = {
         nodesLayer.innerHTML = ''; linesLayer.innerHTML = '';
         
         const mod = this.getActiveMod();
-        if (!mod) { this.updateSummary(); return; }
+        if (!mod) return;
 
         mod.quests.forEach(quest => {
             if (quest.parents) {
@@ -167,8 +170,8 @@ export const Editor = {
             node.className = 'quest-node';
             if (this.linkingFromNodeId === quest.id) node.classList.add('selected');
             node.style.left = `${quest.x}px`; node.style.top = `${quest.y}px`;
+            node.dataset.id = quest.id;
             
-            // Если есть требования - берем первую иконку. Иначе пусто.
             const iconPath = (quest.reqs && quest.reqs.length > 0) ? ItemsDB.getImageUrl(quest.reqs[0].item.image) : '';
             const imgHtml = iconPath ? `<img src="${iconPath}">` : '';
 
@@ -187,8 +190,8 @@ export const Editor = {
                             if (this.linkingFromNodeId !== quest.id) {
                                 if (!quest.parents) quest.parents = [];
                                 const idx = quest.parents.indexOf(this.linkingFromNodeId);
-                                if (idx > -1) quest.parents.splice(idx, 1); // Разорвать
-                                else quest.parents.push(this.linkingFromNodeId); // Соединить
+                                if (idx > -1) quest.parents.splice(idx, 1);
+                                else quest.parents.push(this.linkingFromNodeId);
                             }
                             this.linkingFromNodeId = null;
                         }
@@ -212,13 +215,8 @@ export const Editor = {
                 menu.classList.remove('hidden');
             });
 
-            node.addEventListener('mouseenter', () => this.showTooltip(quest));
-            node.addEventListener('mouseleave', () => document.getElementById('quest-tooltip').classList.add('hidden'));
-
             nodesLayer.appendChild(node);
         });
-
-        this.updateSummary();
     },
 
     drawLine(svg, parent, child) {
@@ -230,7 +228,6 @@ export const Editor = {
     },
 
     showTooltip(quest) {
-        if (this.isPanning || this.draggedQuestId) return; // Не показываем при перетаскивании
         const tt = document.getElementById('quest-tooltip');
         document.getElementById('tt-title').innerHTML = ItemsDB.formatMC(quest.title);
         document.getElementById('tt-desc').innerText = quest.desc || '';
@@ -252,26 +249,6 @@ export const Editor = {
         document.getElementById('tt-rewards').innerHTML = rewHtml;
 
         tt.classList.remove('hidden');
-    },
-
-    updateSummary() {
-        const container = document.getElementById('rewards-summary-list');
-        container.innerHTML = '';
-        const mod = this.getActiveMod();
-        if (!mod) return;
-
-        const totals = {};
-        mod.quests.forEach(q => {
-            (q.rewards || []).forEach(r => {
-                const name = r.customName || r.item.name;
-                if (!totals[name]) totals[name] = { count: 0, item: r.item };
-                totals[name].count += parseInt(r.count || 1);
-            });
-        });
-
-        for (const key in totals) {
-            container.innerHTML += `<div class="summary-item"><img src="${ItemsDB.getImageUrl(totals[key].item.image)}"> ${totals[key].count}x ${ItemsDB.formatMC(key)}</div>`;
-        }
     },
 
     // ==========================================
@@ -299,7 +276,6 @@ export const Editor = {
             const title = document.getElementById('quest-title').value || 'Новый квест';
             const desc = document.getElementById('quest-desc').value;
             
-            // Читаем из инпутов
             this.tempReqs.forEach((r, idx) => {
                 r.count = document.getElementById(`req-count-${idx}`).value;
                 r.customName = document.getElementById(`req-name-${idx}`).value;
@@ -343,7 +319,6 @@ export const Editor = {
             document.getElementById('quest-title').value = q.title || '';
             document.getElementById('quest-desc').value = q.desc || '';
             
-            // Адаптация старых сейвов (если было req, переводим в массив reqs)
             let reqs = q.reqs || [];
             if (q.req && reqs.length === 0) reqs = [q.req]; 
             
@@ -488,12 +463,10 @@ export const Editor = {
             if (!name || !this.tempModIcon) return alert('Введите название и выберите иконку!');
             
             if (this.editingModId) {
-                // Редактируем существующую
                 const mod = this.data.mods.find(m => m.id === this.editingModId);
                 mod.name = name;
                 mod.icon = this.tempModIcon;
             } else {
-                // Создаем новую
                 const id = 'mod_' + Date.now();
                 this.data.mods.push({ id, name, icon: this.tempModIcon, quests: [] });
                 this.activeModId = id;
@@ -523,13 +496,11 @@ export const Editor = {
                 </div>
             `;
             
-            // Клик по самой вкладке
             li.querySelector('.mod-item-content').addEventListener('click', () => {
                 this.activeModId = mod.id;
                 this.renderSidebar(); this.renderCanvas(); 
             });
 
-            // Редактирование
             li.querySelector('.edit').addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.editingModId = mod.id;
@@ -540,7 +511,6 @@ export const Editor = {
                 document.getElementById('add-mod-modal').classList.remove('hidden');
             });
 
-            // Удаление
             li.querySelector('.delete').addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (confirm(`Удалить ветку "${mod.name}" со всеми квестами?`)) {
