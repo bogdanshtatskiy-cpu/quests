@@ -66,14 +66,22 @@ textarea.mc-input { resize: none; height: 80px; }
 #connections-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 .quest-line { stroke: #00aaaa; stroke-width: 4; fill: none; }
 #nodes-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-.save-btn { position: absolute; bottom: 20px; right: 20px; z-index: 100; }
 
-#rewards-summary { position: absolute; top: 55px; right: 10px; width: 250px; background-color: rgba(198, 198, 198, 0.95); z-index: 100; padding: 10px; max-height: 50vh; display: flex; flex-direction: column; }
-#rewards-summary-list { overflow-y: auto; flex: 1; }
+/* Тёмное окно статистики в углу */
+#rewards-summary {
+    position: absolute; top: 55px; right: 10px; width: 250px;
+    background-color: rgba(16, 16, 20, 0.95); border: 2px solid #373737;
+    z-index: 100; padding: 10px; color: #fff; display: flex; flex-direction: column;
+}
+#rewards-summary .summary-header {
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid #333; padding-bottom: 5px; margin-bottom: 5px;
+}
+#rewards-summary .mc-title { margin: 0; font-size: 14px; text-shadow: 1px 1px 0 #000; color: #55ffff; }
+#rewards-summary-list { overflow-y: auto; max-height: 40vh; }
 .summary-item { display: flex; align-items: center; margin-bottom: 5px; font-size: 14px; }
 .summary-item img { width: 20px; height: 20px; image-rendering: pixelated; margin-right: 8px; }
-#rewards-summary.minimized h3, #rewards-summary.minimized #rewards-summary-list { display: none; }
-#rewards-summary.minimized { max-height: auto; width: auto; padding: 5px; }
+#btn-toggle-summary-size { padding: 2px 8px; font-size: 12px; }
 
 .quest-node { position: absolute; background-color: #8b8b8b; border: 3px solid; border-top-color: #373737; border-left-color: #373737; border-bottom-color: #ffffff; border-right-color: #ffffff; display: flex; justify-content: center; align-items: center; cursor: pointer; pointer-events: auto; padding: 3px; }
 .quest-node.selected { border-color: #55ffff; box-shadow: 0 0 10px #55ffff; }
@@ -127,26 +135,8 @@ body.show-titles .quest-node .node-title { display: block; }
 .search-result-item img { image-rendering: pixelated; margin-right: 10px; }
 .fav-star { color: #555; font-size: 20px; margin-right: 10px; cursor: pointer; transition: color 0.2s; }
 .fav-star.active { color: #ffaa00; text-shadow: 0 0 5px #ffaa00; }
-/* Таблицы в админ-панели */
-.admin-table {
-    width: 100%;
-    border-collapse: collapse;
-    color: #e0e0e0;
-    font-size: 14px;
-}
-.admin-table th {
-    background-color: #373737;
-    padding: 8px;
-    text-align: left;
-    border-bottom: 2px solid #555;
-    position: sticky;
-    top: 0;
-    z-index: 2;
-}
-.admin-table td {
-    padding: 8px;
-    border-bottom: 1px solid #333;
-}
-.admin-table tr:hover {
-    background-color: #444;
-}
+
+.admin-table { width: 100%; border-collapse: collapse; color: #e0e0e0; font-size: 14px; }
+.admin-table th { background-color: #373737; padding: 8px; text-align: left; border-bottom: 2px solid #555; position: sticky; top: 0; z-index: 2; }
+.admin-table td { padding: 8px; border-bottom: 1px solid #333; }
+.admin-table tr:hover { background-color: #444; }
