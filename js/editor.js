@@ -17,28 +17,37 @@ export const Editor = {
     hoveredQuestId: null,
     
     pickerCallback: null, tempReqs: [], tempRewards: [], editingModId: null, tempModIcon: null,
+    
+    saveTimeout: null, // Таймер автосохранения
 
     init() {
         this.bindCanvasEvents();
         this.bindModModalEvents();
         this.bindQuestModalEvents();
         this.bindItemPickerEvents();
-        this.bindTopBarEvents();
-        this.renderSidebar();
-    },
-
-    bindTopBarEvents() {
+        
         document.getElementById('btn-toggle-titles').addEventListener('click', () => {
             document.body.classList.toggle('show-titles');
         });
-
-        const btnMinimize = document.getElementById('btn-minimize-summary');
-        const summaryPanel = document.getElementById('rewards-summary');
         
-        btnMinimize.addEventListener('click', () => {
-            summaryPanel.classList.toggle('minimized');
-            btnMinimize.innerText = summaryPanel.classList.contains('minimized') ? 'Развернуть' : 'Свернуть';
-        });
+        this.renderSidebar();
+    },
+
+    // Метод АВТОСОХРАНЕНИЯ
+    triggerAutoSave() {
+        if (!Auth.user) return; // Гости не сохраняют
+        const indicator = document.getElementById('save-indicator');
+        indicator.classList.remove('hidden');
+        indicator.innerText = "Сохранение...";
+        indicator.style.color = "#ffaa00"; // Желтый во время записи
+
+        clearTimeout(this.saveTimeout);
+        this.saveTimeout = setTimeout(async () => {
+            await DB.saveQuestsSilent(this.data.mods);
+            indicator.innerText = "Сохранено ✔";
+            indicator.style.color = "#55ff55"; // Зеленый при успехе
+            setTimeout(() => indicator.classList.add('hidden'), 2000);
+        }, 1500); // Сохраняем через 1.5 сек после последнего изменения
     },
 
     bindCanvasEvents() {
@@ -83,7 +92,7 @@ export const Editor = {
                 if (Math.abs(dx) > 3 || Math.abs(dy) > 3) this.hasMovedNode = true;
                 quest.x = this.nodeStartX + dx;
                 quest.y = this.nodeStartY + dy;
-                this.renderCanvas();
+                this.renderCanvas(true); // render without updating auto-save instantly to avoid spam
             }
 
             const hoveredNode = e.target.closest('.quest-node');
@@ -108,18 +117,23 @@ export const Editor = {
             tooltip.classList.add('hidden');
             this.hoveredQuestId = null;
             this.isPanning = false;
+            if(this.draggedQuestId && this.hasMovedNode) this.triggerAutoSave();
             this.draggedQuestId = null;
         });
 
         window.addEventListener('mouseup', () => {
             this.isPanning = false;
+            // Если узел был передвинут, триггерим автосохранение
+            if (this.draggedQuestId && this.hasMovedNode) {
+                this.triggerAutoSave();
+            }
             this.draggedQuestId = null;
             container.style.cursor = 'default';
         });
 
         container.addEventListener('contextmenu', (e) => {
             e.preventDefault();
-            if (!Auth.user) return; // Только админы могут вызывать ПКМ по пустому месту
+            if (!Auth.user) return; 
             if (!this.activeModId) return alert('Выберите ветку квестов!');
             if (e.target.closest('.quest-node') || e.target.closest('.ui-element')) return;
 
@@ -149,13 +163,13 @@ export const Editor = {
         document.getElementById('quest-canvas').style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`;
     },
 
-    renderCanvas() {
+    renderCanvas(skipSave = false) {
         const nodesLayer = document.getElementById('nodes-layer');
         const linesLayer = document.getElementById('connections-layer');
         nodesLayer.innerHTML = ''; linesLayer.innerHTML = '';
         
         const mod = this.getActiveMod();
-        if (!mod) { this.updateSummary(); return; }
+        if (!mod) return;
 
         mod.quests.forEach(quest => {
             if (quest.parents) {
@@ -192,6 +206,7 @@ export const Editor = {
                                 const idx = quest.parents.indexOf(this.linkingFromNodeId);
                                 if (idx > -1) quest.parents.splice(idx, 1);
                                 else quest.parents.push(this.linkingFromNodeId);
+                                this.triggerAutoSave(); // Сохраняем создание/удаление связи
                             }
                             this.linkingFromNodeId = null;
                         }
@@ -208,7 +223,7 @@ export const Editor = {
 
             node.addEventListener('contextmenu', (e) => {
                 e.preventDefault(); e.stopPropagation();
-                if (!Auth.user) return; // Гости не видят меню
+                if (!Auth.user) return; 
                 this.contextNodeId = quest.id;
                 const menu = document.getElementById('node-context-menu');
                 menu.style.left = `${e.clientX}px`;
@@ -218,8 +233,6 @@ export const Editor = {
 
             nodesLayer.appendChild(node);
         });
-
-        this.updateSummary();
     },
 
     drawLine(svg, parent, child) {
@@ -250,33 +263,6 @@ export const Editor = {
         document.getElementById('tt-rewards').innerHTML = rewHtml;
 
         tt.classList.remove('hidden');
-    },
-
-    updateSummary() {
-        const container = document.getElementById('rewards-summary-list');
-        const summaryPanel = document.getElementById('rewards-summary');
-        container.innerHTML = '';
-        
-        const mod = this.getActiveMod();
-        if (!mod) { summaryPanel.classList.add('hidden'); return; }
-
-        const totals = {};
-        mod.quests.forEach(q => {
-            (q.rewards || []).forEach(r => {
-                const name = r.customName || r.item.name;
-                if (!totals[name]) totals[name] = { count: 0, item: r.item };
-                totals[name].count += parseInt(r.count || 1);
-            });
-        });
-
-        if (Object.keys(totals).length > 0) {
-            summaryPanel.classList.remove('hidden');
-            for (const key in totals) {
-                container.innerHTML += `<div class="summary-item"><img src="${ItemsDB.getImageUrl(totals[key].item.image)}"> ${totals[key].count}x ${ItemsDB.formatMC(key)}</div>`;
-            }
-        } else {
-            summaryPanel.classList.add('hidden');
-        }
     },
 
     bindQuestModalEvents() {
@@ -310,6 +296,7 @@ export const Editor = {
                 });
                 DB.logAction(`Создал квест: ${title}`);
             }
+            this.triggerAutoSave();
             modal.classList.add('hidden');
             this.renderCanvas();
         });
@@ -377,6 +364,7 @@ export const Editor = {
         mod.quests = mod.quests.filter(q => q.id !== questId);
         mod.quests.forEach(q => { if(q.parents) q.parents = q.parents.filter(id => id !== questId); });
         DB.logAction(`Удалил квест: ${quest.title}`);
+        this.triggerAutoSave();
         this.renderCanvas();
     },
 
@@ -453,6 +441,7 @@ export const Editor = {
                 DB.logAction(`Создал ветку: ${name}`);
             }
             
+            this.triggerAutoSave();
             modal.classList.add('hidden');
             this.renderSidebar(); this.renderCanvas();
         });
@@ -499,6 +488,7 @@ export const Editor = {
                         this.data.mods = this.data.mods.filter(m => m.id !== mod.id);
                         if (this.activeModId === mod.id) this.activeModId = null;
                         DB.logAction(`Удалил ветку: ${mod.name}`);
+                        this.triggerAutoSave();
                         this.renderSidebar(); this.renderCanvas();
                     }
                 });
