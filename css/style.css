@@ -83,9 +83,11 @@ textarea.mc-input { resize: none; height: 120px; }
     border-bottom: 1px solid #333; padding-bottom: 5px; margin-bottom: 5px;
 }
 #rewards-summary .mc-title { margin: 0; font-size: 14px; text-shadow: 1px 1px 0 #000; color: #55ffff; }
-#rewards-summary-list { overflow-y: auto; max-height: 40vh; }
-.summary-item { display: flex; align-items: center; margin-bottom: 5px; font-size: 14px; }
-.summary-item img { width: 20px; height: 20px; image-rendering: pixelated; margin-right: 8px; }
+/* Добавили горизонтальный скролл для длинных названий */
+#rewards-summary-list { overflow-y: auto; overflow-x: auto; max-height: 40vh; }
+/* Запретили перенос строк (white-space: nowrap) */
+.summary-item { display: flex; align-items: center; margin-bottom: 5px; font-size: 14px; white-space: nowrap; }
+.summary-item img { width: 20px; height: 20px; image-rendering: pixelated; margin-right: 8px; flex-shrink: 0; }
 #btn-toggle-summary-size { padding: 2px 8px; font-size: 12px; }
 #rewards-summary.minimized #rewards-summary-list { display: none; }
 #rewards-summary.minimized { padding: 5px 10px; }
