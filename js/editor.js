@@ -16,7 +16,7 @@ export const Editor = {
     linkingFromNodeId: null, contextNodeId: null, editingNodeId: null,
     hoveredQuestId: null,
     
-    pickerCallback: null, tempReqs: [], tempRewards: [], editingModId: null, tempModIcon: null,
+    pickerCallback: null, tempReqs: [], tempRewards: [], tempQuestIcon: null, editingModId: null, tempModIcon: null,
     
     saveTimeout: null,
 
@@ -25,20 +25,22 @@ export const Editor = {
         this.bindModModalEvents();
         this.bindQuestModalEvents();
         this.bindItemPickerEvents();
-        
+        this.bindTopBarEvents();
+        this.renderSidebar();
+    },
+
+    bindTopBarEvents() {
         document.getElementById('btn-toggle-titles').addEventListener('click', () => {
             document.body.classList.toggle('show-titles');
         });
 
-        // Сворачивание панели наград
         const btnToggleSummary = document.getElementById('btn-toggle-summary-size');
-        const summaryList = document.getElementById('rewards-summary-list');
-        btnToggleSummary.addEventListener('click', () => {
-            summaryList.classList.toggle('hidden');
-            btnToggleSummary.innerText = summaryList.classList.contains('hidden') ? '▲' : '▼';
-        });
+        const summaryPanel = document.getElementById('rewards-summary');
         
-        this.renderSidebar();
+        btnToggleSummary.addEventListener('click', () => {
+            summaryPanel.classList.toggle('minimized');
+            btnToggleSummary.innerText = summaryPanel.classList.contains('minimized') ? '▲' : '▼';
+        });
     },
 
     triggerAutoSave() {
@@ -195,7 +197,12 @@ export const Editor = {
             node.style.left = `${quest.x}px`; node.style.top = `${quest.y}px`;
             node.dataset.id = quest.id;
             
-            const iconPath = (quest.reqs && quest.reqs.length > 0) ? ItemsDB.getImageUrl(quest.reqs[0].item.image) : '';
+            // Если есть кастомная иконка, берем ее. Иначе первую из требований.
+            let iconStr = '';
+            if (quest.icon) iconStr = quest.icon;
+            else if (quest.reqs && quest.reqs.length > 0) iconStr = quest.reqs[0].item.image;
+
+            const iconPath = iconStr ? ItemsDB.getImageUrl(iconStr) : '';
             const imgHtml = iconPath ? `<img src="${iconPath}">` : '';
 
             node.innerHTML = `${imgHtml}<div class="node-title">${ItemsDB.formatMC(quest.title)}</div>`;
@@ -300,34 +307,66 @@ export const Editor = {
         }
     },
 
+    // Сохраняет инпуты ДО открытия пикера, чтобы не слетали числа
+    saveTempState() {
+        this.tempReqs.forEach((r, idx) => {
+            const countInp = document.getElementById(`req-count-${idx}`);
+            const nameInp = document.getElementById(`req-name-${idx}`);
+            if (countInp) r.count = countInp.value;
+            if (nameInp) r.customName = nameInp.value;
+        });
+        this.tempRewards.forEach((r, idx) => {
+            const countInp = document.getElementById(`rew-count-${idx}`);
+            const nameInp = document.getElementById(`rew-name-${idx}`);
+            if (countInp) r.count = countInp.value;
+            if (nameInp) r.customName = nameInp.value;
+        });
+    },
+
     bindQuestModalEvents() {
         const modal = document.getElementById('quest-edit-modal');
         
+        document.getElementById('btn-select-quest-icon').addEventListener('click', () => {
+            this.saveTempState();
+            this.openItemPicker((item) => {
+                this.tempQuestIcon = item.image;
+                document.getElementById('quest-icon-preview').innerHTML = `<img src="${ItemsDB.getImageUrl(item.image)}" style="width: 32px; height: 32px; image-rendering: pixelated;">`;
+            });
+        });
+
         document.getElementById('btn-add-req').addEventListener('click', () => {
-            this.openItemPicker((item) => { this.tempReqs.push({ item: item, count: 1, customName: item.name }); this.renderQuestEditForm(); });
+            this.saveTempState();
+            this.openItemPicker((item) => { 
+                this.tempReqs.push({ item: item, count: 1, customName: item.name }); 
+                this.renderQuestEditForm(); 
+            });
         });
 
         document.getElementById('btn-add-reward').addEventListener('click', () => {
-            this.openItemPicker((item) => { this.tempRewards.push({ item: item, count: 1, customName: item.name }); this.renderQuestEditForm(); });
+            this.saveTempState();
+            this.openItemPicker((item) => { 
+                this.tempRewards.push({ item: item, count: 1, customName: item.name }); 
+                this.renderQuestEditForm(); 
+            });
         });
 
         document.getElementById('btn-save-quest').addEventListener('click', () => {
+            this.saveTempState(); // Окончательно собираем данные из инпутов
             const mod = this.getActiveMod();
             const title = document.getElementById('quest-title').value || 'Новый квест';
             const desc = document.getElementById('quest-desc').value;
             const size = document.getElementById('quest-size').value;
-            
-            this.tempReqs.forEach((r, idx) => { r.count = document.getElementById(`req-count-${idx}`).value; r.customName = document.getElementById(`req-name-${idx}`).value; });
-            this.tempRewards.forEach((r, idx) => { r.count = document.getElementById(`rew-count-${idx}`).value; r.customName = document.getElementById(`rew-name-${idx}`).value; });
 
             if (this.editingNodeId) {
                 const q = mod.quests.find(q => q.id === this.editingNodeId);
-                q.title = title; q.desc = desc; q.size = size; q.reqs = [...this.tempReqs]; q.rewards = [...this.tempRewards];
+                q.title = title; q.desc = desc; q.size = size; q.icon = this.tempQuestIcon;
+                q.reqs = [...this.tempReqs]; q.rewards = [...this.tempRewards];
                 DB.logAction(`Отредактировал квест: ${title}`);
             } else {
                 mod.quests.push({
                     id: 'q_' + Date.now(), x: this.newQuestX, y: this.newQuestY,
-                    title: title, desc: desc, size: size, reqs: [...this.tempReqs], rewards: [...this.tempRewards], parents: []
+                    title: title, desc: desc, size: size, icon: this.tempQuestIcon,
+                    reqs: [...this.tempReqs], rewards: [...this.tempRewards], parents: []
                 });
                 DB.logAction(`Создал квест: ${title}`);
             }
@@ -356,16 +395,22 @@ export const Editor = {
             document.getElementById('quest-title').value = q.title || '';
             document.getElementById('quest-desc').value = q.desc || '';
             document.getElementById('quest-size').value = q.size || 'md';
+            this.tempQuestIcon = q.icon || null;
+            
             let reqs = q.reqs || [];
             if (q.req && reqs.length === 0) reqs = [q.req]; 
+            
             this.tempReqs = JSON.parse(JSON.stringify(reqs));
             this.tempRewards = q.rewards ? JSON.parse(JSON.stringify(q.rewards)) : [];
         } else {
             document.getElementById('quest-title').value = '';
             document.getElementById('quest-desc').value = '';
             document.getElementById('quest-size').value = 'md';
+            this.tempQuestIcon = null;
             this.tempReqs = []; this.tempRewards = [];
         }
+        
+        document.getElementById('quest-icon-preview').innerHTML = this.tempQuestIcon ? `<img src="${ItemsDB.getImageUrl(this.tempQuestIcon)}" style="width: 32px; height: 32px; image-rendering: pixelated;">` : '';
         
         this.renderQuestEditForm();
         modal.classList.remove('hidden');
@@ -438,6 +483,7 @@ export const Editor = {
             searchInp.value = '';
             renderResults();
             modal.classList.remove('hidden');
+            setTimeout(() => searchInp.focus(), 50); // Фокус на строке поиска!
         };
     },
 
@@ -530,7 +576,5 @@ export const Editor = {
             }
             list.appendChild(li);
         });
-    },
-
-    getActiveMod() { return this.data.mods.find(m => m.id === this.activeModId); }
+    }
 };
