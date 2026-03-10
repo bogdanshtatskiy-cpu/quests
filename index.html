@@ -6,7 +6,9 @@
     <title>Minecraft Quest Editor</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
-<body class="show-titles"> <div id="top-bar" class="mc-panel ui-element">
+<body class="show-titles">
+
+    <div id="top-bar" class="mc-panel ui-element">
         <button id="btn-toggle-titles" class="mc-button">Скрыть названия</button>
         <button id="btn-toggle-summary" class="mc-button">Статистика наград</button>
         <div class="controls-hint">Перемещение: ЛКМ | Настройки квеста: ПКМ | Связать: Shift+ЛКМ</div>
@@ -15,6 +17,12 @@
     <div id="rewards-summary" class="mc-panel ui-element hidden">
         <h3 class="mc-title">Награды за ветку</h3>
         <div id="rewards-summary-list"></div>
+    </div>
+
+    <div id="node-context-menu" class="mc-panel context-menu hidden">
+        <div class="menu-item" id="menu-edit">Редактировать</div>
+        <div class="menu-item" id="menu-link">Соединить (Shift+ЛКМ)</div>
+        <div class="menu-item delete" id="menu-delete">Удалить</div>
     </div>
 
     <div id="app-container">
