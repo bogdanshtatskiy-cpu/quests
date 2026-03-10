@@ -124,39 +124,50 @@
     <div id="quest-edit-modal" class="modal hidden">
         <div class="mc-panel modal-content large">
             <h2 class="mc-title">Настройки квеста</h2>
+            
             <div class="form-row">
-                <div class="form-group half">
+                <div class="form-group" style="flex: 2;">
                     <label>Название квеста:</label>
                     <input type="text" id="quest-title" class="mc-input">
                 </div>
-                <div class="form-group half">
-                    <label>Размер иконки:</label>
+                <div class="form-group" style="flex: 1;">
+                    <label>Размер рамки:</label>
                     <select id="quest-size" class="mc-input">
                         <option value="sm">Маленький</option>
                         <option value="md" selected>Средний</option>
                         <option value="lg">Большой</option>
                     </select>
                 </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Иконка квеста:</label>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <div id="quest-icon-preview" class="mc-slot" style="width: 40px; height: 40px;"></div>
+                        <button id="btn-select-quest-icon" class="mc-button" style="padding: 4px 8px; font-size: 14px;">Выбрать</button>
+                    </div>
+                </div>
             </div>
+            
             <div class="form-row">
                 <div class="form-group half">
                     <label>Требования (Условия):</label>
-                    <div id="reqs-list" class="item-list-container"></div>
+                    <div id="reqs-list" class="item-list-container big-list"></div>
                     <button id="btn-add-req" class="mc-button mt-5">+ Добавить условие</button>
                 </div>
                 <div class="form-group half">
                     <label>Награды:</label>
-                    <div id="rewards-list" class="item-list-container"></div>
+                    <div id="rewards-list" class="item-list-container big-list"></div>
                     <button id="btn-add-reward" class="mc-button mt-5">+ Добавить награду</button>
                 </div>
             </div>
+            
             <div class="form-group">
                 <label>Описание задания:</label>
                 <textarea id="quest-desc" class="mc-input"></textarea>
             </div>
+            
             <div class="modal-actions">
                 <button id="btn-save-quest" class="mc-button">ОК (Автосохранение)</button>
-                <button id="btn-delete-quest" class="mc-button danger">Удалить</button>
+                <button id="btn-delete-quest" class="mc-button danger">Удалить квест</button>
                 <button id="btn-close-quest" class="mc-button btn-cancel">Отмена</button>
             </div>
         </div>
