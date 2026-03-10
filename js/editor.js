@@ -18,7 +18,7 @@ export const Editor = {
     
     pickerCallback: null, tempReqs: [], tempRewards: [], editingModId: null, tempModIcon: null,
     
-    saveTimeout: null, // Таймер автосохранения
+    saveTimeout: null,
 
     init() {
         this.bindCanvasEvents();
@@ -29,25 +29,32 @@ export const Editor = {
         document.getElementById('btn-toggle-titles').addEventListener('click', () => {
             document.body.classList.toggle('show-titles');
         });
+
+        // Сворачивание панели наград
+        const btnToggleSummary = document.getElementById('btn-toggle-summary-size');
+        const summaryList = document.getElementById('rewards-summary-list');
+        btnToggleSummary.addEventListener('click', () => {
+            summaryList.classList.toggle('hidden');
+            btnToggleSummary.innerText = summaryList.classList.contains('hidden') ? '▲' : '▼';
+        });
         
         this.renderSidebar();
     },
 
-    // Метод АВТОСОХРАНЕНИЯ
     triggerAutoSave() {
-        if (!Auth.user) return; // Гости не сохраняют
+        if (!Auth.user) return;
         const indicator = document.getElementById('save-indicator');
         indicator.classList.remove('hidden');
         indicator.innerText = "Сохранение...";
-        indicator.style.color = "#ffaa00"; // Желтый во время записи
+        indicator.style.color = "#ffaa00";
 
         clearTimeout(this.saveTimeout);
         this.saveTimeout = setTimeout(async () => {
             await DB.saveQuestsSilent(this.data.mods);
             indicator.innerText = "Сохранено ✔";
-            indicator.style.color = "#55ff55"; // Зеленый при успехе
+            indicator.style.color = "#55ff55";
             setTimeout(() => indicator.classList.add('hidden'), 2000);
-        }, 1500); // Сохраняем через 1.5 сек после последнего изменения
+        }, 1500);
     },
 
     bindCanvasEvents() {
@@ -92,7 +99,7 @@ export const Editor = {
                 if (Math.abs(dx) > 3 || Math.abs(dy) > 3) this.hasMovedNode = true;
                 quest.x = this.nodeStartX + dx;
                 quest.y = this.nodeStartY + dy;
-                this.renderCanvas(true); // render without updating auto-save instantly to avoid spam
+                this.renderCanvas(true); 
             }
 
             const hoveredNode = e.target.closest('.quest-node');
@@ -123,7 +130,6 @@ export const Editor = {
 
         window.addEventListener('mouseup', () => {
             this.isPanning = false;
-            // Если узел был передвинут, триггерим автосохранение
             if (this.draggedQuestId && this.hasMovedNode) {
                 this.triggerAutoSave();
             }
@@ -169,7 +175,7 @@ export const Editor = {
         nodesLayer.innerHTML = ''; linesLayer.innerHTML = '';
         
         const mod = this.getActiveMod();
-        if (!mod) return;
+        if (!mod) { this.updateSummary(); return; }
 
         mod.quests.forEach(quest => {
             if (quest.parents) {
@@ -206,7 +212,7 @@ export const Editor = {
                                 const idx = quest.parents.indexOf(this.linkingFromNodeId);
                                 if (idx > -1) quest.parents.splice(idx, 1);
                                 else quest.parents.push(this.linkingFromNodeId);
-                                this.triggerAutoSave(); // Сохраняем создание/удаление связи
+                                this.triggerAutoSave(); 
                             }
                             this.linkingFromNodeId = null;
                         }
@@ -233,6 +239,8 @@ export const Editor = {
 
             nodesLayer.appendChild(node);
         });
+
+        if (!skipSave) this.updateSummary();
     },
 
     drawLine(svg, parent, child) {
@@ -263,6 +271,33 @@ export const Editor = {
         document.getElementById('tt-rewards').innerHTML = rewHtml;
 
         tt.classList.remove('hidden');
+    },
+
+    updateSummary() {
+        const container = document.getElementById('rewards-summary-list');
+        const summaryPanel = document.getElementById('rewards-summary');
+        container.innerHTML = '';
+        
+        const mod = this.getActiveMod();
+        if (!mod) { summaryPanel.classList.add('hidden'); return; }
+
+        const totals = {};
+        mod.quests.forEach(q => {
+            (q.rewards || []).forEach(r => {
+                const name = r.customName || r.item.name;
+                if (!totals[name]) totals[name] = { count: 0, item: r.item };
+                totals[name].count += parseInt(r.count || 1);
+            });
+        });
+
+        if (Object.keys(totals).length > 0) {
+            summaryPanel.classList.remove('hidden');
+            for (const key in totals) {
+                container.innerHTML += `<div class="summary-item"><img src="${ItemsDB.getImageUrl(totals[key].item.image)}"> ${totals[key].count}x ${ItemsDB.formatMC(key)}</div>`;
+            }
+        } else {
+            summaryPanel.classList.add('hidden');
+        }
     },
 
     bindQuestModalEvents() {
