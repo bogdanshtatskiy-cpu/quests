@@ -1,3 +1,4 @@
+// js/db.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { firebaseConfig } from './firebase-config.js';
@@ -7,7 +8,6 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 export const DB = {
-    // Тихое автосохранение
     async saveQuestsSilent(modsData) {
         if (!Auth.user) return;
         try {
@@ -28,7 +28,6 @@ export const DB = {
         }
     },
 
-    // Управление пользователями
     async getUsers() {
         try {
             const docSnap = await getDoc(doc(db, "quests", "users_registry"));
@@ -52,16 +51,18 @@ export const DB = {
         this.logAction(`Отозвал доступ у пользователя: ${login}`);
     },
 
-    // Логи
     async logAction(actionDesc) {
         if (!Auth.user) return;
         try {
             await addDoc(collection(db, "logs"), {
                 username: Auth.user.username,
                 action: actionDesc,
-                timestamp: new Date().getTime() // Используем timestamp для точной сортировки
+                // Возвращаем надежный ISO формат, чтобы сортировка Firebase не ломалась
+                timestamp: new Date().toISOString() 
             });
-        } catch (e) {}
+        } catch (e) {
+            console.error("Ошибка записи лога:", e);
+        }
     },
 
     async getLogs() {
