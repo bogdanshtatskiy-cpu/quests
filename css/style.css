@@ -1,267 +1,130 @@
+/* Подключаем твой шрифт */
+@font-face {
+    font-family: 'MCFont';
+    src: url('../4197-font.ttf') format('truetype');
+}
+
 /* Сброс базовых стилей */
 * {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'MCFont', 'Segoe UI', Tahoma, sans-serif; /* Применяем шрифт ко всему */
 }
 
 body {
-    background-color: #1e2124;
-    color: #dcddde;
-    overflow: hidden; /* Запрещаем скролл всей страницы */
+    background-color: #1e1e1e;
+    color: #e0e0e0;
+    overflow: hidden; 
 }
 
-/* =========================================
-   Макет приложения
-========================================= */
-#app-container {
-    display: flex;
-    height: 100vh;
-    width: 100vw;
-}
+/* Макет */
+#app-container { display: flex; height: 100vh; width: 100vw; }
 
-/* Левая колонка (Моды) */
+/* Левая колонка */
 #sidebar {
     width: 250px;
-    background-color: #2c2f33;
-    border-right: 2px solid #141517;
-    display: flex;
-    flex-direction: column;
+    background-color: #252526;
+    border-right: 2px solid #333;
+    display: flex; flex-direction: column;
     z-index: 10;
-    box-shadow: 2px 0 5px rgba(0,0,0,0.3);
 }
 
 .sidebar-header {
-    padding: 15px;
-    background-color: #23272a;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid #141517;
+    padding: 15px; background-color: #1e1e1e;
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 2px solid #333;
 }
 
 #btn-add-mod {
-    background-color: #43b581;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    width: 30px;
-    height: 30px;
-    font-size: 20px;
-    cursor: pointer;
-    transition: background-color 0.2s;
+    background-color: #2a823b; color: white; border: 2px solid #1a5225;
+    width: 30px; height: 30px; cursor: pointer;
 }
 
-#btn-add-mod:hover {
-    background-color: #3ca374;
-}
-
-#mod-list {
-    list-style: none;
-    overflow-y: auto;
-    flex: 1;
-}
+#mod-list { list-style: none; overflow-y: auto; flex: 1; }
 
 .mod-item {
-    padding: 12px 15px;
-    border-bottom: 1px solid #23272a;
-    cursor: pointer;
-    transition: background-color 0.2s;
+    padding: 10px 15px; border-bottom: 1px solid #333;
+    cursor: pointer; display: flex; align-items: center;
 }
+.mod-item:hover, .mod-item.active { background-color: #37373d; border-left: 4px solid #00a8ff; }
+.mod-item img { image-rendering: pixelated; margin-right: 10px; }
 
-.mod-item:hover, .mod-item.active {
-    background-color: #40444b;
-    border-left: 4px solid #7289da;
-}
-
-/* Холст квестов */
+/* Холст (Перемещение и зум) */
 #canvas-container {
-    flex: 1;
-    position: relative;
-    overflow: hidden; /* Скрываем то, что выходит за рамки */
+    flex: 1; position: relative; overflow: hidden;
+    background-color: #121212;
+    background-image: 
+        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 32px 32px;
 }
 
 #quest-canvas {
-    width: 100%;
-    height: 100%;
-    background-color: #282b30;
-    /* Рисуем сетку как в редакторах */
-    background-image: 
-        linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
-    background-size: 40px 40px; /* Размер ячеек сетки */
-    position: relative;
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    transform-origin: 0 0; /* Важно для зума */
 }
 
-.save-btn {
+/* Слой для линий */
+#connections-layer {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; /* Чтобы клики проходили сквозь SVG на холст */
+    overflow: visible;
+}
+.quest-line { stroke: #00ffff; stroke-width: 4; fill: none; opacity: 0.8; }
+.quest-line:hover { stroke: #ff00ff; opacity: 1; pointer-events: stroke; cursor: pointer;}
+
+/* Слой для узлов */
+#nodes-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+
+/* ДИЗАЙН КВЕСТА (Майнкрафт Слот) */
+.quest-node {
     position: absolute;
-    bottom: 20px;
-    right: 20px;
-    padding: 10px 20px;
-    background-color: #7289da;
-    color: white;
-    border: none;
-    border-radius: 4px;
+    width: 52px; height: 52px;
+    background-color: #8b8b8b;
+    border: 2px solid;
+    border-top-color: #373737; border-left-color: #373737;
+    border-bottom-color: #ffffff; border-right-color: #ffffff;
+    display: flex; justify-content: center; align-items: center;
     cursor: pointer;
-    font-size: 14px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-    transition: background-color 0.2s;
+    pointer-events: auto; /* Включаем клики для узлов */
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+    user-select: none;
+}
+/* Подсветка при выделении */
+.quest-node.selected { border-color: #00ffff; box-shadow: 0 0 10px #00ffff; }
+.quest-node.linking { border-color: #ff00ff; box-shadow: 0 0 15px #ff00ff; }
+.quest-node img { width: 32px; height: 32px; image-rendering: pixelated; pointer-events: none;}
+/* Название квеста под слотом */
+.quest-node .node-title {
+    position: absolute; top: 55px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.7); padding: 2px 4px; border-radius: 3px;
+    white-space: nowrap; font-size: 12px; pointer-events: none;
 }
 
-.save-btn:hover {
-    background-color: #5b6eae;
+/* Контекстное меню */
+.context-menu {
+    position: absolute; background: #252526; border: 1px solid #444;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.5); z-index: 1000; padding: 5px 0;
 }
+.context-menu.hidden { display: none; }
+.menu-item { padding: 8px 15px; cursor: pointer; font-size: 14px; }
+.menu-item:hover { background: #094771; }
+.menu-item.delete:hover { background: #8a1717; }
 
-/* =========================================
-   Модальные окна
-========================================= */
-.modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background-color: rgba(0, 0, 0, 0.8);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-}
+/* Подсказки */
+.canvas-controls { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); padding: 5px 10px; border-radius: 4px; pointer-events: none; }
+.save-btn { position: absolute; bottom: 20px; right: 20px; padding: 10px 20px; background-color: #007acc; color: white; border: none; cursor: pointer; }
 
-.modal.hidden {
-    display: none !important;
-}
-
-.modal-content {
-    background-color: #36393f;
-    padding: 30px;
-    border-radius: 8px;
-    width: 400px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-}
-
-.modal-content.large {
-    width: 600px;
-}
-
-.modal h2 {
-    margin-bottom: 15px;
-    color: #fff;
-}
-
-.modal p {
-    margin-bottom: 20px;
-    color: #b9bbbe;
-    font-size: 14px;
-}
-
-/* Поля ввода и кнопки в модалках */
-input[type="text"],
-input[type="password"],
-textarea {
-    width: 100%;
-    padding: 10px;
-    margin-bottom: 15px;
-    background-color: #202225;
-    border: 1px solid #202225;
-    border-radius: 4px;
-    color: #dcddde;
-    font-size: 14px;
-}
-
-input:focus, textarea:focus {
-    outline: none;
-    border-color: #7289da;
-}
-
-textarea {
-    resize: vertical;
-    min-height: 80px;
-}
-
-button {
-    padding: 10px 15px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
-    margin-right: 10px;
-}
-
-#btn-login, #btn-save-quest {
-    background-color: #7289da;
-    color: white;
-}
-
-#btn-guest, #btn-close-quest {
-    background-color: #4f545c;
-    color: white;
-}
-
-/* =========================================
-   Поиск предметов (Выпадающий список)
-========================================= */
-.item-selection {
-    background-color: #2f3136;
-    padding: 15px;
-    border-radius: 6px;
-    margin-bottom: 15px;
-}
-
-.item-selection h3 {
-    font-size: 14px;
-    margin-bottom: 10px;
-    color: #8e9297;
-}
-
-.search-results-list {
-    max-height: 150px;
-    overflow-y: auto;
-    background-color: #202225;
-    border-radius: 4px;
-    margin-bottom: 10px;
-}
-
-.search-result-item {
-    display: flex;
-    align-items: center;
-    padding: 8px;
-    cursor: pointer;
-    border-bottom: 1px solid #2f3136;
-}
-
-.search-result-item:hover {
-    background-color: #36393f;
-}
-
-.search-result-item img {
-    margin-right: 10px;
-    image-rendering: pixelated; /* Чтобы майнкрафт-иконки не мылились */
-}
-
-.search-result-item small {
-    color: #7289da;
-    margin-left: 5px;
-}
-
-#selected-item-preview {
-    display: flex;
-    align-items: center;
-    margin-bottom: 10px;
-    color: #43b581;
-}
-
-#selected-item-preview img {
-    margin-right: 15px;
-    image-rendering: pixelated;
-    border: 2px solid #43b581;
-    border-radius: 4px;
-    padding: 2px;
-    background-color: #202225;
-}
-
-/* Утилиты */
-.admin-only {
-    display: none; /* По умолчанию скрыто, auth.js покажет если надо */
-}
+/* Модалки и Поиск (как было, немного адаптировано) */
+.modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.8); display: flex; justify-content: center; align-items: center; z-index: 2000; }
+.modal.hidden { display: none !important; }
+.modal-content { background-color: #252526; padding: 20px; border: 2px solid #333; width: 400px; }
+.modal-content.large { width: 600px; }
+input[type="text"], input[type="password"], textarea { width: 100%; padding: 10px; margin-bottom: 10px; background-color: #1e1e1e; border: 1px solid #444; color: #fff; }
+button { padding: 8px 12px; background-color: #094771; color: white; border: 1px solid #000; cursor: pointer; }
+button.btn-cancel { background-color: #444; }
+.search-results-list { max-height: 150px; overflow-y: auto; background-color: #1e1e1e; margin-bottom: 10px; border: 1px solid #444; }
+.search-result-item { display: flex; align-items: center; padding: 5px; cursor: pointer; border-bottom: 1px solid #333; }
+.search-result-item:hover { background-color: #094771; }
+.search-result-item img { image-rendering: pixelated; margin-right: 10px; }
