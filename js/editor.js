@@ -268,7 +268,6 @@ export const Editor = {
         let reqHtml = '';
         if (quest.reqs && quest.reqs.length > 0) {
             quest.reqs.forEach(r => { 
-                // Показываем забирается ли предмет
                 const consumeTag = r.consume !== false 
                     ? '<span style="color:#ff5555; font-size:12px; margin-left:6px;">[Забрать]</span>' 
                     : '<span style="color:#aaaaaa; font-size:12px; margin-left:6px;">[Наличие]</span>';
@@ -279,7 +278,10 @@ export const Editor = {
 
         let rewHtml = '';
         if (quest.rewards && quest.rewards.length > 0) {
-            quest.rewards.forEach(r => { rewHtml += `<div class="tt-item"><img src="${ItemsDB.getImageUrl(r.item.image)}">${r.count}x ${ItemsDB.formatMC(r.customName || r.item.name)}</div>`; });
+            quest.rewards.forEach(r => { 
+                const choiceTag = r.isChoice ? '<span style="color:#ffff55; font-size:12px; margin-left:6px;">[На выбор]</span>' : '';
+                rewHtml += `<div class="tt-item"><img src="${ItemsDB.getImageUrl(r.item.image)}">${r.count}x ${ItemsDB.formatMC(r.customName || r.item.name)}${choiceTag}</div>`; 
+            });
         } else rewHtml = 'Нет наград';
         document.getElementById('tt-rewards').innerHTML = rewHtml;
 
@@ -298,15 +300,17 @@ export const Editor = {
         mod.quests.forEach(q => {
             (q.rewards || []).forEach(r => {
                 const name = r.customName || r.item.name;
-                if (!totals[name]) totals[name] = { count: 0, item: r.item };
-                totals[name].count += parseInt(r.count || 1);
+                const key = name + (r.isChoice ? '___CHOICE' : '___GUARANTEED'); // Разделяем выбор и обычные
+                if (!totals[key]) totals[key] = { count: 0, item: r.item, name: name, isChoice: r.isChoice };
+                totals[key].count += parseInt(r.count || 1);
             });
         });
 
         if (Object.keys(totals).length > 0) {
             summaryPanel.classList.remove('hidden');
             for (const key in totals) {
-                container.innerHTML += `<div class="summary-item"><img src="${ItemsDB.getImageUrl(totals[key].item.image)}"> ${totals[key].count}x ${ItemsDB.formatMC(key)}</div>`;
+                const choiceTag = totals[key].isChoice ? '<span style="color:#ffff55; font-size:12px; margin-left:4px;">[На выбор]</span>' : '';
+                container.innerHTML += `<div class="summary-item"><img src="${ItemsDB.getImageUrl(totals[key].item.image)}"> ${totals[key].count}x ${ItemsDB.formatMC(totals[key].name)}${choiceTag}</div>`;
             }
         } else {
             summaryPanel.classList.add('hidden');
@@ -325,14 +329,25 @@ export const Editor = {
         this.tempRewards.forEach((r, idx) => {
             const countInp = document.getElementById(`rew-count-${idx}`);
             const nameInp = document.getElementById(`rew-name-${idx}`);
+            const choiceCb = document.getElementById(`rew-choice-${idx}`);
             if (countInp) r.count = countInp.value;
             if (nameInp) r.customName = nameInp.value;
+            if (choiceCb) r.isChoice = choiceCb.checked;
         });
     },
 
     bindQuestModalEvents() {
         const modal = document.getElementById('quest-edit-modal');
         
+        // Кнопка массового переключения (Забрать/Наличие)
+        document.getElementById('btn-toggle-all-consume').addEventListener('click', () => {
+            this.saveTempState(); 
+            // Если есть хотя бы один false (Наличие), то делаем все true (Забрать). Иначе делаем все false.
+            const targetState = this.tempReqs.some(r => r.consume === false);
+            this.tempReqs.forEach(r => r.consume = targetState);
+            this.renderQuestEditForm();
+        });
+
         document.getElementById('btn-select-quest-icon').addEventListener('click', () => {
             this.saveTempState();
             this.openItemPicker((item) => {
@@ -343,7 +358,6 @@ export const Editor = {
 
         document.getElementById('btn-add-req').addEventListener('click', () => {
             this.saveTempState();
-            // По умолчанию галочка "consume" включена
             this.openItemPicker((item) => { 
                 this.tempReqs.push({ item: item, count: 1, customName: item.name, consume: true }); 
                 this.renderQuestEditForm(); 
@@ -353,7 +367,7 @@ export const Editor = {
         document.getElementById('btn-add-reward').addEventListener('click', () => {
             this.saveTempState();
             this.openItemPicker((item) => { 
-                this.tempRewards.push({ item: item, count: 1, customName: item.name }); 
+                this.tempRewards.push({ item: item, count: 1, customName: item.name, isChoice: false }); 
                 this.renderQuestEditForm(); 
             });
         });
@@ -450,10 +464,14 @@ export const Editor = {
         this.tempRewards.forEach((r, idx) => {
             const div = document.createElement('div');
             div.className = 'reward-row';
+            const isChoice = r.isChoice ? 'checked' : '';
             div.innerHTML = `
                 <div class="mc-slot"><img src="${ItemsDB.getImageUrl(r.item.image)}" width="24" height="24"></div>
-                <input type="number" id="rew-count-${idx}" class="mc-input" value="${r.count}">
-                <input type="text" id="rew-name-${idx}" class="mc-input custom-name-input" value="${r.customName}">
+                <input type="number" id="rew-count-${idx}" class="mc-input" value="${r.count}" title="Количество">
+                <input type="text" id="rew-name-${idx}" class="mc-input custom-name-input" value="${r.customName}" title="Название">
+                <label class="mc-checkbox" title="Предлагать этот предмет на выбор?">
+                    <input type="checkbox" id="rew-choice-${idx}" ${isChoice}> На выбор
+                </label>
                 <button class="mc-button danger" data-idx="${idx}">X</button>
             `;
             div.querySelector('.danger').addEventListener('click', () => { this.tempRewards.splice(idx, 1); this.renderQuestEditForm(); });
