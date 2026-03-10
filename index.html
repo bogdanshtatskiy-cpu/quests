@@ -8,52 +8,82 @@
 </head>
 <body class="show-titles">
 
-    <div id="top-bar" class="mc-panel ui-element">
-        <button id="btn-toggle-titles" class="mc-button">Скрыть названия</button>
-        <div class="controls-hint">Перемещение: ЛКМ | Настройки: ПКМ | Связать: Shift+ЛКМ</div>
+    <div id="auth-modal" class="modal">
+        <div class="mc-panel modal-content">
+            <h2 class="mc-title">Вход в редактор</h2>
+            <input type="text" id="auth-login" class="mc-input" placeholder="Логин (например: DesOope)">
+            <input type="password" id="auth-pass" class="mc-input" placeholder="Пароль">
+            <div class="modal-actions">
+                <button id="btn-login" class="mc-button">Войти</button>
+                <button id="btn-guest" class="mc-button btn-cancel">Режим просмотра</button>
+            </div>
+        </div>
     </div>
 
-    <div id="rewards-summary" class="mc-panel ui-element hidden">
+    <div id="admin-modal" class="modal hidden">
+        <div class="mc-panel modal-content large">
+            <h2 class="mc-title">Панель администратора</h2>
+            <div class="form-row">
+                <div class="form-group half">
+                    <label>Добавить редактора:</label>
+                    <input type="text" id="new-user-login" class="mc-input" placeholder="Логин нового юзера">
+                    <input type="text" id="new-user-pass" class="mc-input" placeholder="Пароль">
+                    <button id="btn-create-user" class="mc-button mt-5">Создать пользователя</button>
+                </div>
+                <div class="form-group half">
+                    <label>Логи действий:</label>
+                    <div id="logs-container" class="item-list-container" style="height: 200px; font-size:12px; color:#aaa;"></div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="btn-close-admin" class="mc-button btn-cancel">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="top-bar" class="mc-panel ui-element">
+        <span style="color: #ffaa00; margin-right: 15px;">👤 <span id="current-user-name">Загрузка...</span></span>
+        <button id="btn-logout" class="mc-button admin-only" style="margin-right: 15px; font-size: 12px; padding: 4px;">Выйти</button>
+        <button id="btn-open-admin" class="mc-button super-admin-only" style="margin-right: 15px; background-color: #550000; color:white;">⚡ Админ Панель</button>
+        <button id="btn-toggle-titles" class="mc-button">Скрыть названия</button>
+        <button id="btn-toggle-summary" class="mc-button">Показать награды</button>
+        <div class="controls-hint">ЛКМ: Двигать | ПКМ: Настройки | Shift+ЛКМ: Связать</div>
+    </div>
+
+    <div id="rewards-summary" class="mc-panel ui-element hidden minimized">
         <h3 class="mc-title">Награды за ветку</h3>
         <div id="rewards-summary-list"></div>
-        <button id="btn-minimize-summary" class="mc-button" style="width: 100%; margin-top: 10px;">Свернуть</button>
+        <button id="btn-minimize-summary" class="mc-button" style="width: 100%; margin-top: 10px;">Развернуть</button>
     </div>
 
     <div id="node-context-menu" class="mc-panel context-menu hidden">
-        <div class="menu-item" id="menu-edit">Редактировать</div>
-        <div class="menu-item" id="menu-link">Соединить (Shift+ЛКМ)</div>
-        <div class="menu-item delete" id="menu-delete">Удалить</div>
+        <div class="menu-item admin-only" id="menu-edit">Редактировать</div>
+        <div class="menu-item admin-only" id="menu-link">Соединить (Shift+ЛКМ)</div>
+        <div class="menu-item delete admin-only" id="menu-delete">Удалить</div>
     </div>
 
     <div id="app-container">
         <aside id="sidebar" class="mc-panel ui-element">
             <div class="sidebar-header">
                 <h3>Ветки квестов</h3>
-                <button id="btn-add-mod" class="mc-button">+</button>
+                <button id="btn-add-mod" class="mc-button admin-only">+</button>
             </div>
             <ul id="mod-list"></ul>
         </aside>
-
         <main id="canvas-container">
             <div id="quest-canvas">
                 <svg id="connections-layer"></svg>
                 <div id="nodes-layer"></div>
             </div>
-            <button id="btn-save-cloud" class="mc-button ui-element save-btn">💾 Сохранить</button>
+            <button id="btn-save-cloud" class="mc-button ui-element save-btn admin-only">💾 Сохранить</button>
         </main>
     </div>
 
     <div id="quest-tooltip" class="mc-panel hidden ui-element">
         <h3 id="tt-title"></h3>
         <div id="tt-desc"></div>
-        <div class="tt-section" id="tt-reqs-container">
-            <span class="tt-label">Требуется:</span>
-            <div id="tt-reqs"></div>
-        </div>
-        <div class="tt-section" id="tt-rewards-container">
-            <span class="tt-label">Награда:</span>
-            <div id="tt-rewards"></div>
-        </div>
+        <div class="tt-section" id="tt-reqs-container"><span class="tt-label">Требуется:</span><div id="tt-reqs"></div></div>
+        <div class="tt-section" id="tt-rewards-container"><span class="tt-label">Награда:</span><div id="tt-rewards"></div></div>
     </div>
 
     <div id="add-mod-modal" class="modal hidden">
@@ -92,7 +122,6 @@
                     </select>
                 </div>
             </div>
-            
             <div class="form-row">
                 <div class="form-group half">
                     <label>Требования (Условия):</label>
@@ -105,15 +134,13 @@
                     <button id="btn-add-reward" class="mc-button mt-5">+ Добавить награду</button>
                 </div>
             </div>
-            
             <div class="form-group">
                 <label>Описание задания:</label>
                 <textarea id="quest-desc" class="mc-input"></textarea>
             </div>
-            
             <div class="modal-actions">
                 <button id="btn-save-quest" class="mc-button">Сохранить</button>
-                <button id="btn-delete-quest" class="mc-button danger">Удалить квест</button>
+                <button id="btn-delete-quest" class="mc-button danger">Удалить</button>
                 <button id="btn-close-quest" class="mc-button btn-cancel">Отмена</button>
             </div>
         </div>
