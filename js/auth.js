@@ -1,42 +1,85 @@
 // js/auth.js
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { firebaseConfig } from './firebase-config.js';
+import { DB } from './db.js';
+
+const app = initializeApp(firebaseConfig);
+export const authInst = getAuth(app);
+
 export const Auth = {
-    key: localStorage.getItem('quest_admin_key') || null,
-    isAdmin: false,
+    user: null,
 
     init() {
         const modal = document.getElementById('auth-modal');
         
-        if (this.key) {
-            this.login(this.key);
-            modal.style.display = 'none';
-        }
+        onAuthStateChanged(authInst, (user) => {
+            if (user) {
+                this.user = { username: user.email.split('@')[0] };
+                modal.classList.add('hidden');
+                this.applyPermissions();
+                if (!sessionStorage.getItem('just_logged_in')) {
+                    sessionStorage.setItem('just_logged_in', 'true');
+                    DB.logAction('Выполнил вход в систему');
+                }
+            } else {
+                this.user = null;
+                sessionStorage.removeItem('just_logged_in');
+                this.applyPermissions();
+            }
+        });
 
-        document.getElementById('btn-login').addEventListener('click', () => {
-            const inputKey = document.getElementById('auth-key').value;
-            if (inputKey) {
-                this.login(inputKey);
-                modal.style.display = 'none';
+        document.getElementById('btn-login').addEventListener('click', async () => {
+            const login = document.getElementById('auth-login').value.trim();
+            const pass = document.getElementById('auth-pass').value;
+            if (!login || !pass) return;
+
+            try {
+                const email = `${login}@quest.local`;
+                await signInWithEmailAndPassword(authInst, email, pass);
+            } catch (e) {
+                alert('Неверный логин или пароль!');
             }
         });
 
         document.getElementById('btn-guest').addEventListener('click', () => {
-            modal.style.display = 'none';
-            this.applyPermissions(); // Оставит кнопки скрытыми
+            modal.classList.add('hidden');
+            this.applyPermissions();
+        });
+
+        document.getElementById('btn-logout').addEventListener('click', () => {
+            signOut(authInst);
+            window.location.reload();
         });
     },
 
-    login(token) {
-        this.key = token;
-        this.isAdmin = true;
-        localStorage.setItem('quest_admin_key', token);
-        this.applyPermissions();
+    async registerNewUser(newLogin, newPass) {
+        try {
+            const tempApp = initializeApp(firebaseConfig, "TempApp");
+            const tempAuth = getAuth(tempApp);
+            await createUserWithEmailAndPassword(tempAuth, `${newLogin}@quest.local`, newPass);
+            await signOut(tempAuth);
+            
+            DB.logAction(`Создал нового пользователя: ${newLogin}`);
+            alert(`Пользователь ${newLogin} успешно создан!`);
+        } catch (e) {
+            alert('Ошибка создания: ' + e.message);
+        }
     },
 
     applyPermissions() {
-        // Показываем кнопки редактирования только если админ
         const adminElements = document.querySelectorAll('.admin-only');
-        adminElements.forEach(el => {
-            el.style.display = this.isAdmin ? 'block' : 'none';
+        adminElements.forEach(el => el.style.display = this.user ? 'flex' : 'none');
+        
+        const saveBtn = document.getElementById('btn-save-cloud');
+        if(saveBtn) saveBtn.style.display = this.user ? 'block' : 'none';
+        
+        const superAdminElements = document.querySelectorAll('.super-admin-only');
+        superAdminElements.forEach(el => {
+            el.style.display = (this.user && this.user.username.toLowerCase() === 'desoope') ? 'block' : 'none';
         });
+
+        const nameSpan = document.getElementById('current-user-name');
+        if(nameSpan) nameSpan.innerText = this.user ? this.user.username : 'Гость';
     }
 };
