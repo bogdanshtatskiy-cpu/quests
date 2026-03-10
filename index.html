@@ -10,8 +10,11 @@
 
     <div id="top-bar" class="mc-panel ui-element">
         <span style="color: #ffaa00; margin-right: 15px;">👤 <span id="current-user-name">Загрузка...</span></span>
-        <button id="btn-logout" class="mc-button admin-only" style="margin-right: 15px; font-size: 12px; padding: 4px;">Выйти</button>
-        <button id="btn-open-admin" class="mc-button super-admin-only" style="margin-right: 15px; background-color: #550000; color:white;">⚡ Админ Панель</button>
+        
+        <button id="btn-show-login" class="mc-button guest-only" style="margin-right: 15px; font-size: 12px; padding: 4px; display: none;">Войти</button>
+        
+        <button id="btn-logout" class="mc-button admin-only" style="margin-right: 15px; font-size: 12px; padding: 4px; display: none;">Выйти</button>
+        <button id="btn-open-admin" class="mc-button super-admin-only" style="margin-right: 15px; background-color: #550000; color:white; display: none;">⚡ Админ Панель</button>
         <button id="btn-toggle-titles" class="mc-button">Скрыть названия</button>
         
         <span id="save-indicator" class="hidden" style="margin-left: 20px; color: #55ff55; font-weight: bold;">Сохранение...</span>
