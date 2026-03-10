@@ -105,35 +105,54 @@ textarea.mc-input { resize: none; height: 80px; }
 #rewards-summary {
     position: absolute; top: 55px; right: 10px; width: 250px;
     background-color: rgba(198, 198, 198, 0.95);
-    z-index: 100; padding: 10px; max-height: 400px; overflow-y: auto;
+    z-index: 100; padding: 10px; max-height: 50vh; display: flex; flex-direction: column;
 }
+#rewards-summary-list { overflow-y: auto; flex: 1; }
 .summary-item { display: flex; align-items: center; margin-bottom: 5px; font-size: 14px; }
 .summary-item img { width: 20px; height: 20px; image-rendering: pixelated; margin-right: 8px; }
 
+/* Минимизированное состояние статистики */
+#rewards-summary.minimized h3 { display: none; }
+#rewards-summary.minimized #rewards-summary-list { display: none; }
+#rewards-summary.minimized { max-height: auto; width: auto; padding: 5px; }
+
 /* УЗЕЛ КВЕСТА */
 .quest-node {
-    position: absolute; width: 48px; height: 48px; background-color: #8b8b8b;
+    position: absolute; background-color: #8b8b8b;
     border: 3px solid; border-top-color: #373737; border-left-color: #373737;
     border-bottom-color: #ffffff; border-right-color: #ffffff;
     display: flex; justify-content: center; align-items: center;
-    cursor: pointer; pointer-events: auto;
+    cursor: pointer; pointer-events: auto; padding: 3px;
 }
 .quest-node.selected { border-color: #55ffff; box-shadow: 0 0 10px #55ffff; }
-.quest-node img { width: 32px; height: 32px; image-rendering: pixelated; pointer-events: none; }
+
+/* Размеры квестов */
+.quest-node.size-sm { width: 36px; height: 36px; }
+.quest-node.size-md { width: 52px; height: 52px; }
+.quest-node.size-lg { width: 68px; height: 68px; }
+
+/* Изображение внутри растягивается под рамку */
+.quest-node img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; pointer-events: none; }
+
+/* Позиция названия зависит от размера */
 .quest-node .node-title {
-    position: absolute; top: 50px; left: 50%; transform: translateX(-50%);
+    position: absolute; left: 50%; transform: translateX(-50%);
     background: rgba(0,0,0,0.8); color: #fff; padding: 3px 6px; border-radius: 3px;
     white-space: nowrap; font-size: 14px; pointer-events: none; display: none;
 }
+.quest-node.size-sm .node-title { top: 38px; }
+.quest-node.size-md .node-title { top: 54px; }
+.quest-node.size-lg .node-title { top: 70px; }
+
 body.show-titles .quest-node .node-title { display: block; }
 
 /* Тултип */
 #quest-tooltip {
     position: fixed; z-index: 9999; background-color: rgba(16, 16, 20, 0.95);
     border: 2px solid #373737; border-radius: 4px; color: #fff; padding: 12px; min-width: 220px;
-    pointer-events: none; /* Гарантирует, что тултип не мешает мышке */
+    pointer-events: none;
 }
-#quest-tooltip * { pointer-events: none; } /* Дополнительная защита */
+#quest-tooltip * { pointer-events: none; }
 #quest-tooltip h3 { margin-bottom: 5px; color: #fff; text-shadow: 1px 1px 0 #000; }
 #quest-tooltip #tt-desc { color: #aaaaaa; margin-bottom: 10px; font-size: 14px; }
 .tt-section { margin-top: 8px; }
@@ -153,7 +172,7 @@ body.show-titles .quest-node .node-title { display: block; }
 .modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.8); display: flex; justify-content: center; align-items: center; z-index: 2000; }
 .modal.hidden { display: none !important; }
 .modal-content { width: 450px; padding: 20px; }
-.modal-content.large { width: 800px; } /* Сделали пошире для двух колонок */
+.modal-content.large { width: 800px; }
 
 .form-row { display: flex; gap: 20px; }
 .form-group { margin-bottom: 15px; flex: 1; }
