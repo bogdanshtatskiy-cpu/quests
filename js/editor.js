@@ -1,8 +1,14 @@
 // js/editor.js
 import { ItemsDB } from './items.js';
 
+// Карта размеров (ширина/высота рамки квеста) для расчёта центров SVG линий
+const SIZE_MAP = { sm: 36, md: 52, lg: 68 };
+
 export const Editor = {
     data: { mods: [] }, 
+    /* Структура квеста: 
+       { id, x, y, title, desc, size: 'sm'|'md'|'lg', reqs: [{item, count, customName}], rewards: [{item, count, customName}], parents: [] }
+    */
     activeModId: null,
     
     // Canvas state
@@ -28,12 +34,23 @@ export const Editor = {
         this.bindModModalEvents();
         this.bindQuestModalEvents();
         this.bindItemPickerEvents();
-        
+        this.bindTopBarEvents();
+        this.renderSidebar();
+    },
+
+    bindTopBarEvents() {
         document.getElementById('btn-toggle-titles').addEventListener('click', () => {
             document.body.classList.toggle('show-titles');
         });
 
-        this.renderSidebar();
+        // Сворачивание/Разворачивание окна статистики
+        const btnMinimize = document.getElementById('btn-minimize-summary');
+        const summaryPanel = document.getElementById('rewards-summary');
+        
+        btnMinimize.addEventListener('click', () => {
+            summaryPanel.classList.toggle('minimized');
+            btnMinimize.innerText = summaryPanel.classList.contains('minimized') ? 'Развернуть' : 'Свернуть';
+        });
     },
 
     // ==========================================
@@ -63,16 +80,17 @@ export const Editor = {
             }
         });
 
-        // ГЛОБАЛЬНЫЙ обработчик движения мыши (решает проблему с зависающим окном)
         container.addEventListener('mousemove', (e) => {
-            // 1. Логика перетаскивания холста
+            if (this.isPanning || this.draggedQuestId) {
+                tooltip.classList.add('hidden');
+            }
+
             if (this.isPanning) {
                 this.panX = this.initialPanX + (e.clientX - this.panStartX);
                 this.panY = this.initialPanY + (e.clientY - this.panStartY);
                 this.updateTransform();
             }
             
-            // 2. Логика перетаскивания узла
             if (this.draggedQuestId) {
                 const quest = this.getActiveMod().quests.find(q => q.id === this.draggedQuestId);
                 const dx = (e.clientX - this.mouseStartX) / this.scale;
@@ -84,24 +102,20 @@ export const Editor = {
                 this.renderCanvas();
             }
 
-            // 3. Логика Tooltip (всплывающего окна)
             const hoveredNode = e.target.closest('.quest-node');
             
             if (hoveredNode && !this.isPanning && !this.draggedQuestId) {
                 const questId = hoveredNode.dataset.id;
                 
-                // Рендерим контент только если навели на новый квест (чтобы не лагало)
                 if (this.hoveredQuestId !== questId) {
                     this.hoveredQuestId = questId;
                     const quest = this.getActiveMod().quests.find(q => q.id === questId);
                     if (quest) this.showTooltip(quest);
                 }
                 
-                // Двигаем окно за мышкой
                 tooltip.style.left = (e.clientX + 15) + 'px';
                 tooltip.style.top = (e.clientY + 15) + 'px';
             } else {
-                // Если мышка не на квесте ИЛИ мы тащим/двигаем - скрываем 100%
                 this.hoveredQuestId = null;
                 tooltip.classList.add('hidden');
             }
@@ -120,12 +134,11 @@ export const Editor = {
 
             contextMenu.classList.add('hidden');
             const rect = container.getBoundingClientRect();
-            this.newQuestX = (e.clientX - rect.left - this.panX) / this.scale - 24; 
-            this.newQuestY = (e.clientY - rect.top - this.panY) / this.scale - 24;
+            this.newQuestX = (e.clientX - rect.left - this.panX) / this.scale - 26; 
+            this.newQuestY = (e.clientY - rect.top - this.panY) / this.scale - 26;
             this.openQuestModal();
         });
 
-        // Кнопки ПКМ-меню узла
         document.getElementById('menu-delete').addEventListener('click', () => {
             contextMenu.classList.add('hidden');
             this.deleteQuest(this.contextNodeId);
@@ -154,7 +167,7 @@ export const Editor = {
         nodesLayer.innerHTML = ''; linesLayer.innerHTML = '';
         
         const mod = this.getActiveMod();
-        if (!mod) return;
+        if (!mod) { this.updateSummary(); return; }
 
         mod.quests.forEach(quest => {
             if (quest.parents) {
@@ -167,7 +180,10 @@ export const Editor = {
 
         mod.quests.forEach(quest => {
             const node = document.createElement('div');
-            node.className = 'quest-node';
+            // Применяем размер
+            const nodeSize = quest.size || 'md';
+            node.className = `quest-node size-${nodeSize}`;
+            
             if (this.linkingFromNodeId === quest.id) node.classList.add('selected');
             node.style.left = `${quest.x}px`; node.style.top = `${quest.y}px`;
             node.dataset.id = quest.id;
@@ -217,12 +233,17 @@ export const Editor = {
 
             nodesLayer.appendChild(node);
         });
+
+        this.updateSummary();
     },
 
     drawLine(svg, parent, child) {
+        const pSize = SIZE_MAP[parent.size || 'md'] / 2;
+        const cSize = SIZE_MAP[child.size || 'md'] / 2;
+
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        line.setAttribute('x1', parent.x + 24); line.setAttribute('y1', parent.y + 24);
-        line.setAttribute('x2', child.x + 24); line.setAttribute('y2', child.y + 24);
+        line.setAttribute('x1', parent.x + pSize); line.setAttribute('y1', parent.y + pSize);
+        line.setAttribute('x2', child.x + cSize); line.setAttribute('y2', child.y + cSize);
         line.setAttribute('class', 'quest-line');
         svg.appendChild(line);
     },
@@ -251,6 +272,37 @@ export const Editor = {
         tt.classList.remove('hidden');
     },
 
+    updateSummary() {
+        const container = document.getElementById('rewards-summary-list');
+        const summaryPanel = document.getElementById('rewards-summary');
+        container.innerHTML = '';
+        
+        const mod = this.getActiveMod();
+        if (!mod) {
+            summaryPanel.classList.add('hidden');
+            return;
+        }
+
+        const totals = {};
+        mod.quests.forEach(q => {
+            (q.rewards || []).forEach(r => {
+                const name = r.customName || r.item.name;
+                if (!totals[name]) totals[name] = { count: 0, item: r.item };
+                totals[name].count += parseInt(r.count || 1);
+            });
+        });
+
+        // Если есть хоть одна награда - показываем блок
+        if (Object.keys(totals).length > 0) {
+            summaryPanel.classList.remove('hidden');
+            for (const key in totals) {
+                container.innerHTML += `<div class="summary-item"><img src="${ItemsDB.getImageUrl(totals[key].item.image)}"> ${totals[key].count}x ${ItemsDB.formatMC(key)}</div>`;
+            }
+        } else {
+            summaryPanel.classList.add('hidden');
+        }
+    },
+
     // ==========================================
     // ОКНО РЕДАКТИРОВАНИЯ КВЕСТА
     // ==========================================
@@ -275,6 +327,7 @@ export const Editor = {
             const mod = this.getActiveMod();
             const title = document.getElementById('quest-title').value || 'Новый квест';
             const desc = document.getElementById('quest-desc').value;
+            const size = document.getElementById('quest-size').value; // Читаем размер
             
             this.tempReqs.forEach((r, idx) => {
                 r.count = document.getElementById(`req-count-${idx}`).value;
@@ -287,12 +340,13 @@ export const Editor = {
 
             if (this.editingNodeId) {
                 const q = mod.quests.find(q => q.id === this.editingNodeId);
-                q.title = title; q.desc = desc; 
+                q.title = title; q.desc = desc; q.size = size;
                 q.reqs = [...this.tempReqs]; q.rewards = [...this.tempRewards];
             } else {
                 mod.quests.push({
                     id: 'q_' + Date.now(), x: this.newQuestX, y: this.newQuestY,
-                    title: title, desc: desc, reqs: [...this.tempReqs], rewards: [...this.tempRewards], parents: []
+                    title: title, desc: desc, size: size,
+                    reqs: [...this.tempReqs], rewards: [...this.tempRewards], parents: []
                 });
             }
             modal.classList.add('hidden');
@@ -318,6 +372,7 @@ export const Editor = {
             const q = this.getActiveMod().quests.find(q => q.id === questId);
             document.getElementById('quest-title').value = q.title || '';
             document.getElementById('quest-desc').value = q.desc || '';
+            document.getElementById('quest-size').value = q.size || 'md';
             
             let reqs = q.reqs || [];
             if (q.req && reqs.length === 0) reqs = [q.req]; 
@@ -327,6 +382,7 @@ export const Editor = {
         } else {
             document.getElementById('quest-title').value = '';
             document.getElementById('quest-desc').value = '';
+            document.getElementById('quest-size').value = 'md';
             this.tempReqs = []; this.tempRewards = [];
         }
         
