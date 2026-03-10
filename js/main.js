@@ -13,17 +13,51 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     Editor.init();
 
-    document.getElementById('btn-save-cloud').addEventListener('click', () => {
-        DB.saveQuests(Editor.data.mods);
-    });
-
+    // Логика Админ-панели
     document.getElementById('btn-open-admin').addEventListener('click', async () => {
         document.getElementById('admin-modal').classList.remove('hidden');
-        const logsContainer = document.getElementById('logs-container');
-        logsContainer.innerHTML = 'Загрузка логов...';
+        
+        // Рендер логов
+        const logsContainer = document.getElementById('logs-tbody');
+        logsContainer.innerHTML = '<tr><td colspan="3">Загрузка...</td></tr>';
         const logs = await DB.getLogs();
-        logsContainer.innerHTML = logs.map(l => `[${new Date(l.timestamp).toLocaleString('ru-RU')}] <b>${l.username}</b>: ${l.action}`).join('<br>');
+        logsContainer.innerHTML = logs.map(l => {
+            const time = new Date(l.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second:'2-digit' });
+            const date = new Date(l.timestamp).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+            return `<tr><td>${date} ${time}</td><td><b>${l.username}</b></td><td>${l.action}</td></tr>`;
+        }).join('');
+
+        // Рендер пользователей
+        renderUsersTable();
     });
+
+    async function renderUsersTable() {
+        const usersTbody = document.getElementById('users-tbody');
+        usersTbody.innerHTML = '<tr><td colspan="2">Загрузка...</td></tr>';
+        const users = await DB.getUsers();
+        
+        usersTbody.innerHTML = '';
+        users.forEach(u => {
+            const tr = document.createElement('tr');
+            if(u.toLowerCase() === 'desoope') {
+                tr.innerHTML = `<td><b style="color:#ffaa00;">${u} (Создатель)</b></td><td>-</td>`;
+            } else {
+                tr.innerHTML = `<td>${u}</td><td><button class="mc-button danger btn-delete-user" data-user="${u}" style="font-size:12px; padding:2px 5px;">Удалить</button></td>`;
+            }
+            usersTbody.appendChild(tr);
+        });
+
+        // Кнопки удаления юзера
+        document.querySelectorAll('.btn-delete-user').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const login = e.target.getAttribute('data-user');
+                if (confirm(`Запретить доступ пользователю ${login}?`)) {
+                    await DB.removeUser(login);
+                    renderUsersTable(); // Обновляем таблицу
+                }
+            });
+        });
+    }
 
     document.getElementById('btn-close-admin').addEventListener('click', () => {
         document.getElementById('admin-modal').classList.add('hidden');
@@ -33,9 +67,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const login = document.getElementById('new-user-login').value;
         const pass = document.getElementById('new-user-pass').value;
         if (login && pass) {
-            Auth.registerNewUser(login, pass);
-            document.getElementById('new-user-login').value = '';
-            document.getElementById('new-user-pass').value = '';
+            Auth.registerNewUser(login, pass).then(() => {
+                document.getElementById('new-user-login').value = '';
+                document.getElementById('new-user-pass').value = '';
+                renderUsersTable();
+            });
         }
     });
 });
