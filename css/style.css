@@ -163,3 +163,5 @@ body.show-titles .quest-node .node-title { display: block; }
 .admin-table th { background-color: #373737; padding: 8px; text-align: left; border-bottom: 2px solid #555; position: sticky; top: 0; z-index: 2; }
 .admin-table td { padding: 8px; border-bottom: 1px solid #333; }
 .admin-table tr:hover { background-color: #444; }
+.reward-row .mc-checkbox { font-size: 13px; margin: 0 10px; display: flex; align-items: center; gap: 4px; color: #fff; cursor: pointer; }
+.reward-row .mc-checkbox input { margin: 0; cursor: pointer; }
