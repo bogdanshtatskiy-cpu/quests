@@ -11,13 +11,13 @@ export const Auth = {
 
     init() {
         const modal = document.getElementById('auth-modal');
+        const isGuest = sessionStorage.getItem('quest_guest_mode');
         
         onAuthStateChanged(authInst, async (user) => {
             if (user) {
                 const username = user.email.split('@')[0];
                 const allowedUsers = await DB.getUsers();
 
-                // Главный админ (DesOope) или юзер из белого списка
                 if (username.toLowerCase() === 'desoope' || allowedUsers.includes(username)) {
                     this.user = { username };
                     modal.classList.add('hidden');
@@ -27,7 +27,6 @@ export const Auth = {
                         DB.logAction('Выполнил вход в редактор');
                     }
                 } else {
-                    // Если юзера удалили из списка
                     alert('Доступ запрещен. Ваш аккаунт был удален администратором.');
                     signOut(authInst);
                     this.user = null;
@@ -36,6 +35,10 @@ export const Auth = {
             } else {
                 this.user = null;
                 sessionStorage.removeItem('just_logged_in');
+                // Показываем окно только если это не гость
+                if (!isGuest) {
+                    modal.classList.remove('hidden');
+                }
                 this.applyPermissions();
             }
         });
@@ -53,11 +56,13 @@ export const Auth = {
         });
 
         document.getElementById('btn-guest').addEventListener('click', () => {
+            sessionStorage.setItem('quest_guest_mode', 'true');
             modal.classList.add('hidden');
             this.applyPermissions();
         });
 
         document.getElementById('btn-logout').addEventListener('click', () => {
+            sessionStorage.removeItem('quest_guest_mode'); // Сбрасываем режим гостя при выходе
             signOut(authInst);
             window.location.reload();
         });
@@ -70,12 +75,10 @@ export const Auth = {
             await createUserWithEmailAndPassword(tempAuth, `${newLogin}@quest.local`, newPass);
             await signOut(tempAuth);
             
-            // Обязательно добавляем в белый список БД
             await DB.addUser(newLogin);
             DB.logAction(`Создал нового редактора: ${newLogin}`);
-            alert(`Пользователь ${newLogin} успешно создан и добавлен в белый список!`);
+            alert(`Пользователь ${newLogin} успешно создан!`);
         } catch (e) {
-            // Если аккаунт уже есть в Firebase Auth, просто вернем его в белый список
             if(e.code === 'auth/email-already-in-use') {
                 await DB.addUser(newLogin);
                 DB.logAction(`Восстановил доступ пользователю: ${newLogin}`);
