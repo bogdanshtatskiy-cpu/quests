@@ -1,46 +1,21 @@
-@font-face {
-    font-family: 'MCFont';
-    src: url('../4197-font.ttf') format('truetype');
-}
+@font-face { font-family: 'MCFont'; src: url('../4197-font.ttf') format('truetype'); }
 
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-    font-family: 'MCFont', 'Courier New', Courier, monospace;
-}
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'MCFont', 'Courier New', Courier, monospace; }
 
-body {
-    background-color: #202020;
-    color: #404040;
-    overflow: hidden;
-    user-select: none;
-}
+body { background-color: #202020; color: #404040; overflow: hidden; user-select: none; }
 
-/* ГЛОБАЛЬНЫЙ КЛАСС СКРЫТИЯ (Вот из-за него была проблема!) */
-.hidden {
-    display: none !important;
-}
+.hidden { display: none !important; }
 
-/* GUI Minecraft */
 .mc-panel {
-    background-color: #c6c6c6;
-    border: 3px solid;
+    background-color: #c6c6c6; border: 3px solid;
     border-top-color: #ffffff; border-left-color: #ffffff;
     border-bottom-color: #555555; border-right-color: #555555;
     box-shadow: inset -2px -2px 0px rgba(0,0,0,0.1), inset 2px 2px 0px rgba(255,255,255,0.5);
 }
-
-.mc-title {
-    color: #404040;
-    text-shadow: 1px 1px 0px rgba(255,255,255,0.7);
-    margin-bottom: 15px;
-    text-align: center;
-}
+.mc-title { color: #404040; text-shadow: 1px 1px 0px rgba(255,255,255,0.7); margin-bottom: 15px; text-align: center; }
 
 .mc-button {
-    background-color: #c6c6c6;
-    border: 2px solid;
+    background-color: #c6c6c6; border: 2px solid;
     border-top-color: #ffffff; border-left-color: #ffffff;
     border-bottom-color: #555555; border-right-color: #555555;
     color: #202020; padding: 8px 12px; cursor: pointer; font-size: 16px; outline: none;
@@ -60,7 +35,6 @@ body {
     border-bottom-color: #ffffff; border-right-color: #ffffff;
     padding: 8px; font-size: 16px; width: 100%; outline: none;
 }
-
 textarea.mc-input { resize: none; height: 80px; }
 
 .mc-slot {
@@ -70,24 +44,14 @@ textarea.mc-input { resize: none; height: 80px; }
     display: inline-flex; justify-content: center; align-items: center;
 }
 
-/* Макет */
-#top-bar {
-    position: absolute; top: 0; left: 0; width: 100%; height: 45px;
-    z-index: 100; display: flex; align-items: center; gap: 10px; padding: 0 10px;
-    border-bottom-width: 3px;
-}
+#top-bar { position: absolute; top: 0; left: 0; width: 100%; height: 45px; z-index: 100; display: flex; align-items: center; gap: 10px; padding: 0 10px; border-bottom-width: 3px; }
 .controls-hint { margin-left: auto; color: #404040; text-shadow: 1px 1px 0 #fff; font-size: 14px; }
-
 #app-container { display: flex; height: 100vh; width: 100vw; padding-top: 45px; }
 
 #sidebar { width: 300px; display: flex; flex-direction: column; z-index: 10; border-width: 0 3px 0 0; }
 .sidebar-header { padding: 10px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #555; }
 #mod-list { list-style: none; overflow-y: auto; flex: 1; padding: 5px; }
-
-.mod-item {
-    padding: 8px; margin-bottom: 5px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;
-    background: #a0a0a0; border: 2px solid #555;
-}
+.mod-item { padding: 8px; margin-bottom: 5px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: #a0a0a0; border: 2px solid #555; }
 .mod-item:hover { background: #c6c6c6; border-color: #fff; }
 .mod-item.active { background: #e0e0e0; border-color: #00aa00; }
 .mod-item-content { display: flex; align-items: center; flex: 1; }
@@ -97,64 +61,33 @@ textarea.mc-input { resize: none; height: 80px; }
 .mod-btn { background: transparent; border: none; cursor: pointer; font-size: 16px; }
 .mod-btn:hover { transform: scale(1.2); }
 
-/* Холст */
 #canvas-container { flex: 1; position: relative; background-color: #202020; }
 #quest-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform-origin: 0 0; }
 #connections-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 .quest-line { stroke: #00aaaa; stroke-width: 4; fill: none; }
 #nodes-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-
 .save-btn { position: absolute; bottom: 20px; right: 20px; z-index: 100; }
 
-/* Окно статистики */
-#rewards-summary {
-    position: absolute; top: 55px; right: 10px; width: 250px;
-    background-color: rgba(198, 198, 198, 0.95);
-    z-index: 100; padding: 10px; max-height: 50vh; display: flex; flex-direction: column;
-}
+#rewards-summary { position: absolute; top: 55px; right: 10px; width: 250px; background-color: rgba(198, 198, 198, 0.95); z-index: 100; padding: 10px; max-height: 50vh; display: flex; flex-direction: column; }
 #rewards-summary-list { overflow-y: auto; flex: 1; }
 .summary-item { display: flex; align-items: center; margin-bottom: 5px; font-size: 14px; }
 .summary-item img { width: 20px; height: 20px; image-rendering: pixelated; margin-right: 8px; }
-
-/* Минимизированное состояние статистики */
-#rewards-summary.minimized h3 { display: none; }
-#rewards-summary.minimized #rewards-summary-list { display: none; }
+#rewards-summary.minimized h3, #rewards-summary.minimized #rewards-summary-list { display: none; }
 #rewards-summary.minimized { max-height: auto; width: auto; padding: 5px; }
 
-/* УЗЕЛ КВЕСТА */
-.quest-node {
-    position: absolute; background-color: #8b8b8b;
-    border: 3px solid; border-top-color: #373737; border-left-color: #373737;
-    border-bottom-color: #ffffff; border-right-color: #ffffff;
-    display: flex; justify-content: center; align-items: center;
-    cursor: pointer; pointer-events: auto; padding: 3px;
-}
+.quest-node { position: absolute; background-color: #8b8b8b; border: 3px solid; border-top-color: #373737; border-left-color: #373737; border-bottom-color: #ffffff; border-right-color: #ffffff; display: flex; justify-content: center; align-items: center; cursor: pointer; pointer-events: auto; padding: 3px; }
 .quest-node.selected { border-color: #55ffff; box-shadow: 0 0 10px #55ffff; }
-
-/* Размеры квестов */
 .quest-node.size-sm { width: 36px; height: 36px; }
 .quest-node.size-md { width: 52px; height: 52px; }
 .quest-node.size-lg { width: 68px; height: 68px; }
-
 .quest-node img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; pointer-events: none; }
-
-.quest-node .node-title {
-    position: absolute; left: 50%; transform: translateX(-50%);
-    background: rgba(0,0,0,0.8); color: #fff; padding: 3px 6px; border-radius: 3px;
-    white-space: nowrap; font-size: 14px; pointer-events: none; display: none;
-}
+.quest-node .node-title { position: absolute; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 3px 6px; border-radius: 3px; white-space: nowrap; font-size: 14px; pointer-events: none; display: none; }
 .quest-node.size-sm .node-title { top: 38px; }
 .quest-node.size-md .node-title { top: 54px; }
 .quest-node.size-lg .node-title { top: 70px; }
-
 body.show-titles .quest-node .node-title { display: block; }
 
-/* Тултип */
-#quest-tooltip {
-    position: fixed; z-index: 9999; background-color: rgba(16, 16, 20, 0.95);
-    border: 2px solid #373737; border-radius: 4px; color: #fff; padding: 12px; min-width: 220px;
-    pointer-events: none;
-}
+#quest-tooltip { position: fixed; z-index: 9999; background-color: rgba(16, 16, 20, 0.95); border: 2px solid #373737; border-radius: 4px; color: #fff; padding: 12px; min-width: 220px; pointer-events: none; }
 #quest-tooltip * { pointer-events: none; }
 #quest-tooltip h3 { margin-bottom: 5px; color: #fff; text-shadow: 1px 1px 0 #000; }
 #quest-tooltip #tt-desc { color: #aaaaaa; margin-bottom: 10px; font-size: 14px; }
@@ -163,38 +96,31 @@ body.show-titles .quest-node .node-title { display: block; }
 .tt-item { display: flex; align-items: center; margin-top: 4px; font-size: 14px; }
 .tt-item img { width: 16px; height: 16px; image-rendering: pixelated; margin-right: 6px; }
 
-/* Контекстное меню */
 .context-menu { position: absolute; z-index: 1000; padding: 0; min-width: 200px; box-shadow: 4px 4px 0px rgba(0,0,0,0.5); }
 .menu-item { padding: 10px 15px; cursor: pointer; font-size: 16px; color: #404040; text-shadow: 1px 1px 0 #fff; border-bottom: 2px solid #a0a0a0; background-color: #c6c6c6; }
 .menu-item:hover { background-color: #a0a0a0; color: #000; }
 .menu-item.delete { color: #aa0000; border-bottom: none; }
 .menu-item.delete:hover { background-color: #ffaaaa; }
 
-/* Модальные окна */
 .modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.8); display: flex; justify-content: center; align-items: center; z-index: 2000; }
 .modal-content { width: 450px; padding: 20px; }
 .modal-content.large { width: 800px; }
-
 .form-row { display: flex; gap: 20px; }
 .form-group { margin-bottom: 15px; flex: 1; }
 .form-group.half { width: 50%; }
 .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
 .modal-actions { display: flex; justify-content: space-between; margin-top: 20px; border-top: 2px solid #555; padding-top: 15px; }
 
-/* Списки внутри редактора квеста */
 .item-list-container { max-height: 180px; overflow-y: auto; background-color: #1e1e1e; border: 2px solid #555; padding: 5px; }
 .mt-5 { margin-top: 10px; width: 100%; }
-
 .reward-row { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; background: #333; padding: 5px; border: 1px solid #555; }
 .reward-row input[type="number"] { width: 60px; text-align: center; }
 .reward-row .custom-name-input { flex: 1; text-align: left; }
 
-/* Поиск */
 .picker-controls { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
 .picker-controls input[type="text"] { flex: 2; margin: 0; }
 .picker-controls select { flex: 1; margin: 0; }
 .mc-checkbox { font-size: 14px; cursor: pointer; }
-
 .search-results-list { height: 300px; overflow-y: auto; background-color: #1e1e1e; border: 2px solid #555; padding: 5px; }
 .search-result-item { display: flex; align-items: center; padding: 6px; cursor: pointer; border-bottom: 1px solid #333; color: #fff; font-size: 15px; }
 .search-result-item:hover { background-color: #37373d; }
