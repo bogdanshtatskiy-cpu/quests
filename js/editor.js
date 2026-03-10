@@ -2,9 +2,9 @@
 import { ItemsDB } from './items.js';
 
 export const Editor = {
-    data: { mods: [] }, // { id, name, icon, quests: [] }
+    data: { mods: [] }, 
     /* Структура квеста: 
-       { id, x, y, title, desc, req: {item, count, customName}, rewards: [{item, count, customName}], parents: [] }
+       { id, x, y, title, desc, reqs: [{item, count, customName}], rewards: [{item, count, customName}], parents: [] }
     */
     activeModId: null,
     
@@ -14,36 +14,47 @@ export const Editor = {
     
     // Node state
     draggedQuestId: null, mouseStartX: 0, mouseStartY: 0, nodeStartX: 0, nodeStartY: 0, hasMovedNode: false,
-    linkingFromNodeId: null,
+    linkingFromNodeId: null, contextNodeId: null, editingNodeId: null,
     
-    // Pickers
+    // Pickers and Modal State
     pickerCallback: null,
-    tempReq: null,
+    tempReqs: [],
     tempRewards: [],
+    
+    // Mod Modal State
+    editingModId: null,
+    tempModIcon: null,
 
     init() {
         this.bindCanvasEvents();
         this.bindModModalEvents();
         this.bindQuestModalEvents();
         this.bindItemPickerEvents();
-        
+        this.bindTopBarEvents();
+        this.renderSidebar();
+    },
+
+    bindTopBarEvents() {
         document.getElementById('btn-toggle-titles').addEventListener('click', () => {
             document.body.classList.toggle('show-titles');
         });
 
-        document.getElementById('btn-toggle-summary').addEventListener('click', () => {
-            document.getElementById('rewards-summary').classList.toggle('hidden');
+        const btnSummary = document.getElementById('btn-toggle-summary');
+        const summaryPanel = document.getElementById('rewards-summary');
+        
+        btnSummary.addEventListener('click', () => {
+            summaryPanel.classList.toggle('hidden');
+            btnSummary.innerText = summaryPanel.classList.contains('hidden') ? 'Показать награды' : 'Скрыть награды';
         });
-
-        this.renderSidebar();
     },
 
     // ==========================================
-    // ХОЛСТ: Перемещение, Зум, Подсказки
+    // ХОЛСТ: Перемещение, Зум
     // ==========================================
     bindCanvasEvents() {
         const container = document.getElementById('canvas-container');
         const tooltip = document.getElementById('quest-tooltip');
+        const contextMenu = document.getElementById('node-context-menu');
 
         container.addEventListener('wheel', (e) => {
             e.preventDefault();
@@ -53,7 +64,7 @@ export const Editor = {
         });
 
         container.addEventListener('mousedown', (e) => {
-            // Если кликнули мимо узла или интерфейса - двигаем холст
+            contextMenu.classList.add('hidden');
             if (!e.target.closest('.quest-node') && !e.target.closest('.ui-element')) {
                 if (e.button === 0) {
                     this.isPanning = true;
@@ -65,27 +76,28 @@ export const Editor = {
         });
 
         window.addEventListener('mousemove', (e) => {
-            // Двигаем холст
+            // При любом перемещении (drag/pan) прячем тултип чтобы не моргал
+            if (this.isPanning || this.draggedQuestId) {
+                tooltip.classList.add('hidden');
+            }
+
             if (this.isPanning) {
                 this.panX = this.initialPanX + (e.clientX - this.panStartX);
                 this.panY = this.initialPanY + (e.clientY - this.panStartY);
                 this.updateTransform();
             }
             
-            // Двигаем узел плавно
             if (this.draggedQuestId) {
                 const quest = this.getActiveMod().quests.find(q => q.id === this.draggedQuestId);
                 const dx = (e.clientX - this.mouseStartX) / this.scale;
                 const dy = (e.clientY - this.mouseStartY) / this.scale;
                 
                 if (Math.abs(dx) > 3 || Math.abs(dy) > 3) this.hasMovedNode = true;
-                
                 quest.x = this.nodeStartX + dx;
                 quest.y = this.nodeStartY + dy;
                 this.renderCanvas();
             }
 
-            // Перемещение Tooltip за мышкой
             if (!tooltip.classList.contains('hidden')) {
                 tooltip.style.left = (e.clientX + 15) + 'px';
                 tooltip.style.top = (e.clientY + 15) + 'px';
@@ -98,16 +110,31 @@ export const Editor = {
             container.style.cursor = 'default';
         });
 
-        // ПКМ по холсту для создания квеста
         container.addEventListener('contextmenu', (e) => {
             e.preventDefault();
             if (!this.activeModId) return alert('Выберите ветку квестов!');
             if (e.target.closest('.quest-node') || e.target.closest('.ui-element')) return;
 
+            contextMenu.classList.add('hidden');
             const rect = container.getBoundingClientRect();
-            this.newQuestX = (e.clientX - rect.left - this.panX) / this.scale - 24; // 24 = half node width
+            this.newQuestX = (e.clientX - rect.left - this.panX) / this.scale - 24; 
             this.newQuestY = (e.clientY - rect.top - this.panY) / this.scale - 24;
             this.openQuestModal();
+        });
+
+        // Кнопки ПКМ-меню узла
+        document.getElementById('menu-delete').addEventListener('click', () => {
+            contextMenu.classList.add('hidden');
+            this.deleteQuest(this.contextNodeId);
+        });
+        document.getElementById('menu-edit').addEventListener('click', () => {
+            contextMenu.classList.add('hidden');
+            this.openQuestModal(this.contextNodeId);
+        });
+        document.getElementById('menu-link').addEventListener('click', () => {
+            contextMenu.classList.add('hidden');
+            this.linkingFromNodeId = this.contextNodeId;
+            this.renderCanvas();
         });
     },
 
@@ -116,7 +143,7 @@ export const Editor = {
     },
 
     // ==========================================
-    // ОТРИСОВКА И ЛОГИКА УЗЛОВ
+    // ОТРИСОВКА УЗЛОВ И ЛИНИЙ
     // ==========================================
     renderCanvas() {
         const nodesLayer = document.getElementById('nodes-layer');
@@ -126,7 +153,6 @@ export const Editor = {
         const mod = this.getActiveMod();
         if (!mod) { this.updateSummary(); return; }
 
-        // Рисуем линии
         mod.quests.forEach(quest => {
             if (quest.parents) {
                 quest.parents.forEach(pId => {
@@ -136,40 +162,38 @@ export const Editor = {
             }
         });
 
-        // Рисуем узлы
         mod.quests.forEach(quest => {
             const node = document.createElement('div');
             node.className = 'quest-node';
             if (this.linkingFromNodeId === quest.id) node.classList.add('selected');
             node.style.left = `${quest.x}px`; node.style.top = `${quest.y}px`;
             
-            const iconPath = quest.req?.item?.image ? ItemsDB.getImageUrl(quest.req.item.image) : '';
+            // Если есть требования - берем первую иконку. Иначе пусто.
+            const iconPath = (quest.reqs && quest.reqs.length > 0) ? ItemsDB.getImageUrl(quest.reqs[0].item.image) : '';
+            const imgHtml = iconPath ? `<img src="${iconPath}">` : '';
+
             node.innerHTML = `
-                <img src="${iconPath}">
+                ${imgHtml}
                 <div class="node-title">${ItemsDB.formatMC(quest.title)}</div>
             `;
 
-            // Логика кликов на узел
             node.addEventListener('mousedown', (e) => {
                 if (e.button === 0) {
-                    if (e.shiftKey) {
-                        // Связывание Shift+ЛКМ
+                    if (e.shiftKey || this.linkingFromNodeId) {
                         e.stopPropagation();
                         if (!this.linkingFromNodeId) {
                             this.linkingFromNodeId = quest.id;
                         } else {
                             if (this.linkingFromNodeId !== quest.id) {
-                                // Добавляем или удаляем связь
                                 if (!quest.parents) quest.parents = [];
                                 const idx = quest.parents.indexOf(this.linkingFromNodeId);
-                                if (idx > -1) quest.parents.splice(idx, 1); // Разорвать связь
-                                else quest.parents.push(this.linkingFromNodeId); // Создать связь
+                                if (idx > -1) quest.parents.splice(idx, 1); // Разорвать
+                                else quest.parents.push(this.linkingFromNodeId); // Соединить
                             }
                             this.linkingFromNodeId = null;
                         }
                         this.renderCanvas();
                     } else {
-                        // Начало перетаскивания
                         e.stopPropagation();
                         this.draggedQuestId = quest.id;
                         this.hasMovedNode = false;
@@ -179,14 +203,16 @@ export const Editor = {
                 }
             });
 
-            // ПКМ - Редактировать
             node.addEventListener('contextmenu', (e) => {
                 e.preventDefault(); e.stopPropagation();
-                this.openQuestModal(quest.id);
+                this.contextNodeId = quest.id;
+                const menu = document.getElementById('node-context-menu');
+                menu.style.left = `${e.clientX}px`;
+                menu.style.top = `${e.clientY}px`;
+                menu.classList.remove('hidden');
             });
 
-            // Подсказки (Tooltip)
-            node.addEventListener('mouseenter', (e) => this.showTooltip(quest));
+            node.addEventListener('mouseenter', () => this.showTooltip(quest));
             node.addEventListener('mouseleave', () => document.getElementById('quest-tooltip').classList.add('hidden'));
 
             nodesLayer.appendChild(node);
@@ -204,11 +230,17 @@ export const Editor = {
     },
 
     showTooltip(quest) {
+        if (this.isPanning || this.draggedQuestId) return; // Не показываем при перетаскивании
         const tt = document.getElementById('quest-tooltip');
         document.getElementById('tt-title').innerHTML = ItemsDB.formatMC(quest.title);
         document.getElementById('tt-desc').innerText = quest.desc || '';
         
-        const reqHtml = quest.req ? `<div class="tt-item"><img src="${ItemsDB.getImageUrl(quest.req.item.image)}">${quest.req.count}x ${ItemsDB.formatMC(quest.req.customName || quest.req.item.name)}</div>` : 'Нет требований';
+        let reqHtml = '';
+        if (quest.reqs && quest.reqs.length > 0) {
+            quest.reqs.forEach(r => {
+                reqHtml += `<div class="tt-item"><img src="${ItemsDB.getImageUrl(r.item.image)}">${r.count}x ${ItemsDB.formatMC(r.customName || r.item.name)}</div>`;
+            });
+        } else reqHtml = 'Нет требований';
         document.getElementById('tt-reqs').innerHTML = reqHtml;
 
         let rewHtml = '';
@@ -238,7 +270,7 @@ export const Editor = {
         });
 
         for (const key in totals) {
-            container.innerHTML += `<div class="summary-item"><img src="${ItemsDB.getImageUrl(totals[key].item.image)}"> ${ItemsDB.formatMC(key)}: ${totals[key].count} шт.</div>`;
+            container.innerHTML += `<div class="summary-item"><img src="${ItemsDB.getImageUrl(totals[key].item.image)}"> ${totals[key].count}x ${ItemsDB.formatMC(key)}</div>`;
         }
     },
 
@@ -248,9 +280,9 @@ export const Editor = {
     bindQuestModalEvents() {
         const modal = document.getElementById('quest-edit-modal');
         
-        document.getElementById('btn-select-req').addEventListener('click', () => {
+        document.getElementById('btn-add-req').addEventListener('click', () => {
             this.openItemPicker((item) => {
-                this.tempReq = { item: item, count: 1, customName: item.name };
+                this.tempReqs.push({ item: item, count: 1, customName: item.name });
                 this.renderQuestEditForm();
             });
         });
@@ -267,11 +299,11 @@ export const Editor = {
             const title = document.getElementById('quest-title').value || 'Новый квест';
             const desc = document.getElementById('quest-desc').value;
             
-            // Читаем из инпутов обновленные count и customName
-            if (this.tempReq) {
-                this.tempReq.count = document.getElementById('req-count').value;
-                this.tempReq.customName = document.getElementById('req-name').value;
-            }
+            // Читаем из инпутов
+            this.tempReqs.forEach((r, idx) => {
+                r.count = document.getElementById(`req-count-${idx}`).value;
+                r.customName = document.getElementById(`req-name-${idx}`).value;
+            });
             this.tempRewards.forEach((r, idx) => {
                 r.count = document.getElementById(`rew-count-${idx}`).value;
                 r.customName = document.getElementById(`rew-name-${idx}`).value;
@@ -279,11 +311,12 @@ export const Editor = {
 
             if (this.editingNodeId) {
                 const q = mod.quests.find(q => q.id === this.editingNodeId);
-                q.title = title; q.desc = desc; q.req = this.tempReq; q.rewards = [...this.tempRewards];
+                q.title = title; q.desc = desc; 
+                q.reqs = [...this.tempReqs]; q.rewards = [...this.tempRewards];
             } else {
                 mod.quests.push({
                     id: 'q_' + Date.now(), x: this.newQuestX, y: this.newQuestY,
-                    title: title, desc: desc, req: this.tempReq, rewards: [...this.tempRewards], parents: []
+                    title: title, desc: desc, reqs: [...this.tempReqs], rewards: [...this.tempRewards], parents: []
                 });
             }
             modal.classList.add('hidden');
@@ -292,11 +325,8 @@ export const Editor = {
 
         document.getElementById('btn-delete-quest').addEventListener('click', () => {
             if(this.editingNodeId && confirm('Удалить квест?')) {
-                const mod = this.getActiveMod();
-                mod.quests = mod.quests.filter(q => q.id !== this.editingNodeId);
-                mod.quests.forEach(q => { if(q.parents) q.parents = q.parents.filter(id => id !== this.editingNodeId); });
+                this.deleteQuest(this.editingNodeId);
                 modal.classList.add('hidden');
-                this.renderCanvas();
             }
         });
 
@@ -312,13 +342,17 @@ export const Editor = {
             const q = this.getActiveMod().quests.find(q => q.id === questId);
             document.getElementById('quest-title').value = q.title || '';
             document.getElementById('quest-desc').value = q.desc || '';
-            // Глубокое копирование объектов чтобы отмена не ломала оригинал
-            this.tempReq = q.req ? JSON.parse(JSON.stringify(q.req)) : null;
+            
+            // Адаптация старых сейвов (если было req, переводим в массив reqs)
+            let reqs = q.reqs || [];
+            if (q.req && reqs.length === 0) reqs = [q.req]; 
+            
+            this.tempReqs = JSON.parse(JSON.stringify(reqs));
             this.tempRewards = q.rewards ? JSON.parse(JSON.stringify(q.rewards)) : [];
         } else {
             document.getElementById('quest-title').value = '';
             document.getElementById('quest-desc').value = '';
-            this.tempReq = null; this.tempRewards = [];
+            this.tempReqs = []; this.tempRewards = [];
         }
         
         this.renderQuestEditForm();
@@ -326,14 +360,23 @@ export const Editor = {
     },
 
     renderQuestEditForm() {
-        const reqBox = document.getElementById('quest-req-preview');
-        if (this.tempReq) {
-            reqBox.innerHTML = `
-                <div class="mc-slot"><img src="${ItemsDB.getImageUrl(this.tempReq.item.image)}" width="32" height="32"></div>
-                <input type="number" id="req-count" class="mc-input" style="width: 60px;" value="${this.tempReq.count}">шт
-                <input type="text" id="req-name" class="mc-input custom-name-input" value="${this.tempReq.customName}">
+        const reqBox = document.getElementById('reqs-list');
+        reqBox.innerHTML = '';
+        this.tempReqs.forEach((r, idx) => {
+            const div = document.createElement('div');
+            div.className = 'reward-row';
+            div.innerHTML = `
+                <div class="mc-slot"><img src="${ItemsDB.getImageUrl(r.item.image)}" width="24" height="24"></div>
+                <input type="number" id="req-count-${idx}" class="mc-input" value="${r.count}">
+                <input type="text" id="req-name-${idx}" class="mc-input custom-name-input" value="${r.customName}">
+                <button class="mc-button danger" data-idx="${idx}">X</button>
             `;
-        } else reqBox.innerHTML = '<span style="color:#aaa;">Не выбрано</span>';
+            div.querySelector('.danger').addEventListener('click', () => {
+                this.tempReqs.splice(idx, 1);
+                this.renderQuestEditForm();
+            });
+            reqBox.appendChild(div);
+        });
 
         const rewBox = document.getElementById('rewards-list');
         rewBox.innerHTML = '';
@@ -354,8 +397,17 @@ export const Editor = {
         });
     },
 
+    deleteQuest(questId) {
+        if(confirm('Точно удалить квест?')) {
+            const mod = this.getActiveMod();
+            mod.quests = mod.quests.filter(q => q.id !== questId);
+            mod.quests.forEach(q => { if(q.parents) q.parents = q.parents.filter(id => id !== questId); });
+            this.renderCanvas();
+        }
+    },
+
     // ==========================================
-    // ВЫБОР ПРЕДМЕТА И ЛОГИКА ВКЛАДОК
+    // ВЫБОР ПРЕДМЕТА И ЛОГИКА ВКЛАДОК (МОДОВ)
     // ==========================================
     bindItemPickerEvents() {
         const modal = document.getElementById('item-picker-modal');
@@ -378,14 +430,12 @@ export const Editor = {
                     <span>${ItemsDB.formatMC(item.name)} <small style="color:#888;">[${item.mod}]</small></span>
                 `;
                 
-                // Клик на звезду
                 div.querySelector('.fav-star').addEventListener('click', (e) => {
                     e.stopPropagation();
                     ItemsDB.toggleFavorite(item.item_key);
-                    renderResults(); // Обновляем список
+                    renderResults(); 
                 });
 
-                // Клик на предмет
                 div.addEventListener('click', () => {
                     modal.classList.add('hidden');
                     if (this.pickerCallback) this.pickerCallback(item);
@@ -394,17 +444,14 @@ export const Editor = {
             });
         };
 
-        // События поиска
         searchInp.addEventListener('input', renderResults);
         filterMod.addEventListener('change', renderResults);
         favCb.addEventListener('change', renderResults);
 
         document.getElementById('btn-picker-cancel').addEventListener('click', () => modal.classList.add('hidden'));
 
-        // Экспортируем функцию вызова пикера в контекст
         this.openItemPicker = (cb) => {
             this.pickerCallback = cb;
-            // Заполняем фильтр модов, если он пуст
             if (filterMod.options.length <= 1) {
                 filterMod.innerHTML = '<option value="">Все моды</option>';
                 ItemsDB.mods.forEach(m => filterMod.innerHTML += `<option value="${m}">${m}</option>`);
@@ -417,26 +464,41 @@ export const Editor = {
 
     bindModModalEvents() {
         const modal = document.getElementById('add-mod-modal');
-        let tempIcon = null;
 
-        document.getElementById('btn-add-mod').addEventListener('click', () => modal.classList.remove('hidden'));
+        document.getElementById('btn-add-mod').addEventListener('click', () => {
+            this.editingModId = null;
+            this.tempModIcon = null;
+            document.getElementById('new-mod-name').value = '';
+            document.getElementById('mod-icon-preview').innerHTML = '';
+            document.getElementById('mod-modal-title').innerText = 'Новая ветка';
+            modal.classList.remove('hidden');
+        });
+
         document.getElementById('btn-close-mod').addEventListener('click', () => modal.classList.add('hidden'));
 
         document.getElementById('btn-select-mod-icon').addEventListener('click', () => {
             this.openItemPicker((item) => {
-                tempIcon = item.image;
+                this.tempModIcon = item.image;
                 document.getElementById('mod-icon-preview').innerHTML = `<div class="mc-slot"><img src="${ItemsDB.getImageUrl(item.image)}" width="32" height="32"></div>`;
             });
         });
 
         document.getElementById('btn-save-mod').addEventListener('click', () => {
             const name = document.getElementById('new-mod-name').value;
-            if (!name || !tempIcon) return alert('Введите название и выберите иконку!');
-            const id = 'mod_' + Date.now();
-            this.data.mods.push({ id, name, icon: tempIcon, quests: [] });
-            this.activeModId = id;
-            document.getElementById('new-mod-name').value = '';
-            document.getElementById('mod-icon-preview').innerHTML = '';
+            if (!name || !this.tempModIcon) return alert('Введите название и выберите иконку!');
+            
+            if (this.editingModId) {
+                // Редактируем существующую
+                const mod = this.data.mods.find(m => m.id === this.editingModId);
+                mod.name = name;
+                mod.icon = this.tempModIcon;
+            } else {
+                // Создаем новую
+                const id = 'mod_' + Date.now();
+                this.data.mods.push({ id, name, icon: this.tempModIcon, quests: [] });
+                this.activeModId = id;
+            }
+            
             modal.classList.add('hidden');
             this.renderSidebar(); this.renderCanvas();
         });
@@ -449,11 +511,45 @@ export const Editor = {
             const li = document.createElement('li');
             li.className = 'mod-item';
             if (this.activeModId === mod.id) li.classList.add('active');
-            li.innerHTML = `<img src="${ItemsDB.getImageUrl(mod.icon)}" width="24" height="24"><span>${ItemsDB.formatMC(mod.name)}</span>`;
-            li.addEventListener('click', () => {
+            
+            li.innerHTML = `
+                <div class="mod-item-content">
+                    <img src="${ItemsDB.getImageUrl(mod.icon)}" width="24" height="24">
+                    <span>${ItemsDB.formatMC(mod.name)}</span>
+                </div>
+                <div class="mod-item-actions">
+                    <button class="mod-btn edit" title="Редактировать">✏️</button>
+                    <button class="mod-btn delete" title="Удалить">❌</button>
+                </div>
+            `;
+            
+            // Клик по самой вкладке
+            li.querySelector('.mod-item-content').addEventListener('click', () => {
                 this.activeModId = mod.id;
                 this.renderSidebar(); this.renderCanvas(); 
             });
+
+            // Редактирование
+            li.querySelector('.edit').addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.editingModId = mod.id;
+                this.tempModIcon = mod.icon;
+                document.getElementById('new-mod-name').value = mod.name;
+                document.getElementById('mod-icon-preview').innerHTML = `<div class="mc-slot"><img src="${ItemsDB.getImageUrl(mod.icon)}" width="32" height="32"></div>`;
+                document.getElementById('mod-modal-title').innerText = 'Редактировать ветку';
+                document.getElementById('add-mod-modal').classList.remove('hidden');
+            });
+
+            // Удаление
+            li.querySelector('.delete').addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (confirm(`Удалить ветку "${mod.name}" со всеми квестами?`)) {
+                    this.data.mods = this.data.mods.filter(m => m.id !== mod.id);
+                    if (this.activeModId === mod.id) this.activeModId = null;
+                    this.renderSidebar(); this.renderCanvas();
+                }
+            });
+
             list.appendChild(li);
         });
     },
