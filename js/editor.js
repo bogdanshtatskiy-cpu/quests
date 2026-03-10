@@ -27,6 +27,7 @@ export const Editor = {
         this.bindItemPickerEvents();
         this.bindTopBarEvents();
         this.renderSidebar();
+        this.renderCanvas(); // Рендерим холст сразу при инициализации
     },
 
     bindTopBarEvents() {
@@ -104,6 +105,7 @@ export const Editor = {
                 this.renderCanvas(true); 
             }
 
+            // НАДЕЖНАЯ ПРОВЕРКА ДЛЯ ТУЛТИПА
             const hoveredNode = e.target.closest('.quest-node');
             const isMenuHidden = contextMenu.classList.contains('hidden');
             
@@ -197,7 +199,6 @@ export const Editor = {
             node.style.left = `${quest.x}px`; node.style.top = `${quest.y}px`;
             node.dataset.id = quest.id;
             
-            // Если есть кастомная иконка, берем ее. Иначе первую из требований.
             let iconStr = '';
             if (quest.icon) iconStr = quest.icon;
             else if (quest.reqs && quest.reqs.length > 0) iconStr = quest.reqs[0].item.image;
@@ -307,7 +308,6 @@ export const Editor = {
         }
     },
 
-    // Сохраняет инпуты ДО открытия пикера, чтобы не слетали числа
     saveTempState() {
         this.tempReqs.forEach((r, idx) => {
             const countInp = document.getElementById(`req-count-${idx}`);
@@ -351,7 +351,8 @@ export const Editor = {
         });
 
         document.getElementById('btn-save-quest').addEventListener('click', () => {
-            this.saveTempState(); // Окончательно собираем данные из инпутов
+            this.saveTempState(); // БЕЗОПАСНЫЙ СБОР ДАННЫХ! КРАШЕЙ БОЛЬШЕ НЕ БУДЕТ.
+            
             const mod = this.getActiveMod();
             const title = document.getElementById('quest-title').value || 'Новый квест';
             const desc = document.getElementById('quest-desc').value;
@@ -483,7 +484,7 @@ export const Editor = {
             searchInp.value = '';
             renderResults();
             modal.classList.remove('hidden');
-            setTimeout(() => searchInp.focus(), 50); // Фокус на строке поиска!
+            setTimeout(() => searchInp.focus(), 50); 
         };
     },
 
@@ -576,5 +577,7 @@ export const Editor = {
             }
             list.appendChild(li);
         });
-    }
+    },
+
+    getActiveMod() { return this.data.mods.find(m => m.id === this.activeModId); }
 };
