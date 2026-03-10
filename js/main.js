@@ -8,10 +8,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     Auth.init();
     await ItemsDB.load();
     
-    // Загружаем данные из облака
     const savedQuests = await DB.loadQuests();
     if (savedQuests && savedQuests.length > 0) {
-        // Миграция старых данных (на всякий случай)
         savedQuests.forEach(mod => {
             mod.quests.forEach(q => {
                 if (q.req && !q.reqs) q.reqs = [q.req];
@@ -20,24 +18,26 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         });
         Editor.data.mods = savedQuests;
-        // АВТОМАТИЧЕСКИ ОТКРЫВАЕМ ПЕРВУЮ ВЕТКУ (Решает проблему "не видно квестов")
         Editor.activeModId = savedQuests[0].id; 
     }
     
     Editor.init();
 
-    // Логика Админ-панели
     document.getElementById('btn-open-admin').addEventListener('click', async () => {
         document.getElementById('admin-modal').classList.remove('hidden');
         
-        // Рендер логов
         const logsContainer = document.getElementById('logs-tbody');
         logsContainer.innerHTML = '<tr><td colspan="3">Загрузка...</td></tr>';
         const logs = await DB.getLogs();
+        
         logsContainer.innerHTML = logs.map(l => {
-            const time = new Date(l.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second:'2-digit' });
-            const date = new Date(l.timestamp).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
-            return `<tr><td>${date} ${time}</td><td><b>${l.username}</b></td><td>${l.action}</td></tr>`;
+            // Надежный парсинг даты, даже если в базе застряли старые кривые логи
+            let d = new Date(l.timestamp);
+            if (isNaN(d.getTime())) d = new Date(); 
+            
+            const time = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second:'2-digit' });
+            const date = d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+            return `<tr><td>${date} ${time}</td><td><b style="color:#55ffff;">${l.username}</b></td><td>${l.action}</td></tr>`;
         }).join('');
 
         renderUsersTable();
