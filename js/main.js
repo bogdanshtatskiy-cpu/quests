@@ -7,10 +7,23 @@ import { Editor } from './editor.js';
 document.addEventListener('DOMContentLoaded', async () => {
     Auth.init();
     await ItemsDB.load();
+    
+    // Загружаем данные из облака
     const savedQuests = await DB.loadQuests();
     if (savedQuests && savedQuests.length > 0) {
+        // Миграция старых данных (на всякий случай)
+        savedQuests.forEach(mod => {
+            mod.quests.forEach(q => {
+                if (q.req && !q.reqs) q.reqs = [q.req];
+                if (!q.reqs) q.reqs = [];
+                if (!q.rewards) q.rewards = [];
+            });
+        });
         Editor.data.mods = savedQuests;
+        // АВТОМАТИЧЕСКИ ОТКРЫВАЕМ ПЕРВУЮ ВЕТКУ (Решает проблему "не видно квестов")
+        Editor.activeModId = savedQuests[0].id; 
     }
+    
     Editor.init();
 
     // Логика Админ-панели
@@ -27,7 +40,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             return `<tr><td>${date} ${time}</td><td><b>${l.username}</b></td><td>${l.action}</td></tr>`;
         }).join('');
 
-        // Рендер пользователей
         renderUsersTable();
     });
 
@@ -47,13 +59,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             usersTbody.appendChild(tr);
         });
 
-        // Кнопки удаления юзера
         document.querySelectorAll('.btn-delete-user').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const login = e.target.getAttribute('data-user');
                 if (confirm(`Запретить доступ пользователю ${login}?`)) {
                     await DB.removeUser(login);
-                    renderUsersTable(); // Обновляем таблицу
+                    renderUsersTable(); 
                 }
             });
         });
