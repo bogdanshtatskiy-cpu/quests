@@ -3,24 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quest Editor</title>
+    <title>Minecraft Quest Editor</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
-    <div id="auth-modal" class="modal hidden">
-        <div class="modal-content">
-            <h2>Вход в редактор</h2>
-            <input type="password" id="auth-key" placeholder="Секретный ключ...">
-            <button id="btn-login">Войти</button>
-            <button id="btn-guest">Режим просмотра</button>
-        </div>
+<body class="show-titles"> <div id="top-bar" class="mc-panel ui-element">
+        <button id="btn-toggle-titles" class="mc-button">Скрыть названия</button>
+        <button id="btn-toggle-summary" class="mc-button">Статистика наград</button>
+        <div class="controls-hint">Перемещение: ЛКМ | Настройки квеста: ПКМ | Связать: Shift+ЛКМ</div>
+    </div>
+
+    <div id="rewards-summary" class="mc-panel ui-element hidden">
+        <h3 class="mc-title">Награды за ветку</h3>
+        <div id="rewards-summary-list"></div>
     </div>
 
     <div id="app-container">
-        <aside id="sidebar">
+        <aside id="sidebar" class="mc-panel ui-element">
             <div class="sidebar-header">
                 <h3>Ветки квестов</h3>
-                <button id="btn-add-mod" class="admin-only">+</button>
+                <button id="btn-add-mod" class="mc-button">+</button>
             </div>
             <ul id="mod-list"></ul>
         </aside>
@@ -30,52 +31,85 @@
                 <svg id="connections-layer"></svg>
                 <div id="nodes-layer"></div>
             </div>
-            
-            <div class="canvas-controls">
-                <span>ЛКМ - Таскать холст/квесты | ПКМ - Добавить квест | Shift+Клик - Соединить</span>
-            </div>
-            
-            <button id="btn-save-cloud" class="admin-only save-btn">💾 Сохранить изменения</button>
+            <button id="btn-save-cloud" class="mc-button ui-element save-btn">💾 Сохранить</button>
         </main>
     </div>
 
-    <div id="node-context-menu" class="context-menu hidden">
-        <div class="menu-item" id="menu-edit">Редактировать</div>
-        <div class="menu-item" id="menu-link">Соединить (Shift+Клик)</div>
-        <div class="menu-item delete" id="menu-delete">Удалить</div>
+    <div id="quest-tooltip" class="mc-panel hidden ui-element">
+        <h3 id="tt-title"></h3>
+        <div id="tt-desc"></div>
+        <div class="tt-section" id="tt-reqs-container">
+            <span class="tt-label">Требуется:</span>
+            <div id="tt-reqs"></div>
+        </div>
+        <div class="tt-section" id="tt-rewards-container">
+            <span class="tt-label">Награда:</span>
+            <div id="tt-rewards"></div>
+        </div>
     </div>
 
     <div id="add-mod-modal" class="modal hidden">
-        <div class="modal-content">
-            <h2>Добавить ветку квестов</h2>
-            <input type="text" id="new-mod-name" placeholder="Название (например: IC2)">
-            <div class="item-selection">
-                <h3>Иконка для вкладки</h3>
-                <input type="text" id="mod-icon-search" placeholder="Поиск по базе...">
-                <div id="mod-icon-results" class="search-results-list"></div>
-                <div id="mod-icon-preview"></div>
+        <div class="mc-panel modal-content">
+            <h2 class="mc-title">Новая ветка</h2>
+            <div class="form-group">
+                <label>Название ветки:</label>
+                <input type="text" id="new-mod-name" class="mc-input" placeholder="Например: IC2">
             </div>
-            <button id="btn-save-mod">Добавить</button>
-            <button id="btn-close-mod" class="btn-cancel">Отмена</button>
+            <div class="form-group">
+                <label>Иконка ветки:</label>
+                <button id="btn-select-mod-icon" class="mc-button">Выбрать иконку</button>
+                <div id="mod-icon-preview" class="preview-box"></div>
+            </div>
+            <div class="modal-actions">
+                <button id="btn-save-mod" class="mc-button">Добавить</button>
+                <button id="btn-close-mod" class="mc-button">Отмена</button>
+            </div>
         </div>
     </div>
 
     <div id="quest-edit-modal" class="modal hidden">
-        <div class="modal-content large">
-            <h2>Настройки квеста</h2>
-            <input type="text" id="quest-title" placeholder="Название квеста">
-            <textarea id="quest-desc" placeholder="Описание задания..."></textarea>
-            
-            <div class="item-selection">
-                <h3>Иконка / Требуемый предмет</h3>
-                <input type="text" id="item-search" placeholder="Поиск по базе...">
-                <div id="search-results" class="search-results-list"></div>
-                <div id="selected-item-preview"></div>
-                <input type="text" id="custom-item-name" placeholder="Свое название предмета (необязательно)">
+        <div class="mc-panel modal-content large">
+            <h2 class="mc-title">Настройки квеста</h2>
+            <div class="form-row">
+                <div class="form-group half">
+                    <label>Название квеста:</label>
+                    <input type="text" id="quest-title" class="mc-input">
+                </div>
+                <div class="form-group half">
+                    <label>Требуемый предмет (Условие):</label>
+                    <button id="btn-select-req" class="mc-button">Выбрать предмет</button>
+                    <div id="quest-req-preview" class="preview-box flex-preview"></div>
+                </div>
             </div>
+            <div class="form-group">
+                <label>Описание задания:</label>
+                <textarea id="quest-desc" class="mc-input"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Награды:</label>
+                <div id="rewards-list" class="mc-slot-container"></div>
+                <button id="btn-add-reward" class="mc-button" style="margin-top: 10px;">+ Добавить награду</button>
+            </div>
+            <div class="modal-actions">
+                <button id="btn-save-quest" class="mc-button">Сохранить</button>
+                <button id="btn-delete-quest" class="mc-button danger">Удалить квест</button>
+                <button id="btn-close-quest" class="mc-button">Отмена</button>
+            </div>
+        </div>
+    </div>
 
-            <button id="btn-save-quest">Сохранить</button>
-            <button id="btn-close-quest" class="btn-cancel">Отмена</button>
+    <div id="item-picker-modal" class="modal hidden">
+        <div class="mc-panel modal-content large">
+            <h2 class="mc-title">Выбор предмета</h2>
+            <div class="picker-controls">
+                <select id="picker-mod-filter" class="mc-input"></select>
+                <input type="text" id="picker-search" class="mc-input" placeholder="Поиск по названию или ID...">
+                <label class="mc-checkbox"><input type="checkbox" id="picker-fav-only"> Только избранное (★)</label>
+            </div>
+            <div id="picker-results" class="search-results-list"></div>
+            <div class="modal-actions">
+                <button id="btn-picker-cancel" class="mc-button">Отмена</button>
+            </div>
         </div>
     </div>
 
