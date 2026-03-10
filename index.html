@@ -13,6 +13,12 @@
         <div class="controls-hint">Перемещение: ЛКМ | Настройки: ПКМ | Связать: Shift+ЛКМ</div>
     </div>
 
+    <div id="rewards-summary" class="mc-panel ui-element hidden">
+        <h3 class="mc-title">Награды за ветку</h3>
+        <div id="rewards-summary-list"></div>
+        <button id="btn-minimize-summary" class="mc-button" style="width: 100%; margin-top: 10px;">Свернуть</button>
+    </div>
+
     <div id="node-context-menu" class="mc-panel context-menu hidden">
         <div class="menu-item" id="menu-edit">Редактировать</div>
         <div class="menu-item" id="menu-link">Соединить (Shift+ЛКМ)</div>
@@ -72,9 +78,19 @@
     <div id="quest-edit-modal" class="modal hidden">
         <div class="mc-panel modal-content large">
             <h2 class="mc-title">Настройки квеста</h2>
-            <div class="form-group">
-                <label>Название квеста:</label>
-                <input type="text" id="quest-title" class="mc-input">
+            <div class="form-row">
+                <div class="form-group half">
+                    <label>Название квеста:</label>
+                    <input type="text" id="quest-title" class="mc-input">
+                </div>
+                <div class="form-group half">
+                    <label>Размер иконки:</label>
+                    <select id="quest-size" class="mc-input">
+                        <option value="sm">Маленький</option>
+                        <option value="md" selected>Средний</option>
+                        <option value="lg">Большой</option>
+                    </select>
+                </div>
             </div>
             
             <div class="form-row">
