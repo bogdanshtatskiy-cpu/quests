@@ -1,3 +1,4 @@
+// js/items.js
 export const ItemsDB = {
     items: [], mods: [],
     favorites: JSON.parse(localStorage.getItem('quest_favorites') || '[]'),
@@ -25,9 +26,8 @@ export const ItemsDB = {
         this.mods = Array.from(modsSet).sort();
     },
 
-    search(query, modFilter = '', favOnly = false) {
+    search(query, modFilter = '') {
         let results = this.items;
-        if (favOnly) results = results.filter(item => this.favorites.includes(item.item_key));
         if (modFilter) results = results.filter(item => item.mod === modFilter);
         if (query) {
             const lowerQuery = query.toLowerCase();
@@ -37,7 +37,11 @@ export const ItemsDB = {
             );
         }
         results.sort((a, b) => (a.item_id === b.item_id) ? a.damage - b.damage : a.item_id - b.item_id);
-        return results.slice(0, 100); 
+        return results; // Отдаем всё. Скролл будет порционно выводить это на экран.
+    },
+
+    getFavorites() {
+        return this.items.filter(item => this.favorites.includes(item.item_key));
     },
 
     toggleFavorite(itemKey) {
