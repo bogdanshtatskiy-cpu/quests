@@ -1,4 +1,3 @@
-// js/items.js
 export const ItemsDB = {
     items: [], mods: [],
     favorites: JSON.parse(localStorage.getItem('quest_favorites') || '[]'),
@@ -7,13 +6,23 @@ export const ItemsDB = {
         try {
             const response = await fetch('./database.json');
             this.items = await response.json();
-            
-            const modsSet = new Set();
-            this.items.forEach(item => modsSet.add(item.mod));
-            this.mods = Array.from(modsSet).sort();
+            this.updateModsList();
         } catch (error) {
             console.error('Ошибка загрузки базы:', error);
         }
+    },
+
+    addCustomItems(customItemsArray) {
+        if (customItemsArray && customItemsArray.length > 0) {
+            this.items = [...this.items, ...customItemsArray];
+            this.updateModsList();
+        }
+    },
+
+    updateModsList() {
+        const modsSet = new Set();
+        this.items.forEach(item => modsSet.add(item.mod));
+        this.mods = Array.from(modsSet).sort();
     },
 
     search(query, modFilter = '', favOnly = false) {
@@ -38,7 +47,11 @@ export const ItemsDB = {
         localStorage.setItem('quest_favorites', JSON.stringify(this.favorites));
     },
 
-    getImageUrl(imageName) { return `./icons/${imageName}`; },
+    getImageUrl(imagePath) {
+        if (!imagePath) return '';
+        if (imagePath.startsWith('http') || imagePath.startsWith('data:')) return imagePath;
+        return `./icons/${imagePath}`;
+    },
 
     formatMC(str) {
         if (!str) return '';
