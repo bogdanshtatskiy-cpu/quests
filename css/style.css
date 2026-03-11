@@ -183,3 +183,23 @@ body.show-titles .quest-node .node-title { display: block; }
 .view-item-row .item-info { display: flex; flex-direction: column; gap: 4px; }
 .view-item-row .item-name { font-size: 18px; color: #fff; text-shadow: 1px 1px 0 #000; }
 .view-item-row .item-meta { font-size: 14px; text-shadow: 1px 1px 0 #000; }
+/* Обновленные размеры модального окна и ячеек */
+.modal-content.large { width: 1300px; max-width: 95vw; }
+.reward-row input[type="number"] { width: 85px; text-align: center; padding: 6px; }
+.reward-row .task-type-select { width: 110px; padding: 6px; background-color: #000; color: #fff; border: 1px solid #555; }
+
+/* Экран загрузки */
+#global-loader {
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background-color: #202020; z-index: 999999;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    color: #55ffff; font-size: 24px; text-shadow: 2px 2px 0 #000;
+    transition: opacity 0.5s ease;
+}
+#global-loader.hidden { opacity: 0; pointer-events: none; }
+.spinner {
+    width: 60px; height: 60px; margin-bottom: 20px;
+    border: 6px solid #555; border-top-color: #55ffff; border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
