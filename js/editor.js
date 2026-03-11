@@ -1,4 +1,3 @@
-// js/editor.js
 import { ItemsDB } from './items.js';
 import { DB } from './db.js';
 import { Auth } from './auth.js';
@@ -212,6 +211,12 @@ export const Editor = {
             this.openQuestModal();
         });
 
+        // НОВАЯ КНОПКА: КОПИРОВАТЬ
+        document.getElementById('menu-copy').addEventListener('click', () => {
+            contextMenu.classList.add('hidden');
+            this.copyQuest(this.contextNodeId);
+        });
+
         document.getElementById('menu-delete').addEventListener('click', () => {
             contextMenu.classList.add('hidden');
             this.deleteQuest(this.contextNodeId);
@@ -400,6 +405,35 @@ export const Editor = {
             if (nameInp) r.customName = nameInp.value;
             if (choiceCb) r.isChoice = choiceCb.checked;
         });
+    },
+
+    // НОВАЯ ФУНКЦИЯ: КОПИРОВАНИЕ КВЕСТА
+    copyQuest(questId) {
+        const mod = this.getActiveMod();
+        const originalQuest = mod.quests.find(q => q.id === questId);
+        if (!originalQuest) return;
+
+        // Делаем глубокую копию, чтобы предметы не "склеились" в памяти
+        const copiedReqs = JSON.parse(JSON.stringify(originalQuest.reqs || []));
+        const copiedRewards = JSON.parse(JSON.stringify(originalQuest.rewards || []));
+
+        const newQuest = {
+            id: 'q_' + Date.now(),
+            x: originalQuest.x + 60, // Смещаем чуть вправо
+            y: originalQuest.y + 60, // Смещаем чуть вниз
+            title: originalQuest.title + ' (Копия)',
+            desc: originalQuest.desc,
+            size: originalQuest.size,
+            icon: originalQuest.icon,
+            reqs: copiedReqs,
+            rewards: copiedRewards,
+            parents: [] // Связи не копируем
+        };
+
+        mod.quests.push(newQuest);
+        DB.logAction(`Скопировал квест: ${originalQuest.title}`);
+        this.triggerAutoSave();
+        this.renderCanvas();
     },
 
     bindQuestModalEvents() {
@@ -613,7 +647,6 @@ export const Editor = {
         this.renderCanvas();
     },
 
-    // --- НОВАЯ ЛОГИКА ВЫБОРА ПРЕДМЕТОВ (БЕСКОНЕЧНЫЙ СКРОЛЛ И ДВЕ ПАНЕЛИ) ---
     bindItemPickerEvents() {
         const modal = document.getElementById('item-picker-modal');
         const filterMod = document.getElementById('picker-mod-filter');
@@ -670,7 +703,6 @@ export const Editor = {
         searchInp.addEventListener('input', triggerSearch);
         filterMod.addEventListener('change', triggerSearch);
         
-        // Бесконечный скролл (подгрузка по 50 элементов)
         resultsContainer.addEventListener('scroll', () => {
             if (resultsContainer.scrollTop + resultsContainer.clientHeight >= resultsContainer.scrollHeight - 20) {
                 if (itemsLimit < currentSearchData.length) {
@@ -726,7 +758,7 @@ export const Editor = {
                     if (newItem) {
                         ItemsDB.addCustomItems([newItem]);
                         searchInp.value = name;
-                        triggerSearch(); // Обновляем поисковую выдачу
+                        triggerSearch(); 
                     }
                 };
                 img.src = event.target.result;
@@ -810,7 +842,7 @@ export const Editor = {
             li.querySelector('.mod-item-content').addEventListener('click', () => {
                 this.activeModId = mod.id;
                 this.renderSidebar(); this.renderCanvas(); 
-                this.centerCanvas();
+                this.centerCanvas(); 
             });
 
             if (Auth.user) {
