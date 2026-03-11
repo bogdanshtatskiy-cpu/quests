@@ -8,6 +8,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     Auth.init();
     await ItemsDB.load();
     
+    const customItems = await DB.loadCustomItems();
+    ItemsDB.addCustomItems(customItems);
+    
     const savedQuests = await DB.loadQuests();
     if (savedQuests && savedQuests.length > 0) {
         savedQuests.forEach(mod => {
@@ -31,10 +34,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const logs = await DB.getLogs();
         
         logsContainer.innerHTML = logs.map(l => {
-            // Надежный парсинг даты, даже если в базе застряли старые кривые логи
             let d = new Date(l.timestamp);
             if (isNaN(d.getTime())) d = new Date(); 
-            
             const time = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second:'2-digit' });
             const date = d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
             return `<tr><td>${date} ${time}</td><td><b style="color:#55ffff;">${l.username}</b></td><td>${l.action}</td></tr>`;
