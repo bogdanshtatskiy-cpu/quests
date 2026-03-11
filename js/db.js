@@ -1,4 +1,3 @@
-// js/db.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { firebaseConfig } from './firebase-config.js';
@@ -10,11 +9,7 @@ const db = getFirestore(app);
 export const DB = {
     async saveQuestsSilent(modsData) {
         if (!Auth.user) return;
-        try {
-            await setDoc(doc(db, "quests", "main"), { mods: modsData });
-        } catch (e) {
-            console.error("Ошибка автосохранения:", e);
-        }
+        try { await setDoc(doc(db, "quests", "main"), { mods: modsData }); } catch (e) {}
     },
 
     async loadQuests() {
@@ -22,10 +17,7 @@ export const DB = {
             const docSnap = await getDoc(doc(db, "quests", "main"));
             if (docSnap.exists()) return docSnap.data().mods;
             return [];
-        } catch (e) {
-            console.error("Ошибка загрузки квестов:", e);
-            return [];
-        }
+        } catch (e) { return []; }
     },
 
     async getUsers() {
@@ -55,14 +47,9 @@ export const DB = {
         if (!Auth.user) return;
         try {
             await addDoc(collection(db, "logs"), {
-                username: Auth.user.username,
-                action: actionDesc,
-                // Возвращаем надежный ISO формат, чтобы сортировка Firebase не ломалась
-                timestamp: new Date().toISOString() 
+                username: Auth.user.username, action: actionDesc, timestamp: new Date().toISOString() 
             });
-        } catch (e) {
-            console.error("Ошибка записи лога:", e);
-        }
+        } catch (e) {}
     },
 
     async getLogs() {
@@ -72,5 +59,36 @@ export const DB = {
         const logs = [];
         querySnapshot.forEach((doc) => logs.push(doc.data()));
         return logs;
+    },
+
+    async saveCustomItem(itemName, base64Image) {
+        if (!Auth.user) return null;
+        try {
+            const newItem = {
+                item_key: `custom_${Date.now()}`,
+                name: itemName,
+                image: base64Image,
+                mod: "Custom (Свои)",
+                item_id: 99999
+            };
+
+            await addDoc(collection(db, "custom_items"), newItem);
+            this.logAction(`Добавил свою иконку: ${itemName}`);
+            return newItem;
+        } catch (e) {
+            console.error("Ошибка сохранения иконки:", e);
+            alert("Не удалось сохранить иконку в базу данных.");
+            return null;
+        }
+    },
+
+    async loadCustomItems() {
+        try {
+            const q = query(collection(db, "custom_items"));
+            const snap = await getDocs(q);
+            const items = [];
+            snap.forEach(doc => items.push(doc.data()));
+            return items;
+        } catch (e) { return []; }
     }
 };
