@@ -1,3 +1,4 @@
+// js/editor.js
 import { ItemsDB } from './items.js';
 import { DB } from './db.js';
 import { Auth } from './auth.js';
@@ -8,6 +9,8 @@ const getSafeSize = (s) => { const compat = { sm: 'x1', md: 'x1', lg: 'x2' }; re
 export const Editor = {
     data: { mods: [] }, 
     activeModId: null,
+    originalData: null, // Бэкап для режима импорта
+    isImportMode: false, // Флаг режима импорта
     
     scale: 1, panX: 0, panY: 0,
     isPanning: false, panStartX: 0, panStartY: 0, initialPanX: 0, initialPanY: 0,
@@ -43,10 +46,175 @@ export const Editor = {
             summaryPanel.classList.toggle('minimized');
             btnToggleSummary.innerText = summaryPanel.classList.contains('minimized') ? '▲' : '▼';
         });
+
+        // --- ЛОГИКА ИМПОРТА BQ ---
+        const fileInput = document.getElementById('bq-file-input');
+        
+        document.getElementById('btn-import-bq').addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                this.parseBQData(event.target.result);
+                fileInput.value = ''; // Сброс
+            };
+            reader.readAsText(file);
+        });
+
+        document.getElementById('btn-cancel-import').addEventListener('click', () => {
+            if (confirm('Отменить импорт? Вернется старая база квестов.')) {
+                this.isImportMode = false;
+                this.data.mods = JSON.parse(JSON.stringify(this.originalData)); // Возвращаем бэкап
+                this.activeModId = this.data.mods.length > 0 ? this.data.mods[0].id : null;
+                
+                document.getElementById('import-mode-bar').classList.add('hidden');
+                document.body.classList.remove('import-mode');
+                
+                this.renderSidebar();
+                this.renderCanvas();
+                this.centerCanvas();
+            }
+        });
+
+        document.getElementById('btn-apply-import').addEventListener('click', async () => {
+            if (confirm('ВНИМАНИЕ! Это полностью сотрет вашу старую базу квестов в облаке и заменит её на импортированную. Вы уверены?')) {
+                this.isImportMode = false;
+                document.getElementById('import-mode-bar').classList.add('hidden');
+                document.body.classList.remove('import-mode');
+                
+                await DB.saveQuestsSilent(this.data.mods);
+                DB.logAction('Выполнил импорт базы BetterQuesting');
+                alert('Импорт успешно сохранен в базу!');
+            }
+        });
+    },
+
+    // --- ПАРСЕР BETTER QUESTING ---
+    parseBQData(jsonString) {
+        try {
+            const rawData = JSON.parse(jsonString);
+            
+            // Убираем маркеры NBT (:8, :3, :10 и тд) из ключей
+            const cleanKeys = (obj) => {
+                if (Array.isArray(obj)) return obj.map(cleanKeys);
+                if (obj !== null && typeof obj === 'object') {
+                    const cleaned = {};
+                    for (let key in obj) {
+                        const cleanKey = key.split(':')[0];
+                        cleaned[cleanKey] = cleanKeys(obj[key]);
+                    }
+                    return cleaned;
+                }
+                return obj;
+            };
+
+            const data = cleanKeys(rawData);
+            const questsMap = {};
+
+            if (data.questDatabase) {
+                Object.values(data.questDatabase).forEach(q => {
+                    let reqs = [];
+                    let rewards = [];
+                    
+                    if (q.tasks) {
+                        Object.values(q.tasks).forEach(task => {
+                            if (task.taskID === 'bq_standard:retrieval' && task.requiredItems) {
+                                Object.values(task.requiredItems).forEach(item => {
+                                    reqs.push({
+                                        item: { image: '', name: item.id }, // Поддельный предмет (без картинки, только ID)
+                                        count: item.Count || 1,
+                                        customName: item.id,
+                                        consume: task.consume || false
+                                    });
+                                });
+                            }
+                        });
+                    }
+                    
+                    if (q.rewards) {
+                        Object.values(q.rewards).forEach(rew => {
+                            if (rew.rewardID === 'bq_standard:item' && rew.rewards) {
+                                Object.values(rew.rewards).forEach(item => {
+                                    rewards.push({
+                                        item: { image: '', name: item.id },
+                                        count: item.Count || 1,
+                                        customName: item.id,
+                                        isChoice: false
+                                    });
+                                });
+                            }
+                        });
+                    }
+
+                    questsMap[q.questID] = {
+                        id: 'bq_' + q.questID,
+                        title: q.properties?.betterquesting?.name || 'Безымянный квест',
+                        desc: q.properties?.betterquesting?.desc || '',
+                        icon: q.properties?.betterquesting?.icon?.id || '',
+                        parents: (q.preRequisites || []).map(p => 'bq_' + p),
+                        reqs: reqs,
+                        rewards: rewards
+                    };
+                });
+            }
+
+            const newMods = [];
+            if (data.questLines) {
+                Object.keys(data.questLines).forEach(key => {
+                    const ql = data.questLines[key];
+                    const lineQuests = [];
+                    
+                    if (ql.quests) {
+                        Object.values(ql.quests).forEach(pos => {
+                            const baseQ = questsMap[pos.id];
+                            if (baseQ) {
+                                lineQuests.push({
+                                    ...baseQ,
+                                    x: pos.x || 0,
+                                    y: pos.y || 0,
+                                    size: pos.sizeX > 24 ? 'x2' : 'x1' // Примерный размер
+                                });
+                            }
+                        });
+                    }
+
+                    newMods.push({
+                        id: 'bq_mod_' + key,
+                        name: ql.properties?.betterquesting?.name || 'Ветка ' + key,
+                        icon: ql.properties?.betterquesting?.icon?.id || '',
+                        quests: lineQuests
+                    });
+                });
+            }
+
+            // Включаем Сандбокс Импорта
+            this.originalData = JSON.parse(JSON.stringify(this.data.mods)); // Делаем бэкап
+            this.isImportMode = true;
+            this.data.mods = newMods;
+            this.activeModId = newMods.length > 0 ? newMods[0].id : null;
+            
+            document.getElementById('import-mode-bar').classList.remove('hidden');
+            document.body.classList.add('import-mode');
+            
+            this.renderSidebar();
+            this.renderCanvas();
+            this.centerCanvas();
+
+        } catch (e) {
+            console.error(e);
+            alert('Ошибка парсинга файла! Убедитесь, что это QuestDatabase.json от BetterQuesting.');
+        }
     },
 
     triggerAutoSave() {
         if (!Auth.user) return;
+        if (this.isImportMode) return; // ЗАЩИТА: Не сохраняем автоматом в режиме импорта!
+
         const indicator = document.getElementById('save-indicator');
         indicator.classList.remove('hidden');
         indicator.innerText = "Сохранение...";
@@ -211,7 +379,6 @@ export const Editor = {
             this.openQuestModal();
         });
 
-        // НОВАЯ КНОПКА: КОПИРОВАТЬ
         document.getElementById('menu-copy').addEventListener('click', () => {
             contextMenu.classList.add('hidden');
             this.copyQuest(this.contextNodeId);
@@ -407,27 +574,25 @@ export const Editor = {
         });
     },
 
-    // НОВАЯ ФУНКЦИЯ: КОПИРОВАНИЕ КВЕСТА
     copyQuest(questId) {
         const mod = this.getActiveMod();
         const originalQuest = mod.quests.find(q => q.id === questId);
         if (!originalQuest) return;
 
-        // Делаем глубокую копию, чтобы предметы не "склеились" в памяти
         const copiedReqs = JSON.parse(JSON.stringify(originalQuest.reqs || []));
         const copiedRewards = JSON.parse(JSON.stringify(originalQuest.rewards || []));
 
         const newQuest = {
             id: 'q_' + Date.now(),
-            x: originalQuest.x + 60, // Смещаем чуть вправо
-            y: originalQuest.y + 60, // Смещаем чуть вниз
+            x: originalQuest.x + 60, 
+            y: originalQuest.y + 60, 
             title: originalQuest.title + ' (Копия)',
             desc: originalQuest.desc,
             size: originalQuest.size,
             icon: originalQuest.icon,
             reqs: copiedReqs,
             rewards: copiedRewards,
-            parents: [] // Связи не копируем
+            parents: [] 
         };
 
         mod.quests.push(newQuest);
