@@ -10,9 +10,7 @@
 
     <div id="top-bar" class="mc-panel ui-element">
         <span style="color: #ffaa00; margin-right: 15px;">👤 <span id="current-user-name">Загрузка...</span></span>
-        
         <button id="btn-show-login" class="mc-button guest-only" style="margin-right: 15px; font-size: 12px; padding: 4px; display: none;">Войти</button>
-        
         <button id="btn-logout" class="mc-button admin-only" style="margin-right: 15px; font-size: 12px; padding: 4px; display: none;">Выйти</button>
         <button id="btn-open-admin" class="mc-button super-admin-only" style="margin-right: 15px; background-color: #550000; color:white; display: none;">⚡ Админ Панель</button>
         <button id="btn-toggle-titles" class="mc-button">Скрыть названия</button>
@@ -184,6 +182,14 @@
     <div id="item-picker-modal" class="modal hidden">
         <div class="mc-panel modal-content large">
             <h2 class="mc-title">Выбор предмета</h2>
+            
+            <div class="mc-panel admin-only" style="margin-bottom: 10px; padding: 10px; display: flex; gap: 10px; align-items: center; border-width: 2px;">
+                <span style="color:#55ffff; font-size:14px; white-space:nowrap;">Своя иконка:</span>
+                <input type="file" id="custom-item-file" accept="image/png, image/jpeg, image/gif" style="font-size:12px; width: 180px; color:#fff;">
+                <input type="text" id="custom-item-name" class="mc-input" placeholder="Название предмета..." style="padding:4px; font-size:14px;">
+                <button id="btn-upload-custom-item" class="mc-button" style="padding:4px 8px; font-size:14px;">Добавить</button>
+            </div>
+
             <div class="picker-controls">
                 <select id="picker-mod-filter" class="mc-input"></select>
                 <input type="text" id="picker-search" class="mc-input" placeholder="Поиск по названию или ID...">
