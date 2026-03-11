@@ -40,31 +40,26 @@ export const ItemsDB = {
         return results; 
     },
 
-    // Улучшенный и агрессивный поиск (решает проблему с деньгами)
+    // Мощный поиск, игнорирующий отсутствие урона у некоторых модов (как деньги)
     findItemByBQ(bqId, damage) {
         let dmg = damage !== undefined ? damage : 0;
+        let strId = String(bqId);
         let item;
         
-        // 1. Ищем по string_id с учетом урона
-        item = this.items.find(i => i.string_id === bqId && (i.damage == dmg || String(i.item_key).endsWith(':' + dmg)));
-        
-        // 2. Если не нашли, ищем ПРОСТО по string_id (игнорируя урон - именно это спасет деньги)
-        if (!item) item = this.items.find(i => i.string_id === bqId);
-        
-        // 3. Старый поиск по ключам
-        if (!item) item = this.items.find(i => i.item_key === `${bqId}:${dmg}`);
-        if (!item) item = this.items.find(i => i.item_key === bqId || i.item_id == bqId);
-        
-        // 4. Поиск по имени на крайний случай
-        if (!item) item = this.items.find(i => i.name === bqId);
+        item = this.items.find(i => i.string_id === strId && (i.damage == dmg || String(i.item_key).endsWith(':' + dmg)));
+        if (!item) item = this.items.find(i => i.string_id === strId);
+        if (!item) item = this.items.find(i => i.item_key === `${strId}:${dmg}`);
+        if (!item) item = this.items.find(i => i.item_key === strId || i.item_id == strId);
+        if (!item) item = this.items.find(i => i.name === strId);
         
         if (!item) {
             return {
-                item_key: `${bqId}:${dmg}`,
-                name: bqId,
+                item_key: `${strId}:${dmg}`,
+                name: strId,
                 image: '', 
-                mod: 'Импортировано (Нет в базе)',
-                string_id: bqId
+                mod: 'Импортировано',
+                string_id: strId,
+                damage: dmg
             };
         }
         return item;
