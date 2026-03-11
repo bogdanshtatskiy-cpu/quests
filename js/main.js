@@ -1,4 +1,3 @@
-// js/main.js
 import { ItemsDB } from './items.js';
 import { Auth } from './auth.js';
 import { DB } from './db.js';
@@ -6,18 +5,10 @@ import { Editor } from './editor.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
     const loader = document.getElementById('global-loader');
-    const loaderText = document.getElementById('loader-text');
     
     Auth.init();
     
-    loaderText.innerText = "Чтение базы предметов (database.json)...";
-    await ItemsDB.load();
-    
-    loaderText.innerText = "Подключение к серверу...";
-    const customItems = await DB.loadCustomItems();
-    ItemsDB.addCustomItems(customItems);
-    
-    loaderText.innerText = "Синхронизация квестов...";
+    // Быстро качаем только квесты из Firebase
     const savedQuests = await DB.loadQuests();
     if (savedQuests && savedQuests.length > 0) {
         savedQuests.forEach(mod => {
@@ -31,20 +22,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         Editor.activeModId = savedQuests[0].id; 
     }
     
+    // МОМЕНТАЛЬНО отрисовываем редактор
     Editor.init();
     
-    // Прячем загрузочный экран, когда всё готово
     loader.classList.add('hidden');
     setTimeout(() => loader.style.display = 'none', 500);
 
-    // --- Дальше старый код админки без изменений ---
+    // ФОНОВАЯ ЗАГРУЗКА БАЗЫ ПРЕДМЕТОВ (не тормозит экран)
+    ItemsDB.load().then(async () => {
+        const customItems = await DB.loadCustomItems();
+        ItemsDB.addCustomItems(customItems);
+        console.log("База предметов (10k+) успешно загружена в фоне!");
+    });
+
+    // Админка
     document.getElementById('btn-open-admin').addEventListener('click', async () => {
         document.getElementById('admin-modal').classList.remove('hidden');
-        
         const logsContainer = document.getElementById('logs-tbody');
         logsContainer.innerHTML = '<tr><td colspan="3">Загрузка...</td></tr>';
         const logs = await DB.getLogs();
-        
         logsContainer.innerHTML = logs.map(l => {
             let d = new Date(l.timestamp);
             if (isNaN(d.getTime())) d = new Date(); 
@@ -52,7 +48,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const date = d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
             return `<tr><td>${date} ${time}</td><td><b style="color:#55ffff;">${l.username}</b></td><td>${l.action}</td></tr>`;
         }).join('');
-
         renderUsersTable();
     });
 
@@ -60,7 +55,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const usersTbody = document.getElementById('users-tbody');
         usersTbody.innerHTML = '<tr><td colspan="2">Загрузка...</td></tr>';
         const users = await DB.getUsers();
-        
         usersTbody.innerHTML = '';
         users.forEach(u => {
             const tr = document.createElement('tr');
