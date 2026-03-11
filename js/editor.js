@@ -108,7 +108,7 @@ export const Editor = {
 
             if (data.questDatabase) {
                 Object.entries(data.questDatabase).forEach(([qKey, q]) => {
-                    const actualId = q.questID !== undefined ? q.questID : qKey;
+                    const actualId = String(q.questID !== undefined ? q.questID : qKey);
                     let reqs = [];
                     let rewards = [];
                     
@@ -188,13 +188,18 @@ export const Editor = {
                 Object.keys(data.questLines).forEach(key => {
                     const ql = data.questLines[key];
                     const lineQuests = [];
+                    const addedIds = new Set();
                     
                     if (ql.quests) {
                         Object.values(ql.quests).forEach(pos => {
-                            const baseQ = questsMap[pos.id];
+                            const qIdStr = String(pos.id !== undefined ? pos.id : (pos.questID !== undefined ? pos.questID : ""));
+                            if (!qIdStr || addedIds.has(qIdStr)) return;
+                            addedIds.add(qIdStr);
+
+                            const baseQ = questsMap[qIdStr];
                             if (baseQ) {
                                 lineQuests.push({
-                                    ...baseQ,
+                                    ...JSON.parse(JSON.stringify(baseQ)),
                                     x: (pos.x || 0) * 3,
                                     y: (pos.y || 0) * 3,
                                     size: pos.sizeX > 24 ? 'x2' : 'x1' 
@@ -259,7 +264,6 @@ export const Editor = {
 
                 if (q.reqs) {
                     q.reqs.forEach(req => {
-                        // АВТО-КОНВЕРТАЦИЯ СТАРЫХ ПРЕФИКСОВ
                         let tType = req.taskType;
                         if (!tType) {
                             const nameStr = req.customName || req.item.name || "";
@@ -281,10 +285,10 @@ export const Editor = {
                     const dict = {};
                     arr.forEach((req, idx) => {
                         let sysId = req.item.string_id || req.item.item_key || "minecraft:stone";
-                        let damage = req.item.damage !== undefined ? req.item.damage : -1;
+                        let damage = req.item.damage !== undefined ? req.item.damage : 0;
                         if (!req.item.string_id && sysId.includes(':') && !sysId.match(/[a-zA-Z]/)) {
                             const parts = sysId.split(':');
-                            sysId = parts[0]; damage = parseInt(parts[1]) || -1;
+                            sysId = parts[0]; damage = parseInt(parts[1]) || 0;
                         }
                         dict[`${idx}:10`] = { "id:8": sysId, "Count:3": parseInt(req.count) || 1, "Damage:2": damage, "OreDict:8": "" };
                     });
@@ -927,18 +931,6 @@ export const Editor = {
             if (q.req && reqs.length === 0) reqs = [q.req]; 
             
             this.tempReqs = JSON.parse(JSON.stringify(reqs));
-            
-            // Автоконвертация старых префиксов в новые типы задач
-            this.tempReqs.forEach(r => {
-                if(!r.taskType) {
-                    const nameStr = r.customName || r.item.name || "";
-                    if (nameStr.startsWith('Убить: ')) { r.taskType = 'hunt'; r.target = nameStr.replace('Убить: ', '').trim(); }
-                    else if (nameStr.startsWith('Сломать: ')) { r.taskType = 'block_break'; r.customName = nameStr.replace('Сломать: ', '').trim(); }
-                    else if (nameStr.startsWith('Создать: ')) { r.taskType = 'crafting'; r.customName = nameStr.replace('Создать: ', '').trim(); }
-                    else r.taskType = 'retrieval';
-                }
-            });
-
             this.tempRewards = q.rewards ? JSON.parse(JSON.stringify(q.rewards)) : [];
         } else {
             document.getElementById('quest-title').value = '';
@@ -963,12 +955,10 @@ export const Editor = {
             const tType = r.taskType || 'retrieval';
             const isChecked = r.consume !== false ? 'checked' : '';
             
-            // Инпут меняется в зависимости от типа
             const targetInputHtml = tType === 'hunt' 
                 ? `<input type="text" id="req-target-${idx}" class="mc-input custom-name-input" value="${r.target || r.customName || ''}" placeholder="Моб (напр. Creeper)">`
                 : `<input type="text" id="req-name-${idx}" class="mc-input custom-name-input" value="${r.customName || ''}" placeholder="Название">`;
 
-            // Прячем галочку для мобов и блоков
             const showConsume = (tType === 'hunt' || tType === 'block_break') ? 'display:none;' : '';
 
             div.innerHTML = `
