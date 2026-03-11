@@ -1,3 +1,4 @@
+// js/editor.js
 import { ItemsDB } from './items.js';
 import { DB } from './db.js';
 import { Auth } from './auth.js';
@@ -233,6 +234,15 @@ export const Editor = {
                 }
             });
 
+            // ЛОГИКА ОТКРЫТИЯ ПРОСМОТРА ПО КЛИКУ ЛКМ
+            node.addEventListener('click', (e) => {
+                if (e.button !== 0) return; // Только ЛКМ
+                if (e.shiftKey && Auth.user) return; // Игнорируем, если это была связка
+                if (this.hasMovedNode) return; // Игнорируем, если мы только что перетащили квест
+                
+                this.openQuestViewModal(quest.id);
+            });
+
             node.addEventListener('contextmenu', (e) => {
                 e.preventDefault(); e.stopPropagation();
                 if (!Auth.user) return; 
@@ -338,6 +348,11 @@ export const Editor = {
     bindQuestModalEvents() {
         const modal = document.getElementById('quest-edit-modal');
         
+        // Закрытие окна ПРОСМОТРА
+        document.getElementById('btn-close-view').addEventListener('click', () => {
+            document.getElementById('quest-view-modal').classList.add('hidden');
+        });
+        
         document.getElementById('btn-toggle-all-consume').addEventListener('click', () => {
             this.saveTempState(); 
             const targetState = this.tempReqs.some(r => r.consume === false);
@@ -403,6 +418,63 @@ export const Editor = {
         });
 
         document.getElementById('btn-close-quest').addEventListener('click', () => modal.classList.add('hidden'));
+    },
+
+    // НОВАЯ ФУНКЦИЯ: Окно просмотра квеста
+    openQuestViewModal(questId) {
+        const mod = this.getActiveMod();
+        const quest = mod.quests.find(q => q.id === questId);
+        if (!quest) return;
+
+        const modal = document.getElementById('quest-view-modal');
+        
+        let iconStr = '';
+        if (quest.icon) iconStr = quest.icon;
+        else if (quest.reqs && quest.reqs.length > 0) iconStr = quest.reqs[0].item.image;
+        
+        document.getElementById('view-quest-icon').innerHTML = iconStr ? `<img src="${ItemsDB.getImageUrl(iconStr)}" style="width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated;">` : '';
+        document.getElementById('view-quest-title').innerHTML = ItemsDB.formatMC(quest.title);
+        document.getElementById('view-quest-desc').innerHTML = ItemsDB.formatMC(quest.desc || 'Нет описания.');
+
+        const reqsBox = document.getElementById('view-reqs-list');
+        reqsBox.innerHTML = '';
+        if (quest.reqs && quest.reqs.length > 0) {
+            quest.reqs.forEach(r => {
+                const consumeText = r.consume !== false ? '<span style="color:#ff5555;">[Забирается]</span>' : '<span style="color:#aaaaaa;">[Только наличие]</span>';
+                reqsBox.innerHTML += `
+                    <div class="view-item-row">
+                        <div class="mc-slot"><img src="${ItemsDB.getImageUrl(r.item.image)}"></div>
+                        <div class="item-info">
+                            <span class="item-name">${r.count}x ${ItemsDB.formatMC(r.customName || r.item.name)}</span>
+                            <span class="item-meta">${consumeText}</span>
+                        </div>
+                    </div>
+                `;
+            });
+        } else {
+            reqsBox.innerHTML = '<div style="padding: 15px; color: #aaa; font-size: 16px;">Нет требований</div>';
+        }
+
+        const rewsBox = document.getElementById('view-rewards-list');
+        rewsBox.innerHTML = '';
+        if (quest.rewards && quest.rewards.length > 0) {
+            quest.rewards.forEach(r => {
+                const choiceText = r.isChoice ? '<span style="color:#ffff55;">[На выбор]</span>' : '<span style="color:#55ff55;">[Гарантировано]</span>';
+                rewsBox.innerHTML += `
+                    <div class="view-item-row">
+                        <div class="mc-slot"><img src="${ItemsDB.getImageUrl(r.item.image)}"></div>
+                        <div class="item-info">
+                            <span class="item-name">${r.count}x ${ItemsDB.formatMC(r.customName || r.item.name)}</span>
+                            <span class="item-meta">${choiceText}</span>
+                        </div>
+                    </div>
+                `;
+            });
+        } else {
+            rewsBox.innerHTML = '<div style="padding: 15px; color: #aaa; font-size: 16px;">Нет наград</div>';
+        }
+
+        modal.classList.remove('hidden');
     },
 
     openQuestModal(questId = null) {
