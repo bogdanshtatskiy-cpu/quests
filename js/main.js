@@ -5,12 +5,19 @@ import { DB } from './db.js';
 import { Editor } from './editor.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
+    const loader = document.getElementById('global-loader');
+    const loaderText = document.getElementById('loader-text');
+    
     Auth.init();
+    
+    loaderText.innerText = "Чтение базы предметов (database.json)...";
     await ItemsDB.load();
     
+    loaderText.innerText = "Подключение к серверу...";
     const customItems = await DB.loadCustomItems();
     ItemsDB.addCustomItems(customItems);
     
+    loaderText.innerText = "Синхронизация квестов...";
     const savedQuests = await DB.loadQuests();
     if (savedQuests && savedQuests.length > 0) {
         savedQuests.forEach(mod => {
@@ -25,7 +32,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     Editor.init();
+    
+    // Прячем загрузочный экран, когда всё готово
+    loader.classList.add('hidden');
+    setTimeout(() => loader.style.display = 'none', 500);
 
+    // --- Дальше старый код админки без изменений ---
     document.getElementById('btn-open-admin').addEventListener('click', async () => {
         document.getElementById('admin-modal').classList.remove('hidden');
         
