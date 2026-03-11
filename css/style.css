@@ -6,6 +6,7 @@ body { background-color: #202020; color: #404040; overflow: hidden; user-select:
 
 .hidden { display: none !important; }
 
+/* GUI Minecraft */
 .mc-panel {
     background-color: #c6c6c6; border: 3px solid;
     border-top-color: #ffffff; border-left-color: #ffffff;
@@ -44,6 +45,7 @@ textarea.mc-input { resize: none; height: 120px; }
     display: inline-flex; justify-content: center; align-items: center;
 }
 
+/* Макет */
 #top-bar { position: absolute; top: 0; left: 0; width: 100%; height: 45px; z-index: 100; display: flex; align-items: center; gap: 10px; padding: 0 10px; border-bottom-width: 3px; }
 .controls-hint { margin-left: auto; color: #404040; text-shadow: 1px 1px 0 #fff; font-size: 14px; }
 #app-container { display: flex; height: 100vh; width: 100vw; padding-top: 45px; }
@@ -62,13 +64,14 @@ textarea.mc-input { resize: none; height: 120px; }
 .mod-btn { background: transparent; border: none; cursor: pointer; font-size: 16px; }
 .mod-btn:hover { transform: scale(1.2); }
 
-#canvas-container { flex: 1; position: relative; background-color: #202020; }
+/* Холст */
+#canvas-container { flex: 1; position: relative; background-color: #202020; overflow: hidden; }
 #quest-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform-origin: 0 0; }
 #connections-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 .quest-line { stroke: #00aaaa; stroke-width: 4; fill: none; }
 #nodes-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-.save-btn { position: absolute; bottom: 20px; right: 20px; z-index: 100; }
 
+/* Окно статистики */
 #rewards-summary {
     position: absolute; top: 55px; right: 10px; 
     min-width: 250px; width: max-content; max-width: 60vw;
@@ -77,8 +80,7 @@ textarea.mc-input { resize: none; height: 120px; }
 }
 #rewards-summary .summary-header {
     display: flex; justify-content: space-between; align-items: center;
-    border-bottom: 1px solid #333; padding-bottom: 5px; margin-bottom: 5px;
-    gap: 20px;
+    border-bottom: 1px solid #333; padding-bottom: 5px; margin-bottom: 5px; gap: 20px;
 }
 #rewards-summary .mc-title { margin: 0; font-size: 14px; text-shadow: 1px 1px 0 #000; color: #55ffff; white-space: nowrap; }
 #rewards-summary-list { overflow-y: auto; overflow-x: hidden; max-height: 40vh; }
@@ -88,18 +90,25 @@ textarea.mc-input { resize: none; height: 120px; }
 #rewards-summary.minimized #rewards-summary-list { display: none; }
 #rewards-summary.minimized { padding: 5px 10px; width: auto; }
 
+/* УЗЕЛ КВЕСТА - НОВЫЕ РАЗМЕРЫ */
 .quest-node { position: absolute; background-color: #8b8b8b; border: 3px solid; border-top-color: #373737; border-left-color: #373737; border-bottom-color: #ffffff; border-right-color: #ffffff; display: flex; justify-content: center; align-items: center; cursor: pointer; pointer-events: auto; padding: 3px; }
 .quest-node.selected { border-color: #55ffff; box-shadow: 0 0 10px #55ffff; }
-.quest-node.size-sm { width: 36px; height: 36px; }
-.quest-node.size-md { width: 52px; height: 52px; }
-.quest-node.size-lg { width: 68px; height: 68px; }
+
+.quest-node.size-x1 { width: 52px; height: 52px; }
+.quest-node.size-x2 { width: 104px; height: 104px; border-width: 4px;}
+.quest-node.size-x3 { width: 156px; height: 156px; border-width: 5px;}
+.quest-node.size-x4 { width: 208px; height: 208px; border-width: 6px;}
+
 .quest-node img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; pointer-events: none; }
+
 .quest-node .node-title { position: absolute; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 3px 6px; border-radius: 3px; white-space: nowrap; font-size: 14px; pointer-events: none; display: none; z-index: 5; }
-.quest-node.size-sm .node-title { top: 38px; }
-.quest-node.size-md .node-title { top: 54px; }
-.quest-node.size-lg .node-title { top: 70px; }
+.quest-node.size-x1 .node-title { top: 54px; }
+.quest-node.size-x2 .node-title { top: 106px; }
+.quest-node.size-x3 .node-title { top: 158px; font-size: 16px;}
+.quest-node.size-x4 .node-title { top: 210px; font-size: 18px;}
 body.show-titles .quest-node .node-title { display: block; }
 
+/* Тултип */
 #quest-tooltip { 
     position: fixed; z-index: 9999; background-color: rgba(16, 16, 20, 0.95); 
     border: 2px solid #373737; border-radius: 4px; color: #fff; padding: 12px; 
@@ -113,12 +122,14 @@ body.show-titles .quest-node .node-title { display: block; }
 .tt-item { display: flex; align-items: center; margin-top: 4px; font-size: 14px; white-space: nowrap; }
 .tt-item img { width: 16px; height: 16px; image-rendering: pixelated; margin-right: 6px; flex-shrink: 0; }
 
+/* Контекстное меню */
 .context-menu { position: absolute; z-index: 1000; padding: 0; min-width: 200px; box-shadow: 4px 4px 0px rgba(0,0,0,0.5); }
 .menu-item { padding: 10px 15px; cursor: pointer; font-size: 16px; color: #404040; text-shadow: 1px 1px 0 #fff; border-bottom: 2px solid #a0a0a0; background-color: #c6c6c6; }
 .menu-item:hover { background-color: #a0a0a0; color: #000; }
 .menu-item.delete { color: #aa0000; border-bottom: none; }
 .menu-item.delete:hover { background-color: #ffaaaa; }
 
+/* Модальные окна */
 .modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.8); display: flex; justify-content: center; align-items: center; z-index: 2000; }
 .modal-content { width: 450px; padding: 20px; max-height: 95vh; overflow-y: auto; }
 .modal-content.large { width: 1100px; max-width: 95vw; }
@@ -131,6 +142,7 @@ body.show-titles .quest-node .node-title { display: block; }
 .form-group-header label { margin-bottom: 0; }
 .modal-actions { display: flex; justify-content: space-between; margin-top: 20px; border-top: 2px solid #555; padding-top: 15px; }
 
+/* Списки внутри редактора квеста */
 .item-list-container { overflow-y: auto; background-color: #1e1e1e; border: 2px solid #555; padding: 5px; }
 .item-list-container.big-list { max-height: 350px; min-height: 150px; }
 .mt-5 { margin-top: 10px; width: 100%; }
@@ -141,6 +153,7 @@ body.show-titles .quest-node .node-title { display: block; }
 .reward-row .mc-checkbox { font-size: 13px; margin: 0 5px; display: flex; align-items: center; gap: 4px; color: #fff; cursor: pointer; white-space: nowrap; }
 .reward-row .mc-checkbox input { margin: 0; cursor: pointer; }
 
+/* Поиск */
 .picker-controls { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
 .picker-controls input[type="text"] { flex: 2; margin: 0; }
 .picker-controls select { flex: 1; margin: 0; }
@@ -156,14 +169,11 @@ body.show-titles .quest-node .node-title { display: block; }
 .admin-table th { background-color: #373737; padding: 8px; text-align: left; border-bottom: 2px solid #555; position: sticky; top: 0; z-index: 2; }
 .admin-table td { padding: 8px; border-bottom: 1px solid #333; }
 .admin-table tr:hover { background-color: #444; }
-/* Стили для Режима Просмотра Квеста */
-.view-item-row { 
-    display: flex; align-items: center; gap: 15px; 
-    padding: 10px; border-bottom: 2px solid #333; 
-    background-color: transparent;
-}
+
+/* Режим Просмотра */
+.view-item-row { display: flex; align-items: center; gap: 15px; padding: 10px; border-bottom: 2px solid #333; background-color: transparent; }
 .view-item-row:last-child { border-bottom: none; }
-.view-item-row .mc-slot { width: 40px; height: 40px; }
+.view-item-row .mc-slot { width: 40px; height: 40px; flex-shrink: 0; }
 .view-item-row .mc-slot img { width: 24px; height: 24px; }
 .view-item-row .item-info { display: flex; flex-direction: column; gap: 4px; }
 .view-item-row .item-name { font-size: 18px; color: #fff; text-shadow: 1px 1px 0 #000; }
