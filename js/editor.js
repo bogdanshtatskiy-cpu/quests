@@ -86,7 +86,7 @@ export const Editor = {
         });
     },
 
-    // --- ИМПОРТ: РАСШИРЕННЫЙ ПАРСЕР (Мобы, Блоки, Крафт, Выбор наград) ---
+    // --- УЛУЧШЕННЫЙ ПАРСЕР (Не теряет квесты без ID, пылесосит все награды) ---
     parseBQData(jsonString) {
         try {
             const rawData = JSON.parse(jsonString);
@@ -108,76 +108,77 @@ export const Editor = {
             const questsMap = {};
 
             if (data.questDatabase) {
-                Object.values(data.questDatabase).forEach(q => {
+                // Используем Object.entries, чтобы брать ключ, если questID внутри отсутствует
+                Object.entries(data.questDatabase).forEach(([qKey, q]) => {
+                    const actualId = q.questID !== undefined ? q.questID : qKey;
+                    
                     let reqs = [];
                     let rewards = [];
                     
+                    // Парсинг ВСЕХ ТРЕБОВАНИЙ
                     if (q.tasks) {
                         Object.values(q.tasks).forEach(task => {
-                            // 1. ОБЫЧНЫЙ СБОР (retrieval)
-                            if (task.taskID === 'bq_standard:retrieval' && task.requiredItems) {
+                            if (task.requiredItems) {
                                 Object.values(task.requiredItems).forEach(item => {
-                                    const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage || 0);
-                                    reqs.push({ item: foundItem, count: item.Count || 1, customName: foundItem.name === item.id ? item.id : foundItem.name, consume: task.consume || false });
+                                    const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage);
+                                    let prefix = "";
+                                    if (task.taskID && task.taskID.includes('crafting')) prefix = "Создать: ";
+                                    reqs.push({ item: foundItem, count: item.Count || 1, customName: prefix + (foundItem.name === item.id ? item.id : foundItem.name), consume: task.consume || false });
                                 });
                             }
-                            // 2. КРАФТ (crafting)
-                            else if (task.taskID === 'bq_standard:crafting' && task.requiredItems) {
-                                Object.values(task.requiredItems).forEach(item => {
-                                    const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage || 0);
-                                    reqs.push({ item: foundItem, count: item.Count || 1, customName: `Создать: ${foundItem.name === item.id ? item.id : foundItem.name}`, consume: false });
-                                });
-                            }
-                            // 3. ЛОМАНИЕ БЛОКОВ (block_break)
-                            else if (task.taskID === 'bq_standard:block_break' && task.blocks) {
+                            if (task.blocks) {
                                 Object.values(task.blocks).forEach(block => {
-                                    const foundItem = ItemsDB.findItemByBQ(block.id, block.Damage || 0);
+                                    const foundItem = ItemsDB.findItemByBQ(block.id, block.Damage);
                                     reqs.push({ item: foundItem, count: block.Count || 1, customName: `Сломать: ${foundItem.name === block.id ? block.id : foundItem.name}`, consume: false });
                                 });
                             }
-                            // 4. УБИЙСТВО МОБОВ (hunt)
-                            else if (task.taskID === 'bq_standard:hunt') {
-                                reqs.push({
-                                    item: { item_key: `mob_${task.target}`, name: task.target, image: '', mod: 'Мобы' },
-                                    count: task.required || 1,
-                                    customName: `Убить: ${task.target}`,
-                                    consume: false
-                                });
+                            if (task.taskID === 'bq_standard:hunt' || task.target) {
+                                 const target = task.target || "Моб";
+                                 reqs.push({ item: { item_key: `mob_${target}`, name: target, image: '', mod: 'Мобы' }, count: task.required || 1, customName: `Убить: ${target}`, consume: false });
                             }
                         });
                     }
                     
+                    // Парсинг ВСЕХ НАГРАД
                     if (q.rewards) {
                         Object.values(q.rewards).forEach(rew => {
-                            // 1. СТАНДАРТНАЯ НАГРАДА
-                            if (rew.rewardID === 'bq_standard:item' && rew.rewards) {
+                            if (rew.rewards) {
                                 Object.values(rew.rewards).forEach(item => {
-                                    const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage || 0);
+                                    const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage);
                                     rewards.push({ item: foundItem, count: item.Count || 1, customName: foundItem.name === item.id ? item.id : foundItem.name, isChoice: false });
                                 });
                             }
-                            // 2. НАГРАДА НА ВЫБОР (choice)
-                            else if (rew.rewardID === 'bq_standard:choice' && rew.choices) {
+                            if (rew.choices) {
                                 Object.values(rew.choices).forEach(item => {
-                                    const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage || 0);
+                                    const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage);
                                     rewards.push({ item: foundItem, count: item.Count || 1, customName: foundItem.name === item.id ? item.id : foundItem.name, isChoice: true });
                                 });
                             }
                         });
                     }
 
+                    // Читаем связи (они могут быть и массивом, и объектом в старых версиях)
+                    let parents = [];
+                    if (q.preRequisites) {
+                        if (Array.isArray(q.preRequisites)) {
+                            parents = q.preRequisites.map(p => 'bq_' + p);
+                        } else {
+                            parents = Object.values(q.preRequisites).map(p => 'bq_' + p);
+                        }
+                    }
+
                     let questIconStr = '';
                     if (q.properties?.betterquesting?.icon?.id) {
-                        const iconItem = ItemsDB.findItemByBQ(q.properties.betterquesting.icon.id, q.properties.betterquesting.icon.Damage || 0);
+                        const iconItem = ItemsDB.findItemByBQ(q.properties.betterquesting.icon.id, q.properties.betterquesting.icon.Damage);
                         questIconStr = iconItem.image || '';
                     }
 
-                    questsMap[q.questID] = {
-                        id: 'bq_' + q.questID,
+                    questsMap[actualId] = {
+                        id: 'bq_' + actualId,
                         title: q.properties?.betterquesting?.name || 'Безымянный квест',
                         desc: q.properties?.betterquesting?.desc || '',
                         icon: questIconStr,
-                        parents: (q.preRequisites || []).map(p => 'bq_' + p),
+                        parents: parents,
                         reqs: reqs,
                         rewards: rewards
                     };
@@ -228,7 +229,6 @@ export const Editor = {
         }
     },
 
-    // --- ЭКСПОРТ: РАСШИРЕННЫЙ (С определением мобов и ломания блоков) ---
     exportToBQ() {
         const bqData = {
             "build:8": "3.0.328",
@@ -251,7 +251,6 @@ export const Editor = {
                 const bqId = idMap[q.id];
                 const preReqs = (q.parents || []).map(p => idMap[p]).filter(p => p !== undefined);
 
-                // Сортировка требований по их типу
                 const tasks = {};
                 let taskIdx = 0;
 
@@ -301,7 +300,6 @@ export const Editor = {
                     tasks[`${taskIdx++}:10`] = { "taskID:8": "bq_standard:hunt", "target:8": target, "required:3": parseInt(h.count) || 1, "subtypes:1": 1 };
                 });
 
-                // Сортировка наград
                 const rewards = {};
                 let rewIdx = 0;
                 
