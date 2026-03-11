@@ -3,14 +3,8 @@ import { ItemsDB } from './items.js';
 import { DB } from './db.js';
 import { Auth } from './auth.js';
 
-// Обновленные размеры
 const SIZE_MAP = { x1: 52, x2: 104, x3: 156, x4: 208 };
-
-// Функция совместимости для старых квестов
-const getSafeSize = (s) => {
-    const compat = { sm: 'x1', md: 'x1', lg: 'x2' };
-    return compat[s] || s || 'x1';
-};
+const getSafeSize = (s) => { const compat = { sm: 'x1', md: 'x1', lg: 'x2' }; return compat[s] || s || 'x1'; };
 
 export const Editor = {
     data: { mods: [] }, 
@@ -35,7 +29,7 @@ export const Editor = {
         this.bindTopBarEvents();
         this.renderSidebar();
         this.renderCanvas(); 
-        this.centerCanvas(); // Автоцентрирование при старте
+        this.centerCanvas(); 
     },
 
     bindTopBarEvents() {
@@ -68,7 +62,6 @@ export const Editor = {
         }, 1500);
     },
 
-    // --- НОВАЯ ЛОГИКА АВТОЦЕНТРИРОВАНИЯ ---
     centerCanvas() {
         const mod = this.getActiveMod();
         const container = document.getElementById('canvas-container');
@@ -102,7 +95,6 @@ export const Editor = {
         const scaleX = (contW - padding * 2) / (boxWidth || 1);
         const scaleY = (contH - padding * 2) / (boxHeight || 1);
         
-        // Масштаб подбирается так, чтобы всё влезло, но не больше 1.5 и не меньше 0.1
         this.scale = Math.min(scaleX, scaleY, 1.5);
         this.scale = Math.max(0.1, this.scale);
 
@@ -124,7 +116,6 @@ export const Editor = {
             e.preventDefault();
             const zoomAmount = e.deltaY > 0 ? 0.9 : 1.1;
             
-            // --- НОВАЯ МАТЕМАТИКА: ЗУМ ОТ КУРСОРА ---
             const rect = container.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
@@ -622,30 +613,73 @@ export const Editor = {
         this.renderCanvas();
     },
 
+    // --- НОВАЯ ЛОГИКА ВЫБОРА ПРЕДМЕТОВ (БЕСКОНЕЧНЫЙ СКРОЛЛ И ДВЕ ПАНЕЛИ) ---
     bindItemPickerEvents() {
         const modal = document.getElementById('item-picker-modal');
         const filterMod = document.getElementById('picker-mod-filter');
         const searchInp = document.getElementById('picker-search');
-        const favCb = document.getElementById('picker-fav-only');
         
-        const renderResults = () => {
-            const res = ItemsDB.search(searchInp.value, filterMod.value, favCb.checked);
-            const container = document.getElementById('picker-results');
-            container.innerHTML = '';
-            res.forEach(item => {
-                const div = document.createElement('div');
-                div.className = 'search-result-item';
-                const isFav = ItemsDB.favorites.includes(item.item_key);
-                div.innerHTML = `<span class="fav-star ${isFav ? 'active' : ''}" data-key="${item.item_key}">★</span><img src="${ItemsDB.getImageUrl(item.image)}" width="32" height="32"><span>${ItemsDB.formatMC(item.name)} <small style="color:#888;">[${item.mod}]</small></span>`;
-                div.querySelector('.fav-star').addEventListener('click', (e) => { e.stopPropagation(); ItemsDB.toggleFavorite(item.item_key); renderResults(); });
-                div.addEventListener('click', () => { modal.classList.add('hidden'); if (this.pickerCallback) this.pickerCallback(item); });
-                container.appendChild(div);
+        const resultsContainer = document.getElementById('picker-results');
+        const favContainer = document.getElementById('picker-fav-results');
+
+        let currentSearchData = [];
+        let itemsLimit = 50;
+
+        const createItemElement = (item) => {
+            const div = document.createElement('div');
+            div.className = 'search-result-item';
+            const isFav = ItemsDB.favorites.includes(item.item_key);
+            div.innerHTML = `<span class="fav-star ${isFav ? 'active' : ''}" data-key="${item.item_key}">★</span><img src="${ItemsDB.getImageUrl(item.image)}" width="32" height="32"><span>${ItemsDB.formatMC(item.name)} <small style="color:#888;">[${item.mod}]</small></span>`;
+            
+            div.querySelector('.fav-star').addEventListener('click', (e) => { 
+                e.stopPropagation(); 
+                ItemsDB.toggleFavorite(item.item_key); 
+                updateBothLists(); 
             });
+            div.addEventListener('click', () => { 
+                modal.classList.add('hidden'); 
+                if (this.pickerCallback) this.pickerCallback(item); 
+            });
+            return div;
         };
 
-        searchInp.addEventListener('input', renderResults);
-        filterMod.addEventListener('change', renderResults);
-        favCb.addEventListener('change', renderResults);
+        const renderMainResults = () => {
+            resultsContainer.innerHTML = '';
+            const slice = currentSearchData.slice(0, itemsLimit);
+            slice.forEach(item => resultsContainer.appendChild(createItemElement(item)));
+        };
+
+        const renderFavResults = () => {
+            favContainer.innerHTML = '';
+            const favs = ItemsDB.getFavorites();
+            favs.forEach(item => favContainer.appendChild(createItemElement(item)));
+        };
+
+        const updateBothLists = () => {
+            renderMainResults();
+            renderFavResults();
+        };
+
+        const triggerSearch = () => {
+            currentSearchData = ItemsDB.search(searchInp.value, filterMod.value);
+            itemsLimit = 50; 
+            resultsContainer.scrollTop = 0;
+            updateBothLists();
+        };
+
+        searchInp.addEventListener('input', triggerSearch);
+        filterMod.addEventListener('change', triggerSearch);
+        
+        // Бесконечный скролл (подгрузка по 50 элементов)
+        resultsContainer.addEventListener('scroll', () => {
+            if (resultsContainer.scrollTop + resultsContainer.clientHeight >= resultsContainer.scrollHeight - 20) {
+                if (itemsLimit < currentSearchData.length) {
+                    itemsLimit += 50;
+                    renderMainResults();
+                }
+            }
+        });
+
         document.getElementById('btn-picker-cancel').addEventListener('click', () => modal.classList.add('hidden'));
 
         document.getElementById('btn-upload-custom-item').addEventListener('click', () => {
@@ -692,7 +726,7 @@ export const Editor = {
                     if (newItem) {
                         ItemsDB.addCustomItems([newItem]);
                         searchInp.value = name;
-                        renderResults();
+                        triggerSearch(); // Обновляем поисковую выдачу
                     }
                 };
                 img.src = event.target.result;
@@ -707,7 +741,7 @@ export const Editor = {
                 ItemsDB.mods.forEach(m => filterMod.innerHTML += `<option value="${m}">${m}</option>`);
             }
             searchInp.value = '';
-            renderResults();
+            triggerSearch();
             modal.classList.remove('hidden');
             setTimeout(() => searchInp.focus(), 50); 
         };
@@ -760,9 +794,7 @@ export const Editor = {
         this.data.mods.forEach(mod => {
             const li = document.createElement('li');
             li.className = 'mod-item';
-            if (this.activeModId === mod.id) {
-                li.classList.add('active');
-            }
+            if (this.activeModId === mod.id) li.classList.add('active');
             
             li.innerHTML = `
                 <div class="mod-item-content">
@@ -777,9 +809,8 @@ export const Editor = {
             
             li.querySelector('.mod-item-content').addEventListener('click', () => {
                 this.activeModId = mod.id;
-                this.renderSidebar(); 
-                this.renderCanvas(); 
-                this.centerCanvas(); // Автоцентрирование при переключении
+                this.renderSidebar(); this.renderCanvas(); 
+                this.centerCanvas();
             });
 
             if (Auth.user) {
@@ -797,9 +828,7 @@ export const Editor = {
                     e.stopPropagation();
                     if (confirm(`Удалить ветку "${mod.name}" со всеми квестами?`)) {
                         this.data.mods = this.data.mods.filter(m => m.id !== mod.id);
-                        if (this.activeModId === mod.id) {
-                            this.activeModId = this.data.mods.length > 0 ? this.data.mods[0].id : null;
-                        }
+                        if (this.activeModId === mod.id) this.activeModId = null;
                         DB.logAction(`Удалил ветку: ${mod.name}`);
                         this.triggerAutoSave();
                         this.renderSidebar(); this.renderCanvas();
