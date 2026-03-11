@@ -156,3 +156,15 @@ body.show-titles .quest-node .node-title { display: block; }
 .admin-table th { background-color: #373737; padding: 8px; text-align: left; border-bottom: 2px solid #555; position: sticky; top: 0; z-index: 2; }
 .admin-table td { padding: 8px; border-bottom: 1px solid #333; }
 .admin-table tr:hover { background-color: #444; }
+/* Стили для Режима Просмотра Квеста */
+.view-item-row { 
+    display: flex; align-items: center; gap: 15px; 
+    padding: 10px; border-bottom: 2px solid #333; 
+    background-color: transparent;
+}
+.view-item-row:last-child { border-bottom: none; }
+.view-item-row .mc-slot { width: 40px; height: 40px; }
+.view-item-row .mc-slot img { width: 24px; height: 24px; }
+.view-item-row .item-info { display: flex; flex-direction: column; gap: 4px; }
+.view-item-row .item-name { font-size: 18px; color: #fff; text-shadow: 1px 1px 0 #000; }
+.view-item-row .item-meta { font-size: 14px; text-shadow: 1px 1px 0 #000; }
