@@ -48,7 +48,11 @@ textarea.mc-input { resize: none; height: 120px; }
 /* Макет */
 #top-bar { position: absolute; top: 0; left: 0; width: 100%; height: 45px; z-index: 100; display: flex; align-items: center; gap: 10px; padding: 0 10px; border-bottom-width: 3px; }
 .controls-hint { margin-left: auto; color: #404040; text-shadow: 1px 1px 0 #fff; font-size: 14px; }
-#app-container { display: flex; height: 100vh; width: 100vw; padding-top: 45px; }
+
+#app-container { display: flex; height: 100vh; width: 100vw; padding-top: 45px; transition: padding-top 0.2s; }
+/* Сдвиг контента при включении режима импорта */
+body.import-mode #app-container { padding-top: 90px; }
+body.import-mode #rewards-summary { top: 100px; }
 
 #sidebar { width: 300px; display: flex; flex-direction: column; z-index: 10; border-width: 0 3px 0 0; }
 .sidebar-header { padding: 10px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #555; }
@@ -74,9 +78,9 @@ textarea.mc-input { resize: none; height: 120px; }
 /* Окно статистики */
 #rewards-summary {
     position: absolute; top: 55px; right: 10px; 
-    min-width: 250px; width: max-content; max-width: 60vw; 
+    min-width: 250px; width: max-content; max-width: 60vw;
     background-color: rgba(16, 16, 20, 0.95); border: 2px solid #373737;
-    z-index: 100; padding: 10px; color: #fff; display: flex; flex-direction: column;
+    z-index: 100; padding: 10px; color: #fff; display: flex; flex-direction: column; transition: top 0.2s;
 }
 #rewards-summary .summary-header {
     display: flex; justify-content: space-between; align-items: center;
@@ -138,13 +142,11 @@ body.show-titles .quest-node .node-title { display: block; }
 .form-group { margin-bottom: 15px; flex: 1; }
 .form-group.half { width: 50%; }
 .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
-/* ДОБАВЛЕНА СИММЕТРИЯ (min-height 32px) */
 .form-group-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; min-height: 32px; }
 .form-group-header label { margin-bottom: 0; }
-
 .modal-actions { display: flex; justify-content: space-between; margin-top: 20px; border-top: 2px solid #555; padding-top: 15px; }
 
-/* Списки */
+/* Списки внутри редактора квеста */
 .item-list-container { overflow-y: auto; background-color: #1e1e1e; border: 2px solid #555; padding: 5px; }
 .item-list-container.big-list { max-height: 350px; min-height: 150px; }
 .mt-5 { margin-top: 10px; width: 100%; }
@@ -155,7 +157,7 @@ body.show-titles .quest-node .node-title { display: block; }
 .reward-row .mc-checkbox { font-size: 13px; margin: 0 5px; display: flex; align-items: center; gap: 4px; color: #fff; cursor: pointer; white-space: nowrap; }
 .reward-row .mc-checkbox input { margin: 0; cursor: pointer; }
 
-/* Поиск и списки предметов */
+/* Поиск */
 .picker-controls { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
 .picker-controls input[type="text"] { flex: 2; margin: 0; }
 .picker-controls select { flex: 1; margin: 0; }
