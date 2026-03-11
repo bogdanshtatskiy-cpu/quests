@@ -3,7 +3,14 @@ import { ItemsDB } from './items.js';
 import { DB } from './db.js';
 import { Auth } from './auth.js';
 
-const SIZE_MAP = { sm: 36, md: 52, lg: 68 };
+// Обновленные размеры
+const SIZE_MAP = { x1: 52, x2: 104, x3: 156, x4: 208 };
+
+// Функция совместимости для старых квестов
+const getSafeSize = (s) => {
+    const compat = { sm: 'x1', md: 'x1', lg: 'x2' };
+    return compat[s] || s || 'x1';
+};
 
 export const Editor = {
     data: { mods: [] }, 
@@ -28,6 +35,7 @@ export const Editor = {
         this.bindTopBarEvents();
         this.renderSidebar();
         this.renderCanvas(); 
+        this.centerCanvas(); // Автоцентрирование при старте
     },
 
     bindTopBarEvents() {
@@ -60,6 +68,53 @@ export const Editor = {
         }, 1500);
     },
 
+    // --- НОВАЯ ЛОГИКА АВТОЦЕНТРИРОВАНИЯ ---
+    centerCanvas() {
+        const mod = this.getActiveMod();
+        const container = document.getElementById('canvas-container');
+        
+        if (!mod || !mod.quests || mod.quests.length === 0) {
+            this.scale = 1;
+            this.panX = container.clientWidth / 2 - 26;
+            this.panY = container.clientHeight / 2 - 26;
+            this.updateTransform();
+            return;
+        }
+
+        let minX = Infinity, minY = Infinity;
+        let maxX = -Infinity, maxY = -Infinity;
+
+        mod.quests.forEach(q => {
+            const size = SIZE_MAP[getSafeSize(q.size)];
+            if (q.x < minX) minX = q.x;
+            if (q.y < minY) minY = q.y;
+            if (q.x + size > maxX) maxX = q.x + size;
+            if (q.y + size > maxY) maxY = q.y + size;
+        });
+
+        const padding = 100;
+        const boxWidth = maxX - minX;
+        const boxHeight = maxY - minY;
+        
+        const contW = container.clientWidth;
+        const contH = container.clientHeight;
+
+        const scaleX = (contW - padding * 2) / (boxWidth || 1);
+        const scaleY = (contH - padding * 2) / (boxHeight || 1);
+        
+        // Масштаб подбирается так, чтобы всё влезло, но не больше 1.5 и не меньше 0.1
+        this.scale = Math.min(scaleX, scaleY, 1.5);
+        this.scale = Math.max(0.1, this.scale);
+
+        const centerX = minX + boxWidth / 2;
+        const centerY = minY + boxHeight / 2;
+
+        this.panX = (contW / 2) - centerX * this.scale;
+        this.panY = (contH / 2) - centerY * this.scale;
+
+        this.updateTransform();
+    },
+
     bindCanvasEvents() {
         const container = document.getElementById('canvas-container');
         const tooltip = document.getElementById('quest-tooltip');
@@ -68,7 +123,20 @@ export const Editor = {
         container.addEventListener('wheel', (e) => {
             e.preventDefault();
             const zoomAmount = e.deltaY > 0 ? 0.9 : 1.1;
-            this.scale = Math.min(Math.max(0.3, this.scale * zoomAmount), 3);
+            
+            // --- НОВАЯ МАТЕМАТИКА: ЗУМ ОТ КУРСОРА ---
+            const rect = container.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            const canvasX = (mouseX - this.panX) / this.scale;
+            const canvasY = (mouseY - this.panY) / this.scale;
+
+            this.scale = Math.min(Math.max(0.1, this.scale * zoomAmount), 3);
+
+            this.panX = mouseX - canvasX * this.scale;
+            this.panY = mouseY - canvasY * this.scale;
+
             this.updateTransform();
         });
 
@@ -191,7 +259,7 @@ export const Editor = {
 
         mod.quests.forEach(quest => {
             const node = document.createElement('div');
-            const nodeSize = quest.size || 'md';
+            const nodeSize = getSafeSize(quest.size);
             node.className = `quest-node size-${nodeSize}`;
             
             if (this.linkingFromNodeId === quest.id) node.classList.add('selected');
@@ -234,12 +302,10 @@ export const Editor = {
                 }
             });
 
-            // ЛОГИКА ОТКРЫТИЯ ПРОСМОТРА ПО КЛИКУ ЛКМ
             node.addEventListener('click', (e) => {
-                if (e.button !== 0) return; // Только ЛКМ
-                if (e.shiftKey && Auth.user) return; // Игнорируем, если это была связка
-                if (this.hasMovedNode) return; // Игнорируем, если мы только что перетащили квест
-                
+                if (e.button !== 0) return;
+                if (e.shiftKey && Auth.user) return;
+                if (this.hasMovedNode) return; 
                 this.openQuestViewModal(quest.id);
             });
 
@@ -260,8 +326,8 @@ export const Editor = {
     },
 
     drawLine(svg, parent, child) {
-        const pSize = SIZE_MAP[parent.size || 'md'] / 2;
-        const cSize = SIZE_MAP[child.size || 'md'] / 2;
+        const pSize = SIZE_MAP[getSafeSize(parent.size)] / 2;
+        const cSize = SIZE_MAP[getSafeSize(child.size)] / 2;
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         line.setAttribute('x1', parent.x + pSize); line.setAttribute('y1', parent.y + pSize);
         line.setAttribute('x2', child.x + cSize); line.setAttribute('y2', child.y + cSize);
@@ -348,7 +414,6 @@ export const Editor = {
     bindQuestModalEvents() {
         const modal = document.getElementById('quest-edit-modal');
         
-        // Закрытие окна ПРОСМОТРА
         document.getElementById('btn-close-view').addEventListener('click', () => {
             document.getElementById('quest-view-modal').classList.add('hidden');
         });
@@ -420,7 +485,6 @@ export const Editor = {
         document.getElementById('btn-close-quest').addEventListener('click', () => modal.classList.add('hidden'));
     },
 
-    // НОВАЯ ФУНКЦИЯ: Окно просмотра квеста
     openQuestViewModal(questId) {
         const mod = this.getActiveMod();
         const quest = mod.quests.find(q => q.id === questId);
@@ -486,7 +550,7 @@ export const Editor = {
             const q = this.getActiveMod().quests.find(q => q.id === questId);
             document.getElementById('quest-title').value = q.title || '';
             document.getElementById('quest-desc').value = q.desc || '';
-            document.getElementById('quest-size').value = q.size || 'md';
+            document.getElementById('quest-size').value = getSafeSize(q.size);
             this.tempQuestIcon = q.icon || null;
             
             let reqs = q.reqs || [];
@@ -497,7 +561,7 @@ export const Editor = {
         } else {
             document.getElementById('quest-title').value = '';
             document.getElementById('quest-desc').value = '';
-            document.getElementById('quest-size').value = 'md';
+            document.getElementById('quest-size').value = 'x1';
             this.tempQuestIcon = null;
             this.tempReqs = []; this.tempRewards = [];
         }
@@ -696,7 +760,9 @@ export const Editor = {
         this.data.mods.forEach(mod => {
             const li = document.createElement('li');
             li.className = 'mod-item';
-            if (this.activeModId === mod.id) li.classList.add('active');
+            if (this.activeModId === mod.id) {
+                li.classList.add('active');
+            }
             
             li.innerHTML = `
                 <div class="mod-item-content">
@@ -711,7 +777,9 @@ export const Editor = {
             
             li.querySelector('.mod-item-content').addEventListener('click', () => {
                 this.activeModId = mod.id;
-                this.renderSidebar(); this.renderCanvas(); 
+                this.renderSidebar(); 
+                this.renderCanvas(); 
+                this.centerCanvas(); // Автоцентрирование при переключении
             });
 
             if (Auth.user) {
@@ -729,7 +797,9 @@ export const Editor = {
                     e.stopPropagation();
                     if (confirm(`Удалить ветку "${mod.name}" со всеми квестами?`)) {
                         this.data.mods = this.data.mods.filter(m => m.id !== mod.id);
-                        if (this.activeModId === mod.id) this.activeModId = null;
+                        if (this.activeModId === mod.id) {
+                            this.activeModId = this.data.mods.length > 0 ? this.data.mods[0].id : null;
+                        }
                         DB.logAction(`Удалил ветку: ${mod.name}`);
                         this.triggerAutoSave();
                         this.renderSidebar(); this.renderCanvas();
