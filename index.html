@@ -125,6 +125,7 @@
     <div id="quest-edit-modal" class="modal hidden">
         <div class="mc-panel modal-content large">
             <h2 class="mc-title">Настройки квеста</h2>
+            
             <div class="form-row">
                 <div class="form-group" style="flex: 2;">
                     <label>Название квеста:</label>
@@ -147,6 +148,7 @@
                     </div>
                 </div>
             </div>
+            
             <div class="form-row">
                 <div class="form-group half">
                     <div class="form-group-header">
@@ -164,35 +166,16 @@
                     <button id="btn-add-reward" class="mc-button mt-5">+ Добавить награду</button>
                 </div>
             </div>
+            
             <div class="form-group">
                 <label>Описание задания:</label>
                 <textarea id="quest-desc" class="mc-input"></textarea>
             </div>
+            
             <div class="modal-actions">
                 <button id="btn-save-quest" class="mc-button">ОК (Автосохранение)</button>
                 <button id="btn-delete-quest" class="mc-button danger">Удалить квест</button>
                 <button id="btn-close-quest" class="mc-button btn-cancel">Отмена</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="item-picker-modal" class="modal hidden">
-        <div class="mc-panel modal-content large">
-            <h2 class="mc-title">Выбор предмета</h2>
-            <div class="mc-panel admin-only" style="margin-bottom: 10px; padding: 10px; display: flex; gap: 10px; align-items: center; border-width: 2px;">
-                <span style="color:#55ffff; font-size:14px; white-space:nowrap;">Своя иконка:</span>
-                <input type="file" id="custom-item-file" accept="image/png, image/jpeg, image/gif" style="font-size:12px; width: 180px; color:#fff;">
-                <input type="text" id="custom-item-name" class="mc-input" placeholder="Название предмета..." style="padding:4px; font-size:14px;">
-                <button id="btn-upload-custom-item" class="mc-button" style="padding:4px 8px; font-size:14px;">Добавить</button>
-            </div>
-            <div class="picker-controls">
-                <select id="picker-mod-filter" class="mc-input"></select>
-                <input type="text" id="picker-search" class="mc-input" placeholder="Поиск по названию или ID...">
-                <label class="mc-checkbox"><input type="checkbox" id="picker-fav-only"> Только избранное (★)</label>
-            </div>
-            <div id="picker-results" class="search-results-list"></div>
-            <div class="modal-actions">
-                <button id="btn-picker-cancel" class="mc-button btn-cancel">Отмена</button>
             </div>
         </div>
     </div>
@@ -219,6 +202,38 @@
             </div>
             <div class="modal-actions" style="margin-top: 20px;">
                 <button id="btn-close-view" class="mc-button btn-cancel" style="width: 100%; font-size: 18px; padding: 12px;">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="item-picker-modal" class="modal hidden">
+        <div class="mc-panel modal-content" style="width: 1000px; max-width: 95vw;">
+            <h2 class="mc-title">Выбор предмета</h2>
+            
+            <div class="mc-panel admin-only" style="margin-bottom: 10px; padding: 10px; display: flex; gap: 10px; align-items: center; border-width: 2px;">
+                <span style="color:#55ffff; font-size:14px; white-space:nowrap;">Своя иконка:</span>
+                <input type="file" id="custom-item-file" accept="image/png, image/jpeg, image/gif" style="font-size:12px; width: 180px; color:#fff;">
+                <input type="text" id="custom-item-name" class="mc-input" placeholder="Название предмета..." style="padding:4px; font-size:14px;">
+                <button id="btn-upload-custom-item" class="mc-button" style="padding:4px 8px; font-size:14px;">Добавить</button>
+            </div>
+
+            <div style="display: flex; gap: 15px; height: 400px;">
+                <div style="flex: 2; display: flex; flex-direction: column;">
+                    <div class="picker-controls" style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <select id="picker-mod-filter" class="mc-input" style="flex: 1; margin: 0;"></select>
+                        <input type="text" id="picker-search" class="mc-input" placeholder="Поиск по названию или ID..." style="flex: 2; margin: 0;">
+                    </div>
+                    <div id="picker-results" class="item-list-container" style="flex: 1; overflow-y: auto;"></div>
+                </div>
+                
+                <div style="flex: 1; display: flex; flex-direction: column; background: #1e1e1e; border: 2px solid #555; padding: 5px;">
+                    <h3 style="color:#ffaa00; margin: 5px 0 10px 0; text-shadow: 1px 1px 0 #000; text-align:center; font-size: 16px;">★ Избранное</h3>
+                    <div id="picker-fav-results" class="item-list-container" style="flex: 1; overflow-y: auto; border: none; padding: 0;"></div>
+                </div>
+            </div>
+
+            <div class="modal-actions" style="margin-top: 15px;">
+                <button id="btn-picker-cancel" class="mc-button btn-cancel">Отмена</button>
             </div>
         </div>
     </div>
