@@ -86,7 +86,6 @@ export const Editor = {
         });
     },
 
-    // --- УЛУЧШЕННЫЙ ПАРСЕР (Не теряет квесты без ID, пылесосит все награды) ---
     parseBQData(jsonString) {
         try {
             const rawData = JSON.parse(jsonString);
@@ -108,38 +107,38 @@ export const Editor = {
             const questsMap = {};
 
             if (data.questDatabase) {
-                // Используем Object.entries, чтобы брать ключ, если questID внутри отсутствует
                 Object.entries(data.questDatabase).forEach(([qKey, q]) => {
                     const actualId = q.questID !== undefined ? q.questID : qKey;
-                    
                     let reqs = [];
                     let rewards = [];
                     
-                    // Парсинг ВСЕХ ТРЕБОВАНИЙ
                     if (q.tasks) {
                         Object.values(q.tasks).forEach(task => {
-                            if (task.requiredItems) {
+                            if (task.requiredItems && task.taskID === 'bq_standard:retrieval') {
                                 Object.values(task.requiredItems).forEach(item => {
                                     const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage);
-                                    let prefix = "";
-                                    if (task.taskID && task.taskID.includes('crafting')) prefix = "Создать: ";
-                                    reqs.push({ item: foundItem, count: item.Count || 1, customName: prefix + (foundItem.name === item.id ? item.id : foundItem.name), consume: task.consume || false });
+                                    reqs.push({ item: foundItem, count: item.Count || 1, customName: foundItem.name === item.id ? item.id : foundItem.name, consume: task.consume || false, taskType: 'retrieval' });
                                 });
                             }
-                            if (task.blocks) {
+                            else if (task.requiredItems && task.taskID === 'bq_standard:crafting') {
+                                Object.values(task.requiredItems).forEach(item => {
+                                    const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage);
+                                    reqs.push({ item: foundItem, count: item.Count || 1, customName: foundItem.name === item.id ? item.id : foundItem.name, consume: false, taskType: 'crafting' });
+                                });
+                            }
+                            else if (task.blocks && task.taskID === 'bq_standard:block_break') {
                                 Object.values(task.blocks).forEach(block => {
-                                    const foundItem = ItemsDB.findItemByBQ(block.id, block.Damage);
-                                    reqs.push({ item: foundItem, count: block.Count || 1, customName: `Сломать: ${foundItem.name === block.id ? block.id : foundItem.name}`, consume: false });
+                                    const foundItem = ItemsDB.findItemByBQ(block.blockID || block.id, block.meta || block.Damage);
+                                    reqs.push({ item: foundItem, count: block.amount || block.Count || 1, customName: foundItem.name === block.blockID ? block.blockID : foundItem.name, consume: false, taskType: 'block_break' });
                                 });
                             }
-                            if (task.taskID === 'bq_standard:hunt' || task.target) {
+                            else if (task.taskID === 'bq_standard:hunt' || task.target) {
                                  const target = task.target || "Моб";
-                                 reqs.push({ item: { item_key: `mob_${target}`, name: target, image: '', mod: 'Мобы' }, count: task.required || 1, customName: `Убить: ${target}`, consume: false });
+                                 reqs.push({ item: { item_key: `mob_${target}`, name: target, image: '', mod: 'Мобы' }, count: task.required || 1, target: target, customName: target, consume: false, taskType: 'hunt' });
                             }
                         });
                     }
                     
-                    // Парсинг ВСЕХ НАГРАД
                     if (q.rewards) {
                         Object.values(q.rewards).forEach(rew => {
                             if (rew.rewards) {
@@ -157,7 +156,6 @@ export const Editor = {
                         });
                     }
 
-                    // Читаем связи (они могут быть и массивом, и объектом в старых версиях)
                     let parents = [];
                     if (q.preRequisites) {
                         if (Array.isArray(q.preRequisites)) {
@@ -261,10 +259,20 @@ export const Editor = {
 
                 if (q.reqs) {
                     q.reqs.forEach(req => {
-                        const name = req.customName || req.item.name || "";
-                        if (name.startsWith('Убить: ')) hunts.push(req);
-                        else if (name.startsWith('Сломать: ')) blockBreaks.push(req);
-                        else if (name.startsWith('Создать: ')) craftings.push(req);
+                        // АВТО-КОНВЕРТАЦИЯ СТАРЫХ ПРЕФИКСОВ
+                        let tType = req.taskType;
+                        if (!tType) {
+                            const nameStr = req.customName || req.item.name || "";
+                            if (nameStr.startsWith('Убить: ')) { tType = 'hunt'; req.target = nameStr.replace('Убить: ', '').trim(); }
+                            else if (nameStr.startsWith('Сломать: ')) { tType = 'block_break'; req.customName = nameStr.replace('Сломать: ', '').trim(); }
+                            else if (nameStr.startsWith('Создать: ')) { tType = 'crafting'; req.customName = nameStr.replace('Создать: ', '').trim(); }
+                            else tType = 'retrieval';
+                            req.taskType = tType;
+                        }
+
+                        if (tType === 'hunt') hunts.push(req);
+                        else if (tType === 'block_break') blockBreaks.push(req);
+                        else if (tType === 'crafting') craftings.push(req);
                         else retrievals.push(req);
                     });
                 }
@@ -273,46 +281,47 @@ export const Editor = {
                     const dict = {};
                     arr.forEach((req, idx) => {
                         let sysId = req.item.string_id || req.item.item_key || "minecraft:stone";
-                        let damage = req.item.damage !== undefined ? req.item.damage : 0;
-                        
+                        let damage = req.item.damage !== undefined ? req.item.damage : -1;
                         if (!req.item.string_id && sysId.includes(':') && !sysId.match(/[a-zA-Z]/)) {
                             const parts = sysId.split(':');
-                            sysId = parts[0]; damage = parseInt(parts[1]) || 0;
+                            sysId = parts[0]; damage = parseInt(parts[1]) || -1;
                         }
-                        
                         dict[`${idx}:10`] = { "id:8": sysId, "Count:3": parseInt(req.count) || 1, "Damage:2": damage, "OreDict:8": "" };
                     });
                     return dict;
                 };
 
-                if (retrievals.length > 0) {
-                    tasks[`${taskIdx++}:10`] = { "taskID:8": "bq_standard:retrieval", "consume:1": retrievals[0].consume ? 1 : 0, "requiredItems:9": createItemsDict(retrievals) };
-                }
-                if (craftings.length > 0) {
-                    tasks[`${taskIdx++}:10`] = { "taskID:8": "bq_standard:crafting", "allowAnvil:1": 0, "allowSmelt:1": 0, "allowCraft:1": 1, "requiredItems:9": createItemsDict(craftings) };
-                }
-                if (blockBreaks.length > 0) {
-                    tasks[`${taskIdx++}:10`] = { "taskID:8": "bq_standard:block_break", "blocks:9": createItemsDict(blockBreaks) };
-                }
+                const createBlocksDict = (arr) => {
+                    const dict = {};
+                    arr.forEach((req, idx) => {
+                        let sysId = req.item.string_id || req.item.item_key || "minecraft:stone";
+                        let damage = req.item.damage !== undefined ? req.item.damage : -1;
+                        if (!req.item.string_id && sysId.includes(':') && !sysId.match(/[a-zA-Z]/)) {
+                            const parts = sysId.split(':');
+                            sysId = parts[0]; damage = parseInt(parts[1]) || -1;
+                        }
+                        dict[`${idx}:10`] = { "blockID:8": sysId, "amount:3": parseInt(req.count) || 1, "meta:3": damage, "oreDict:8": "", "nbt:10": {} };
+                    });
+                    return dict;
+                };
+
+                if (retrievals.length > 0) tasks[`${taskIdx++}:10`] = { "taskID:8": "bq_standard:retrieval", "consume:1": retrievals[0].consume ? 1 : 0, "requiredItems:9": createItemsDict(retrievals) };
+                if (craftings.length > 0) tasks[`${taskIdx++}:10`] = { "taskID:8": "bq_standard:crafting", "allowAnvil:1": 0, "allowSmelt:1": 0, "allowCraft:1": 1, "requiredItems:9": createItemsDict(craftings) };
+                if (blockBreaks.length > 0) tasks[`${taskIdx++}:10`] = { "taskID:8": "bq_standard:block_break", "blocks:9": createBlocksDict(blockBreaks) };
+                
                 hunts.forEach(h => {
-                    let target = (h.customName || "").replace('Убить: ', '').trim();
-                    if (!target) target = h.item.name;
+                    let target = h.target || h.customName || h.item.name;
                     tasks[`${taskIdx++}:10`] = { "taskID:8": "bq_standard:hunt", "target:8": target, "required:3": parseInt(h.count) || 1, "subtypes:1": 1 };
                 });
 
                 const rewards = {};
                 let rewIdx = 0;
-                
                 if (q.rewards) {
                     const standardRews = q.rewards.filter(r => !r.isChoice);
                     const choiceRews = q.rewards.filter(r => r.isChoice);
 
-                    if (standardRews.length > 0) {
-                        rewards[`${rewIdx++}:10`] = { "rewardID:8": "bq_standard:item", "rewards:9": createItemsDict(standardRews) };
-                    }
-                    if (choiceRews.length > 0) {
-                        rewards[`${rewIdx++}:10`] = { "rewardID:8": "bq_standard:choice", "choices:9": createItemsDict(choiceRews) };
-                    }
+                    if (standardRews.length > 0) rewards[`${rewIdx++}:10`] = { "rewardID:8": "bq_standard:item", "rewards:9": createItemsDict(standardRews) };
+                    if (choiceRews.length > 0) rewards[`${rewIdx++}:10`] = { "rewardID:8": "bq_standard:choice", "choices:9": createItemsDict(choiceRews) };
                 }
 
                 bqData["questDatabase:9"][`${bqId}:10`] = {
@@ -436,19 +445,15 @@ export const Editor = {
         container.addEventListener('wheel', (e) => {
             e.preventDefault();
             const zoomAmount = e.deltaY > 0 ? 0.9 : 1.1;
-            
             const rect = container.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
-
             const canvasX = (mouseX - this.panX) / this.scale;
             const canvasY = (mouseY - this.panY) / this.scale;
 
             this.scale = Math.min(Math.max(0.1, this.scale * zoomAmount), 3);
-
             this.panX = mouseX - canvasX * this.scale;
             this.panY = mouseY - canvasY * this.scale;
-
             this.updateTransform();
         });
 
@@ -652,6 +657,15 @@ export const Editor = {
         svg.appendChild(line);
     },
 
+    getTaskLabel(r) {
+        const t = r.taskType || 'retrieval';
+        let name = r.customName || r.item.name;
+        if (t === 'hunt') return `Убить: ${r.target || name}`;
+        if (t === 'block_break') return `Сломать: ${ItemsDB.formatMC(name)}`;
+        if (t === 'crafting') return `Создать: ${ItemsDB.formatMC(name)}`;
+        return ItemsDB.formatMC(name);
+    },
+
     showTooltip(quest) {
         const tt = document.getElementById('quest-tooltip');
         document.getElementById('tt-title').innerHTML = ItemsDB.formatMC(quest.title);
@@ -660,10 +674,10 @@ export const Editor = {
         let reqHtml = '';
         if (quest.reqs && quest.reqs.length > 0) {
             quest.reqs.forEach(r => { 
-                const consumeTag = r.consume !== false 
-                    ? '<span style="color:#ff5555; font-size:12px; margin-left:6px;">[Забрать]</span>' 
-                    : '<span style="color:#aaaaaa; font-size:12px; margin-left:6px;">[Наличие]</span>';
-                reqHtml += `<div class="tt-item"><img src="${ItemsDB.getImageUrl(r.item.image)}">${r.count}x ${ItemsDB.formatMC(r.customName || r.item.name)}${consumeTag}</div>`; 
+                const consumeTag = (r.taskType !== 'hunt' && r.taskType !== 'block_break') 
+                    ? (r.consume !== false ? '<span style="color:#ff5555; font-size:12px; margin-left:6px;">[Забрать]</span>' : '<span style="color:#aaaaaa; font-size:12px; margin-left:6px;">[Наличие]</span>')
+                    : '';
+                reqHtml += `<div class="tt-item"><img src="${ItemsDB.getImageUrl(r.item.image)}">${r.count}x ${this.getTaskLabel(r)}${consumeTag}</div>`; 
             });
         } else reqHtml = 'Нет требований';
         document.getElementById('tt-reqs').innerHTML = reqHtml;
@@ -711,11 +725,21 @@ export const Editor = {
 
     saveTempState() {
         this.tempReqs.forEach((r, idx) => {
+            const typeSel = document.getElementById(`req-type-${idx}`);
+            if(typeSel) r.taskType = typeSel.value;
+
             const countInp = document.getElementById(`req-count-${idx}`);
-            const nameInp = document.getElementById(`req-name-${idx}`);
-            const consumeCb = document.getElementById(`req-consume-${idx}`);
             if (countInp) r.count = countInp.value;
-            if (nameInp) r.customName = nameInp.value;
+            
+            if (r.taskType === 'hunt') {
+                const targetInp = document.getElementById(`req-target-${idx}`);
+                if (targetInp) r.target = targetInp.value;
+            } else {
+                const nameInp = document.getElementById(`req-name-${idx}`);
+                if (nameInp) r.customName = nameInp.value;
+            }
+
+            const consumeCb = document.getElementById(`req-consume-${idx}`);
             if (consumeCb) r.consume = consumeCb.checked;
         });
         this.tempRewards.forEach((r, idx) => {
@@ -780,7 +804,7 @@ export const Editor = {
         document.getElementById('btn-add-req').addEventListener('click', () => {
             this.saveTempState();
             this.openItemPicker((item) => { 
-                this.tempReqs.push({ item: item, count: 1, customName: item.name, consume: true }); 
+                this.tempReqs.push({ item: item, count: 1, customName: item.name, consume: true, taskType: 'retrieval' }); 
                 this.renderQuestEditForm(); 
             });
         });
@@ -848,12 +872,14 @@ export const Editor = {
         reqsBox.innerHTML = '';
         if (quest.reqs && quest.reqs.length > 0) {
             quest.reqs.forEach(r => {
-                const consumeText = r.consume !== false ? '<span style="color:#ff5555;">[Забирается]</span>' : '<span style="color:#aaaaaa;">[Только наличие]</span>';
+                const consumeText = (r.taskType !== 'hunt' && r.taskType !== 'block_break') 
+                    ? (r.consume !== false ? '<span style="color:#ff5555;">[Забирается]</span>' : '<span style="color:#aaaaaa;">[Только наличие]</span>')
+                    : '';
                 reqsBox.innerHTML += `
                     <div class="view-item-row">
                         <div class="mc-slot"><img src="${ItemsDB.getImageUrl(r.item.image)}"></div>
                         <div class="item-info">
-                            <span class="item-name">${r.count}x ${ItemsDB.formatMC(r.customName || r.item.name)}</span>
+                            <span class="item-name">${r.count}x ${this.getTaskLabel(r)}</span>
                             <span class="item-meta">${consumeText}</span>
                         </div>
                     </div>
@@ -901,6 +927,18 @@ export const Editor = {
             if (q.req && reqs.length === 0) reqs = [q.req]; 
             
             this.tempReqs = JSON.parse(JSON.stringify(reqs));
+            
+            // Автоконвертация старых префиксов в новые типы задач
+            this.tempReqs.forEach(r => {
+                if(!r.taskType) {
+                    const nameStr = r.customName || r.item.name || "";
+                    if (nameStr.startsWith('Убить: ')) { r.taskType = 'hunt'; r.target = nameStr.replace('Убить: ', '').trim(); }
+                    else if (nameStr.startsWith('Сломать: ')) { r.taskType = 'block_break'; r.customName = nameStr.replace('Сломать: ', '').trim(); }
+                    else if (nameStr.startsWith('Создать: ')) { r.taskType = 'crafting'; r.customName = nameStr.replace('Создать: ', '').trim(); }
+                    else r.taskType = 'retrieval';
+                }
+            });
+
             this.tempRewards = q.rewards ? JSON.parse(JSON.stringify(q.rewards)) : [];
         } else {
             document.getElementById('quest-title').value = '';
@@ -922,16 +960,43 @@ export const Editor = {
         this.tempReqs.forEach((r, idx) => {
             const div = document.createElement('div');
             div.className = 'reward-row';
+            const tType = r.taskType || 'retrieval';
             const isChecked = r.consume !== false ? 'checked' : '';
+            
+            // Инпут меняется в зависимости от типа
+            const targetInputHtml = tType === 'hunt' 
+                ? `<input type="text" id="req-target-${idx}" class="mc-input custom-name-input" value="${r.target || r.customName || ''}" placeholder="Моб (напр. Creeper)">`
+                : `<input type="text" id="req-name-${idx}" class="mc-input custom-name-input" value="${r.customName || ''}" placeholder="Название">`;
+
+            // Прячем галочку для мобов и блоков
+            const showConsume = (tType === 'hunt' || tType === 'block_break') ? 'display:none;' : '';
+
             div.innerHTML = `
                 <div class="mc-slot"><img src="${ItemsDB.getImageUrl(r.item.image)}" width="24" height="24"></div>
+                
+                <select id="req-type-${idx}" class="mc-input task-type-select">
+                    <option value="retrieval" ${tType === 'retrieval' ? 'selected' : ''}>Принести</option>
+                    <option value="crafting" ${tType === 'crafting' ? 'selected' : ''}>Создать</option>
+                    <option value="block_break" ${tType === 'block_break' ? 'selected' : ''}>Сломать</option>
+                    <option value="hunt" ${tType === 'hunt' ? 'selected' : ''}>Убить</option>
+                </select>
+
                 <input type="number" id="req-count-${idx}" class="mc-input" value="${r.count}" title="Количество">
-                <input type="text" id="req-name-${idx}" class="mc-input custom-name-input" value="${r.customName}" title="Название">
-                <label class="mc-checkbox" title="Забирать предмет при сдаче квеста?">
+                
+                ${targetInputHtml}
+
+                <label class="mc-checkbox" title="Забирать предмет при сдаче квеста?" style="${showConsume}">
                     <input type="checkbox" id="req-consume-${idx}" ${isChecked}> Забрать
                 </label>
                 <button class="mc-button danger" data-idx="${idx}">X</button>
             `;
+            
+            div.querySelector('.task-type-select').addEventListener('change', (e) => {
+                this.saveTempState(); 
+                this.tempReqs[idx].taskType = e.target.value;
+                this.renderQuestEditForm(); 
+            });
+
             div.querySelector('.danger').addEventListener('click', () => { this.tempReqs.splice(idx, 1); this.renderQuestEditForm(); });
             reqBox.appendChild(div);
         });
