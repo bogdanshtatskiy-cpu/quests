@@ -33,29 +33,34 @@ export const ItemsDB = {
             const lowerQuery = query.toLowerCase();
             results = results.filter(item => 
                 item.name.toLowerCase().includes(lowerQuery) || 
-                item.item_key.toLowerCase().includes(lowerQuery)
+                item.item_key.toLowerCase().includes(lowerQuery) ||
+                (item.string_id && item.string_id.toLowerCase().includes(lowerQuery))
             );
         }
         results.sort((a, b) => (a.item_id === b.item_id) ? a.damage - b.damage : a.item_id - b.item_id);
         return results; 
     },
 
-    // --- НОВАЯ ФУНКЦИЯ ДЛЯ СВЯЗИ С СЕРВЕРНЫМ JSON ---
+    // --- ОБНОВЛЕННЫЙ ПОИСК ДЛЯ ИМПОРТА ИЗ СЕРВЕРНЫХ ФАЙЛОВ ---
     findItemByBQ(bqId, damage) {
-        // 1. Пробуем найти точное совпадение (например "minecraft:stone:1")
-        let item = this.items.find(i => i.item_key === `${bqId}:${damage}`);
-        // 2. Пробуем найти просто по ID ("minecraft:stone")
-        if (!item) item = this.items.find(i => i.item_key === bqId);
-        // 3. Если в базе ключи другие, пробуем найти по названию мода
-        if (!item) item = this.items.find(i => i.name.toLowerCase() === bqId.toLowerCase());
+        let item;
         
-        // 4. Если предмета нет в твоей database.json, создаем заглушку, чтобы не сломать квест
+        // 1. Ищем по новому строковому ID (Например "EnderIO:itemFrankenSkull")
+        item = this.items.find(i => i.string_id === bqId && (i.damage == damage || i.item_key.endsWith(':'+damage)));
+        if (!item) item = this.items.find(i => i.string_id === bqId); // Игнорируем урон, если точного совпадения нет
+        
+        // 2. Резерв: Ищем по старым числовым ID, если мод вдруг использует их
+        if (!item) item = this.items.find(i => i.item_key === `${bqId}:${damage}`);
+        if (!item) item = this.items.find(i => i.item_key === bqId);
+        
+        // 3. Если предмета вообще нет в базе, ставим системную заглушку (чтобы квест не удалился)
         if (!item) {
             return {
                 item_key: `${bqId}:${damage}`,
-                name: bqId, // Оставляем системное имя
-                image: '', // Картинка будет пустой (серый квадрат)
-                mod: 'Импортировано (Нет в базе)'
+                name: bqId,
+                image: '', 
+                mod: 'Импортировано (Нет в базе)',
+                string_id: bqId
             };
         }
         return item;
