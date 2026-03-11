@@ -125,7 +125,6 @@
     <div id="quest-edit-modal" class="modal hidden">
         <div class="mc-panel modal-content large">
             <h2 class="mc-title">Настройки квеста</h2>
-            
             <div class="form-row">
                 <div class="form-group" style="flex: 2;">
                     <label>Название квеста:</label>
@@ -134,9 +133,10 @@
                 <div class="form-group" style="flex: 1;">
                     <label>Размер рамки:</label>
                     <select id="quest-size" class="mc-input">
-                        <option value="sm">Маленький</option>
-                        <option value="md" selected>Средний</option>
-                        <option value="lg">Большой</option>
+                        <option value="x1" selected>Стандарт (x1)</option>
+                        <option value="x2">Большой (x2)</option>
+                        <option value="x3">Огромный (x3)</option>
+                        <option value="x4">Гигантский (x4)</option>
                     </select>
                 </div>
                 <div class="form-group" style="flex: 1;">
@@ -147,7 +147,6 @@
                     </div>
                 </div>
             </div>
-            
             <div class="form-row">
                 <div class="form-group half">
                     <div class="form-group-header">
@@ -165,12 +164,10 @@
                     <button id="btn-add-reward" class="mc-button mt-5">+ Добавить награду</button>
                 </div>
             </div>
-            
             <div class="form-group">
                 <label>Описание задания:</label>
                 <textarea id="quest-desc" class="mc-input"></textarea>
             </div>
-            
             <div class="modal-actions">
                 <button id="btn-save-quest" class="mc-button">ОК (Автосохранение)</button>
                 <button id="btn-delete-quest" class="mc-button danger">Удалить квест</button>
@@ -182,14 +179,12 @@
     <div id="item-picker-modal" class="modal hidden">
         <div class="mc-panel modal-content large">
             <h2 class="mc-title">Выбор предмета</h2>
-            
             <div class="mc-panel admin-only" style="margin-bottom: 10px; padding: 10px; display: flex; gap: 10px; align-items: center; border-width: 2px;">
                 <span style="color:#55ffff; font-size:14px; white-space:nowrap;">Своя иконка:</span>
                 <input type="file" id="custom-item-file" accept="image/png, image/jpeg, image/gif" style="font-size:12px; width: 180px; color:#fff;">
                 <input type="text" id="custom-item-name" class="mc-input" placeholder="Название предмета..." style="padding:4px; font-size:14px;">
                 <button id="btn-upload-custom-item" class="mc-button" style="padding:4px 8px; font-size:14px;">Добавить</button>
             </div>
-
             <div class="picker-controls">
                 <select id="picker-mod-filter" class="mc-input"></select>
                 <input type="text" id="picker-search" class="mc-input" placeholder="Поиск по названию или ID...">
@@ -204,12 +199,10 @@
 
     <div id="quest-view-modal" class="modal hidden">
         <div class="mc-panel modal-content large" style="display: flex; flex-direction: column; max-height: 95vh;">
-            
             <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 20px; border-bottom: 2px solid #555; padding-bottom: 15px;">
                 <div id="view-quest-icon" class="mc-slot" style="width: 64px; height: 64px; border-width: 3px;"></div>
                 <h2 id="view-quest-title" class="mc-title" style="margin: 0; font-size: 28px; text-align: left;">Название квеста</h2>
             </div>
-            
             <div class="form-row" style="flex: 1; overflow: hidden; margin-bottom: 20px;">
                 <div class="form-group half" style="display: flex; flex-direction: column; margin-bottom: 0;">
                     <h3 style="color:#55ffff; margin-bottom:10px; text-shadow: 1px 1px 0 #000;">Требования:</h3>
@@ -220,12 +213,10 @@
                     <div id="view-rewards-list" class="item-list-container" style="flex: 1; overflow-y: auto; background: rgba(0,0,0,0.4); border-color: #444;"></div>
                 </div>
             </div>
-            
             <div class="form-group" style="flex-shrink: 0; margin-bottom: 0;">
                 <h3 style="color:#aaa; margin-bottom:10px; text-shadow: 1px 1px 0 #000;">Описание задания:</h3>
                 <div id="view-quest-desc" class="mc-panel" style="background: rgba(0,0,0,0.6); color: #e0e0e0; padding: 15px; border-color: #444; min-height: 100px; max-height: 250px; overflow-y: auto; white-space: pre-wrap; line-height: 1.6; font-size: 18px;"></div>
             </div>
-            
             <div class="modal-actions" style="margin-top: 20px;">
                 <button id="btn-close-view" class="mc-button btn-cancel" style="width: 100%; font-size: 18px; padding: 12px;">Закрыть</button>
             </div>
