@@ -1,4 +1,3 @@
-// js/editor.js
 import { ItemsDB } from './items.js';
 import { DB } from './db.js';
 import { Auth } from './auth.js';
@@ -300,7 +299,7 @@ export const Editor = {
         mod.quests.forEach(q => {
             (q.rewards || []).forEach(r => {
                 const name = r.customName || r.item.name;
-                const key = name + (r.isChoice ? '___CHOICE' : '___GUARANTEED'); // Разделяем выбор и обычные
+                const key = name + (r.isChoice ? '___CHOICE' : '___GUARANTEED');
                 if (!totals[key]) totals[key] = { count: 0, item: r.item, name: name, isChoice: r.isChoice };
                 totals[key].count += parseInt(r.count || 1);
             });
@@ -339,10 +338,8 @@ export const Editor = {
     bindQuestModalEvents() {
         const modal = document.getElementById('quest-edit-modal');
         
-        // Кнопка массового переключения (Забрать/Наличие)
         document.getElementById('btn-toggle-all-consume').addEventListener('click', () => {
             this.saveTempState(); 
-            // Если есть хотя бы один false (Наличие), то делаем все true (Забрать). Иначе делаем все false.
             const targetState = this.tempReqs.some(r => r.consume === false);
             this.tempReqs.forEach(r => r.consume = targetState);
             this.renderQuestEditForm();
@@ -514,6 +511,58 @@ export const Editor = {
         filterMod.addEventListener('change', renderResults);
         favCb.addEventListener('change', renderResults);
         document.getElementById('btn-picker-cancel').addEventListener('click', () => modal.classList.add('hidden'));
+
+        document.getElementById('btn-upload-custom-item').addEventListener('click', () => {
+            const fileInput = document.getElementById('custom-item-file');
+            const nameInput = document.getElementById('custom-item-name');
+            const file = fileInput.files[0];
+            const name = nameInput.value.trim();
+
+            if (!file) return alert("Выберите картинку!");
+            if (!name) return alert("Введите название предмета!");
+
+            const btn = document.getElementById('btn-upload-custom-item');
+            btn.innerText = "Грузим...";
+            btn.disabled = true;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = async function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_SIZE = 64; 
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
+                    } else {
+                        if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    const base64String = canvas.toDataURL('image/png');
+                    const newItem = await DB.saveCustomItem(name, base64String);
+
+                    btn.innerText = "Добавить";
+                    btn.disabled = false;
+                    fileInput.value = '';
+                    nameInput.value = '';
+
+                    if (newItem) {
+                        ItemsDB.addCustomItems([newItem]);
+                        searchInp.value = name;
+                        renderResults();
+                    }
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
 
         this.openItemPicker = (cb) => {
             this.pickerCallback = cb;
