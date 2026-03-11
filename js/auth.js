@@ -1,4 +1,3 @@
-// js/auth.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { firebaseConfig } from './firebase-config.js';
@@ -67,7 +66,6 @@ export const Auth = {
             window.location.reload();
         });
 
-        // Открытие окна входа по новой кнопке "Войти" на верхней панели
         document.getElementById('btn-show-login').addEventListener('click', () => {
             modal.classList.remove('hidden');
         });
@@ -95,11 +93,9 @@ export const Auth = {
     },
 
     applyPermissions() {
-        // Управление элементами для администраторов
         const adminElements = document.querySelectorAll('.admin-only');
         adminElements.forEach(el => el.style.display = this.user ? 'flex' : 'none');
         
-        // Управление элементами, которые должны видеть ТОЛЬКО гости (кнопка "Войти")
         const guestElements = document.querySelectorAll('.guest-only');
         guestElements.forEach(el => el.style.display = this.user ? 'none' : 'inline-block');
         
