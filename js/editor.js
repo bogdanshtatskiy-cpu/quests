@@ -47,7 +47,6 @@ export const Editor = {
             btnToggleSummary.innerText = summaryPanel.classList.contains('minimized') ? '▲' : '▼';
         });
 
-        // BQ ИМПОРТ/ЭКСПОРТ вынесены в bq.js
         const fileInput = document.getElementById('bq-file-input');
         document.getElementById('btn-import-bq').addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', (e) => {
@@ -683,7 +682,9 @@ export const Editor = {
             const showConsume = (tType === 'hunt' || tType === 'block_break') ? 'display:none;' : '';
 
             div.innerHTML = `
-                <div class="mc-slot"><img src="${ItemsDB.getImageUrl(r.item.image)}" width="24" height="24"></div>
+                <div class="mc-slot item-icon-btn" title="Кликните чтобы изменить иконку" style="cursor: pointer;">
+                    <img src="${ItemsDB.getImageUrl(r.item.image)}" width="24" height="24">
+                </div>
                 
                 <select id="req-type-${idx}" class="mc-input task-type-select">
                     <option value="retrieval" ${tType === 'retrieval' ? 'selected' : ''}>Принести</option>
@@ -702,13 +703,25 @@ export const Editor = {
                 <button class="mc-button danger" data-idx="${idx}">X</button>
             `;
             
+            // Замена картинки по клику
+            div.querySelector('.item-icon-btn').addEventListener('click', () => {
+                this.saveTempState();
+                this.openItemPicker((pickedItem) => {
+                    this.tempReqs[idx].item = pickedItem;
+                    this.renderQuestEditForm();
+                });
+            });
+
             div.querySelector('.task-type-select').addEventListener('change', (e) => {
                 this.saveTempState(); 
                 this.tempReqs[idx].taskType = e.target.value;
                 this.renderQuestEditForm(); 
             });
 
-            div.querySelector('.danger').addEventListener('click', () => { this.tempReqs.splice(idx, 1); this.renderQuestEditForm(); });
+            div.querySelector('.danger').addEventListener('click', () => { 
+                this.tempReqs.splice(idx, 1); 
+                this.renderQuestEditForm(); 
+            });
             reqBox.appendChild(div);
         });
 
@@ -719,7 +732,9 @@ export const Editor = {
             div.className = 'reward-row';
             const isChoice = r.isChoice ? 'checked' : '';
             div.innerHTML = `
-                <div class="mc-slot"><img src="${ItemsDB.getImageUrl(r.item.image)}" width="24" height="24"></div>
+                <div class="mc-slot item-icon-btn" title="Кликните чтобы изменить иконку" style="cursor: pointer;">
+                    <img src="${ItemsDB.getImageUrl(r.item.image)}" width="24" height="24">
+                </div>
                 <input type="number" id="rew-count-${idx}" class="mc-input" value="${r.count}" title="Количество">
                 <input type="text" id="rew-name-${idx}" class="mc-input custom-name-input" value="${r.customName}" title="Название">
                 <label class="mc-checkbox" title="Предлагать этот предмет на выбор?">
@@ -727,7 +742,20 @@ export const Editor = {
                 </label>
                 <button class="mc-button danger" data-idx="${idx}">X</button>
             `;
-            div.querySelector('.danger').addEventListener('click', () => { this.tempRewards.splice(idx, 1); this.renderQuestEditForm(); });
+            
+            // Замена картинки по клику для наград
+            div.querySelector('.item-icon-btn').addEventListener('click', () => {
+                this.saveTempState();
+                this.openItemPicker((pickedItem) => {
+                    this.tempRewards[idx].item = pickedItem;
+                    this.renderQuestEditForm();
+                });
+            });
+
+            div.querySelector('.danger').addEventListener('click', () => { 
+                this.tempRewards.splice(idx, 1); 
+                this.renderQuestEditForm(); 
+            });
             rewBox.appendChild(div);
         });
     },
