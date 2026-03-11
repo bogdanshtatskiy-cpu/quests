@@ -1,4 +1,3 @@
-// js/items.js
 export const ItemsDB = {
     items: [], mods: [],
     favorites: JSON.parse(localStorage.getItem('quest_favorites') || '[]'),
@@ -41,22 +40,27 @@ export const ItemsDB = {
         return results; 
     },
 
-    // --- ОБНОВЛЕННЫЙ ПОИСК ДЛЯ ИМПОРТА ИЗ СЕРВЕРНЫХ ФАЙЛОВ ---
+    // Улучшенный и агрессивный поиск (решает проблему с деньгами)
     findItemByBQ(bqId, damage) {
+        let dmg = damage !== undefined ? damage : 0;
         let item;
         
-        // 1. Ищем по новому строковому ID (Например "EnderIO:itemFrankenSkull")
-        item = this.items.find(i => i.string_id === bqId && (i.damage == damage || i.item_key.endsWith(':'+damage)));
-        if (!item) item = this.items.find(i => i.string_id === bqId); // Игнорируем урон, если точного совпадения нет
+        // 1. Ищем по string_id с учетом урона
+        item = this.items.find(i => i.string_id === bqId && (i.damage == dmg || String(i.item_key).endsWith(':' + dmg)));
         
-        // 2. Резерв: Ищем по старым числовым ID, если мод вдруг использует их
-        if (!item) item = this.items.find(i => i.item_key === `${bqId}:${damage}`);
-        if (!item) item = this.items.find(i => i.item_key === bqId);
+        // 2. Если не нашли, ищем ПРОСТО по string_id (игнорируя урон - именно это спасет деньги)
+        if (!item) item = this.items.find(i => i.string_id === bqId);
         
-        // 3. Если предмета вообще нет в базе, ставим системную заглушку (чтобы квест не удалился)
+        // 3. Старый поиск по ключам
+        if (!item) item = this.items.find(i => i.item_key === `${bqId}:${dmg}`);
+        if (!item) item = this.items.find(i => i.item_key === bqId || i.item_id == bqId);
+        
+        // 4. Поиск по имени на крайний случай
+        if (!item) item = this.items.find(i => i.name === bqId);
+        
         if (!item) {
             return {
-                item_key: `${bqId}:${damage}`,
+                item_key: `${bqId}:${dmg}`,
                 name: bqId,
                 image: '', 
                 mod: 'Импортировано (Нет в базе)',
