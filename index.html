@@ -86,6 +86,7 @@
     <div id="quest-tooltip" class="mc-panel hidden ui-element">
         <h3 id="tt-title"></h3>
         <div id="tt-desc"></div>
+        <div id="tt-parents-container"></div>
         <div class="tt-section" id="tt-reqs-container"><span class="tt-label">Требуется:</span><div id="tt-reqs"></div></div>
         <div class="tt-section" id="tt-rewards-container"><span class="tt-label">Награда:</span><div id="tt-rewards"></div></div>
     </div>
@@ -199,6 +200,15 @@
                     <button id="btn-add-reward" class="mc-button mt-5">+ Добавить награду</button>
                 </div>
             </div>
+
+            <div class="form-group" style="margin-top: 15px; border-top: 2px solid #555; padding-top: 15px;">
+                <label style="color: #ffaa00;">Зависимости (Квест откроется только после выполнения этих):</label>
+                <div id="parents-list" class="item-list-container" style="max-height: 120px; min-height: 50px; margin-bottom: 5px;"></div>
+                <div style="display: flex; gap: 5px;">
+                    <select id="parent-quest-select" class="mc-input"></select>
+                    <button id="btn-add-parent" class="mc-button" style="white-space: nowrap;">+ Привязать квест</button>
+                </div>
+            </div>
             
             <div class="form-group">
                 <label>Описание задания:</label>
@@ -219,6 +229,12 @@
                 <div id="view-quest-icon" class="mc-slot" style="width: 64px; height: 64px; border-width: 3px;"></div>
                 <h2 id="view-quest-title" class="mc-title" style="margin: 0; font-size: 28px; text-align: left;">Название квеста</h2>
             </div>
+            
+            <div id="view-parents-container" class="form-group hidden" style="flex-shrink: 0; margin-bottom: 15px;">
+                <h3 style="color:#ffaa00; margin-bottom:10px; text-shadow: 1px 1px 0 #000;">Для открытия нужно пройти:</h3>
+                <div id="view-parents-list" class="item-list-container" style="max-height: 100px; background: rgba(0,0,0,0.4); border-color: #444; padding: 10px;"></div>
+            </div>
+
             <div class="form-row" style="flex: 1; overflow: hidden; margin-bottom: 20px;">
                 <div class="form-group" style="display: flex; flex-direction: column; margin-bottom: 0; flex: 2;">
                     <h3 style="color:#55ffff; margin-bottom:10px; text-shadow: 1px 1px 0 #000;">Требования:</h3>
@@ -344,11 +360,6 @@
         <option value="Blizz">
         <option value="WitherBoss">
         <option value="DraconicEvolution.EnderDragon">
-        <option value="Pig">
-        <option value="Cow">
-        <option value="Sheep">
-        <option value="Chicken">
-        <option value="Villager">
     </datalist>
 
     <div id="save-indicator" class="hidden">Сохранение...</div>
