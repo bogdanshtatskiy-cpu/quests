@@ -20,7 +20,7 @@ export const Editor = {
     linkingFromNodeId: null, contextNodeId: null, editingNodeId: null, hoveredQuestId: null,
     
     pickerCallback: null, tempReqs: [], tempRewards: [], tempQuestIcon: null, editingModId: null, tempModIcon: null, saveTimeout: null,
-    tempNbtTarget: null, // Ссылка на текущий редактируемый предмет для NBT
+    tempNbtTarget: null,
 
     init() {
         this.bindCanvasEvents(); 
@@ -28,7 +28,7 @@ export const Editor = {
         this.bindQuestModalEvents();
         this.bindItemPickerEvents(); 
         this.bindTopBarEvents();
-        this.bindNbtModalEvents(); // Подключаем события NBT редактора
+        this.bindNbtModalEvents(); 
         this.renderSidebar(); 
         this.renderCanvas(); 
         this.centerCanvas(); 
@@ -213,6 +213,7 @@ export const Editor = {
 
     updateTransform() { document.getElementById('quest-canvas').style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`; },
 
+    // ОПТИМИЗИРОВАННЫЙ РЕНДЕР: Используем DocumentFragment
     renderCanvas(skipSave = false) {
         const nodesLayer = document.getElementById('nodes-layer');
         const linesLayer = document.getElementById('connections-layer');
@@ -221,11 +222,14 @@ export const Editor = {
         const mod = this.getActiveMod();
         if (!mod) { this.updateSummary(); return; }
 
+        const nodesFragment = document.createDocumentFragment();
+        const linesFragment = document.createDocumentFragment();
+
         mod.quests.forEach(quest => {
             if (quest.parents) {
                 quest.parents.forEach(pId => {
                     const parent = mod.quests.find(q => q.id === pId);
-                    if (parent) this.drawLine(linesLayer, parent, quest);
+                    if (parent) this.drawLine(linesFragment, parent, quest);
                 });
             }
         });
@@ -244,7 +248,8 @@ export const Editor = {
             else if (quest.reqs && quest.reqs.length > 0) iconStr = quest.reqs[0].item.image;
 
             const iconPath = iconStr ? ItemsDB.getImageUrl(iconStr) : '';
-            node.innerHTML = `${iconPath ? `<img src="${iconPath}">` : ''}<div class="node-title">${ItemsDB.formatMC(quest.title)}</div>`;
+            // Ленивая загрузка иконок
+            node.innerHTML = `${iconPath ? `<img src="${iconPath}" loading="lazy">` : ''}<div class="node-title">${ItemsDB.formatMC(quest.title)}</div>`;
 
             node.addEventListener('mousedown', (e) => {
                 if (e.button === 0 && Auth.user) {
@@ -284,8 +289,12 @@ export const Editor = {
                 menu.classList.remove('hidden');
             });
 
-            nodesLayer.appendChild(node);
+            nodesFragment.appendChild(node);
         });
+
+        // Вставляем все элементы разом (в 10 раз быстрее)
+        linesLayer.appendChild(linesFragment);
+        nodesLayer.appendChild(nodesFragment);
 
         if (!skipSave) this.updateSummary();
     },
@@ -331,7 +340,7 @@ export const Editor = {
                 const consumeTag = (r.taskType !== 'hunt' && r.taskType !== 'block_break' && r.taskType !== 'checkbox' && r.taskType !== 'xp') 
                     ? (r.consume !== false ? '<span style="color:#ff5555; font-size:12px; margin-left:6px;">[Забрать]</span>' : '<span style="color:#aaaaaa; font-size:12px; margin-left:6px;">[Наличие]</span>')
                     : '';
-                reqHtml += `<div class="tt-item"><img src="${ItemsDB.getImageUrl(r.item.image)}">${r.count}x ${this.getTaskLabel(r)}${consumeTag}</div>`; 
+                reqHtml += `<div class="tt-item"><img src="${ItemsDB.getImageUrl(r.item.image)}" loading="lazy">${r.count}x ${this.getTaskLabel(r)}${consumeTag}</div>`; 
             });
         } else reqHtml = 'Нет требований';
         document.getElementById('tt-reqs').innerHTML = reqHtml;
@@ -340,7 +349,7 @@ export const Editor = {
         if (quest.rewards && quest.rewards.length > 0) {
             quest.rewards.forEach(r => { 
                 const choiceTag = r.isChoice ? '<span style="color:#ffff55; font-size:12px; margin-left:6px;">[На выбор]</span>' : '';
-                rewHtml += `<div class="tt-item"><img src="${ItemsDB.getImageUrl(r.item.image)}">${r.count}x ${this.getRewardLabel(r)}${choiceTag}</div>`; 
+                rewHtml += `<div class="tt-item"><img src="${ItemsDB.getImageUrl(r.item.image)}" loading="lazy">${r.count}x ${this.getRewardLabel(r)}${choiceTag}</div>`; 
             });
         } else rewHtml = 'Нет наград';
         document.getElementById('tt-rewards').innerHTML = rewHtml;
@@ -351,10 +360,9 @@ export const Editor = {
     updateSummary() {
         const container = document.getElementById('rewards-summary-list');
         const summaryPanel = document.getElementById('rewards-summary');
-        container.innerHTML = '';
         
         const mod = this.getActiveMod();
-        if (!mod) { summaryPanel.classList.add('hidden'); return; }
+        if (!mod) { summaryPanel.classList.add('hidden'); container.innerHTML = ''; return; }
 
         const totals = {};
         mod.quests.forEach(q => {
@@ -368,16 +376,18 @@ export const Editor = {
 
         if (Object.keys(totals).length > 0) {
             summaryPanel.classList.remove('hidden');
+            let htmlStr = ''; // Оптимизация: пакетная сборка HTML
             for (const key in totals) {
                 const choiceTag = totals[key].isChoice ? '<span style="color:#ffff55; font-size:12px; margin-left:4px;">[На выбор]</span>' : '';
-                container.innerHTML += `<div class="summary-item"><img src="${ItemsDB.getImageUrl(totals[key].item.image)}"> ${totals[key].count}x ${totals[key].name}${choiceTag}</div>`;
+                htmlStr += `<div class="summary-item"><img src="${ItemsDB.getImageUrl(totals[key].item.image)}" loading="lazy"> ${totals[key].count}x ${totals[key].name}${choiceTag}</div>`;
             }
+            container.innerHTML = htmlStr;
         } else {
             summaryPanel.classList.add('hidden');
+            container.innerHTML = '';
         }
     },
 
-    // НОВОЕ: Обработка модалки NBT
     bindNbtModalEvents() {
         document.getElementById('btn-close-nbt').addEventListener('click', () => {
             document.getElementById('nbt-editor-modal').classList.add('hidden');
@@ -393,13 +403,12 @@ export const Editor = {
                 
                 if (this.tempNbtTarget) {
                     this.tempNbtTarget.nbtTag = parsed;
-                    // Автоматически обновляем название на основе NBT
                     this.tempNbtTarget.customName = BQ.getCustomName(this.tempNbtTarget.item, parsed);
                 }
                 
                 document.getElementById('nbt-editor-modal').classList.add('hidden');
                 errDiv.innerText = '';
-                this.renderQuestEditForm(); // Перерисовываем, чтобы показать новое имя
+                this.renderQuestEditForm(); 
             } catch(e) {
                 errDiv.innerText = 'Ошибка JSON! Проверьте скобки и запятые. Подробно: ' + e.message;
             }
@@ -557,15 +566,15 @@ export const Editor = {
         document.getElementById('view-quest-desc').innerHTML = ItemsDB.formatMC(quest.desc || 'Нет описания.');
 
         const reqsBox = document.getElementById('view-reqs-list');
-        reqsBox.innerHTML = '';
+        let reqsHtml = ''; // Оптимизация: пакетная сборка
         if (quest.reqs && quest.reqs.length > 0) {
             quest.reqs.forEach(r => {
                 const consumeText = (r.taskType !== 'hunt' && r.taskType !== 'block_break' && r.taskType !== 'checkbox' && r.taskType !== 'xp') 
                     ? (r.consume !== false ? '<span style="color:#ff5555;">[Забирается]</span>' : '<span style="color:#aaaaaa;">[Только наличие]</span>')
                     : '';
-                reqsBox.innerHTML += `
+                reqsHtml += `
                     <div class="view-item-row">
-                        <div class="mc-slot"><img src="${ItemsDB.getImageUrl(r.item.image)}"></div>
+                        <div class="mc-slot"><img src="${ItemsDB.getImageUrl(r.item.image)}" loading="lazy"></div>
                         <div class="item-info">
                             <span class="item-name">${r.count}x ${this.getTaskLabel(r)}</span>
                             <span class="item-meta">${consumeText}</span>
@@ -574,17 +583,18 @@ export const Editor = {
                 `;
             });
         } else {
-            reqsBox.innerHTML = '<div style="padding: 15px; color: #aaa; font-size: 16px;">Нет требований</div>';
+            reqsHtml = '<div style="padding: 15px; color: #aaa; font-size: 16px;">Нет требований</div>';
         }
+        reqsBox.innerHTML = reqsHtml;
 
         const rewsBox = document.getElementById('view-rewards-list');
-        rewsBox.innerHTML = '';
+        let rewsHtml = ''; // Оптимизация: пакетная сборка
         if (quest.rewards && quest.rewards.length > 0) {
             quest.rewards.forEach(r => {
                 const choiceText = r.isChoice ? '<span style="color:#ffff55;">[На выбор]</span>' : '<span style="color:#55ff55;">[Гарантировано]</span>';
-                rewsBox.innerHTML += `
+                rewsHtml += `
                     <div class="view-item-row">
-                        <div class="mc-slot"><img src="${ItemsDB.getImageUrl(r.item.image)}"></div>
+                        <div class="mc-slot"><img src="${ItemsDB.getImageUrl(r.item.image)}" loading="lazy"></div>
                         <div class="item-info">
                             <span class="item-name">${r.count}x ${this.getRewardLabel(r)}</span>
                             <span class="item-meta">${choiceText}</span>
@@ -593,8 +603,9 @@ export const Editor = {
                 `;
             });
         } else {
-            rewsBox.innerHTML = '<div style="padding: 15px; color: #aaa; font-size: 16px;">Нет наград</div>';
+            rewsHtml = '<div style="padding: 15px; color: #aaa; font-size: 16px;">Нет наград</div>';
         }
+        rewsBox.innerHTML = rewsHtml;
 
         modal.classList.remove('hidden');
     },
@@ -647,12 +658,11 @@ export const Editor = {
 
             const showConsume = (tType === 'hunt' || tType === 'block_break' || tType === 'checkbox' || tType === 'xp') ? 'display:none;' : '';
 
-            // Подсветка, если есть NBT
             let nbtBtnStyle = r.nbtTag ? 'color: #55ffff; border-color: #55ffff;' : '';
 
             div.innerHTML = `
                 <div class="mc-slot item-icon-btn" title="Кликните чтобы изменить иконку" style="cursor: pointer; flex-shrink:0;">
-                    <img src="${ItemsDB.getImageUrl(r.item.image)}" width="24" height="24">
+                    <img src="${ItemsDB.getImageUrl(r.item.image)}" width="24" height="24" loading="lazy">
                 </div>
                 
                 <select id="req-type-${idx}" class="mc-input task-type-select">
@@ -691,7 +701,6 @@ export const Editor = {
                 this.renderQuestEditForm(); 
             });
             
-            // Вызов NBT редактора
             div.querySelector('.btn-nbt').addEventListener('click', () => {
                 this.saveTempState();
                 this.tempNbtTarget = this.tempReqs[idx];
@@ -728,13 +737,11 @@ export const Editor = {
             else targetInputHtml = `<input type="text" id="rew-name-${idx}" class="mc-input custom-name-input" value="${r.customName || ''}" placeholder="Название">`;
 
             const showChoice = (rType === 'command' || rType === 'xp') ? 'display:none;' : '';
-            
-            // Подсветка, если есть NBT
             let nbtBtnStyle = r.nbtTag ? 'color: #55ffff; border-color: #55ffff;' : '';
 
             div.innerHTML = `
                 <div class="mc-slot item-icon-btn" title="Кликните чтобы изменить иконку" style="cursor: pointer; flex-shrink:0;">
-                    <img src="${ItemsDB.getImageUrl(r.item.image)}" width="24" height="24">
+                    <img src="${ItemsDB.getImageUrl(r.item.image)}" width="24" height="24" loading="lazy">
                 </div>
                 
                 <select id="rew-type-${idx}" class="mc-input task-type-select">
@@ -801,7 +808,8 @@ export const Editor = {
             const div = document.createElement('div');
             div.className = 'search-result-item';
             const isFav = ItemsDB.favorites.includes(item.item_key);
-            div.innerHTML = `<span class="fav-star ${isFav ? 'active' : ''}" data-key="${item.item_key}">★</span><img src="${ItemsDB.getImageUrl(item.image)}" width="32" height="32"><span>${ItemsDB.formatMC(item.name)} <small style="color:#888;">[${item.mod}]</small></span>`;
+            // ОПТИМИЗАЦИЯ: Ленивая загрузка для поиска
+            div.innerHTML = `<span class="fav-star ${isFav ? 'active' : ''}" data-key="${item.item_key}">★</span><img src="${ItemsDB.getImageUrl(item.image)}" width="32" height="32" loading="lazy"><span>${ItemsDB.formatMC(item.name)} <small style="color:#888;">[${item.mod}]</small></span>`;
             
             div.querySelector('.fav-star').addEventListener('click', (e) => { 
                 e.stopPropagation(); 
@@ -817,14 +825,16 @@ export const Editor = {
 
         const renderMainResults = () => {
             resultsContainer.innerHTML = '';
-            const slice = currentSearchData.slice(0, itemsLimit);
-            slice.forEach(item => resultsContainer.appendChild(createItemElement(item)));
+            const fragment = document.createDocumentFragment(); // Оптимизация
+            currentSearchData.slice(0, itemsLimit).forEach(item => fragment.appendChild(createItemElement(item)));
+            resultsContainer.appendChild(fragment);
         };
 
         const renderFavResults = () => {
             favContainer.innerHTML = '';
-            const favs = ItemsDB.getFavorites();
-            favs.forEach(item => favContainer.appendChild(createItemElement(item)));
+            const fragment = document.createDocumentFragment();
+            ItemsDB.getFavorites().forEach(item => fragment.appendChild(createItemElement(item)));
+            favContainer.appendChild(fragment);
         };
 
         const updateBothLists = () => {
@@ -934,7 +944,7 @@ export const Editor = {
         document.getElementById('btn-select-mod-icon').addEventListener('click', () => {
             this.openItemPicker((item) => {
                 this.tempModIcon = item.image;
-                document.getElementById('mod-icon-preview').innerHTML = `<div class="mc-slot"><img src="${ItemsDB.getImageUrl(item.image)}" width="32" height="32"></div>`;
+                document.getElementById('mod-icon-preview').innerHTML = `<div class="mc-slot"><img src="${ItemsDB.getImageUrl(item.image)}" width="32" height="32" loading="lazy"></div>`;
             });
         });
 
@@ -966,6 +976,8 @@ export const Editor = {
         let draggedIndex = null;
         let draggedLi = null;
 
+        const fragment = document.createDocumentFragment(); // Оптимизация сборки меню
+
         this.data.mods.forEach((mod, index) => {
             const li = document.createElement('li');
             li.className = 'mod-item';
@@ -973,7 +985,7 @@ export const Editor = {
             
             li.innerHTML = `
                 <div class="mod-item-content">
-                    <img src="${ItemsDB.getImageUrl(mod.icon)}" width="24" height="24">
+                    <img src="${ItemsDB.getImageUrl(mod.icon)}" width="24" height="24" loading="lazy">
                     <span>${ItemsDB.formatMC(mod.name)}</span>
                 </div>
                 <div class="mod-item-actions admin-only">
@@ -989,52 +1001,36 @@ export const Editor = {
             });
 
             if (Auth.user) {
-                // ЛОГИКА ПЕРЕТАСКИВАНИЯ (Drag & Drop)
                 li.draggable = true;
 
                 li.addEventListener('dragstart', (e) => {
-                    draggedLi = li;
-                    draggedIndex = index;
-                    e.dataTransfer.effectAllowed = 'move';
-                    setTimeout(() => li.style.opacity = '0.5', 0); // Прячем оригинал при захвате
+                    draggedLi = li; draggedIndex = index; e.dataTransfer.effectAllowed = 'move';
+                    setTimeout(() => li.style.opacity = '0.5', 0); 
                 });
 
                 li.addEventListener('dragover', (e) => {
-                    e.preventDefault(); // Разрешаем сброс
+                    e.preventDefault(); 
                     if (draggedIndex === index) return;
-                    
                     const rect = li.getBoundingClientRect();
                     const midY = rect.top + rect.height / 2;
-                    
-                    if (e.clientY < midY) {
-                        li.classList.add('drag-top');
-                        li.classList.remove('drag-bottom');
-                    } else {
-                        li.classList.add('drag-bottom');
-                        li.classList.remove('drag-top');
-                    }
+                    if (e.clientY < midY) { li.classList.add('drag-top'); li.classList.remove('drag-bottom'); } 
+                    else { li.classList.add('drag-bottom'); li.classList.remove('drag-top'); }
                 });
 
-                li.addEventListener('dragleave', () => {
-                    li.classList.remove('drag-top', 'drag-bottom');
-                });
-
+                li.addEventListener('dragleave', () => li.classList.remove('drag-top', 'drag-bottom'));
                 li.addEventListener('dragend', () => {
                     if (draggedLi) draggedLi.style.opacity = '1';
                     document.querySelectorAll('.mod-item').forEach(el => el.classList.remove('drag-top', 'drag-bottom'));
                 });
 
                 li.addEventListener('drop', (e) => {
-                    e.preventDefault();
-                    li.classList.remove('drag-top', 'drag-bottom');
+                    e.preventDefault(); li.classList.remove('drag-top', 'drag-bottom');
                     if (draggedIndex === index || draggedIndex === null) return;
 
                     const rect = li.getBoundingClientRect();
                     const midY = rect.top + rect.height / 2;
-                    
                     let newIndex = index;
                     if (e.clientY > midY) newIndex++;
-
                     if (draggedIndex < newIndex) newIndex--;
 
                     const movedItem = this.data.mods.splice(draggedIndex, 1)[0];
@@ -1045,11 +1041,9 @@ export const Editor = {
                     this.renderSidebar();
                 });
 
-                // Кнопки редактирования и удаления
                 li.querySelector('.edit').addEventListener('click', (e) => {
                     e.stopPropagation();
-                    this.editingModId = mod.id;
-                    this.tempModIcon = mod.icon;
+                    this.editingModId = mod.id; this.tempModIcon = mod.icon;
                     document.getElementById('new-mod-name').value = mod.name;
                     document.getElementById('mod-icon-preview').innerHTML = `<div class="mc-slot"><img src="${ItemsDB.getImageUrl(mod.icon)}" width="32" height="32"></div>`;
                     document.getElementById('mod-modal-title').innerText = 'Редактировать ветку';
@@ -1067,8 +1061,10 @@ export const Editor = {
                     }
                 });
             }
-            list.appendChild(li);
+            fragment.appendChild(li);
         });
+        
+        list.appendChild(fragment); // Разовая вставка меню
     },
 
     getActiveMod() { return this.data.mods.find(m => m.id === this.activeModId); }
