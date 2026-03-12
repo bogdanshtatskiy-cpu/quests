@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Minecraft Quest Editor</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="shortcut icon" type="image/png" href="favicon.png">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="show-titles">
@@ -228,13 +230,11 @@
     <div id="loot-editor-modal" class="modal hidden">
         <div class="mc-panel modal-content large" style="height: 85vh; display: flex; flex-direction: column;">
             <h2 class="mc-title">Менеджер Лутбоксов (QuestLoot.json)</h2>
-            
             <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                 <button id="btn-loot-import" class="mc-button" style="background-color:#000055; color:#fff;">📥 Загрузить QuestLoot.json</button>
                 <input type="file" id="loot-file-input" accept=".json" class="hidden">
                 <button id="btn-loot-export" class="mc-button" style="background-color:#005555; color:#fff;">📤 Скачать QuestLoot.json</button>
             </div>
-
             <div class="form-row" style="flex: 1; overflow: hidden;">
                 <div class="form-group" style="flex: 1; display: flex; flex-direction: column; margin-bottom: 0;">
                     <div class="form-group-header">
@@ -243,7 +243,6 @@
                     </div>
                     <div id="loot-groups-list" class="item-list-container" style="flex: 1; background: rgba(0,0,0,0.5);"></div>
                 </div>
-                
                 <div id="loot-group-settings" class="form-group hidden" style="flex: 3; display: flex; flex-direction: column; margin-bottom: 0; border-left: 2px solid #555; padding-left: 15px;">
                     <h3 id="loot-selected-group-name" style="color:#55ffff; margin-bottom:10px;">Выберите группу</h3>
                     <div style="display: flex; gap: 15px; margin-bottom: 15px;">
@@ -256,7 +255,6 @@
                             <input type="number" id="loot-group-weight" class="mc-input" title="Шанс выпадения всей группы">
                         </div>
                     </div>
-                    
                     <div class="form-group-header">
                         <label>Варианты дропа (Каждая карточка - один возможный исход):</label>
                         <button id="btn-add-loot-reward" class="mc-button" style="padding: 2px 6px; font-size: 12px;">+ Вариант дропа</button>
@@ -264,9 +262,27 @@
                     <div id="loot-rewards-list" class="item-list-container" style="flex: 1; background: rgba(0,0,0,0.3); padding: 10px; display: flex; flex-direction: column; gap: 10px;"></div>
                 </div>
             </div>
-            
             <div class="modal-actions" style="margin-top: 15px;">
                 <button id="btn-close-loot" class="mc-button btn-cancel" style="width: 100%;">Сохранить и закрыть менеджер</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="nbt-editor-modal" class="modal hidden">
+        <div class="mc-panel modal-content" style="width: 700px;">
+            <h2 class="mc-title">Редактор NBT Данных</h2>
+            <div style="background: #1e1e1e; padding: 10px; border: 1px solid #555; margin-bottom: 10px; font-size: 14px;">
+                <p style="color:#aaa; margin-bottom: 5px;">Вставьте или измените JSON-код. Примеры использования:</p>
+                <div style="color:#fff; margin-bottom: 4px;"><b style="color:#55ffff;">Зачарованная книга (Удача V):</b> <br><code style="color:#aaa;">{"StoredEnchantments:9": {"0:10": {"id:2": 35, "lvl:2": 5}}}</code></div>
+                <div style="color:#fff;"><b style="color:#55ffff;">Спрятанный предмет в тайнике:</b> <br><code style="color:#aaa;">{"Item:10": {"id:8": "minecraft:stone", "Count:3": 64}}</code></div>
+            </div>
+            
+            <textarea id="nbt-editor-textarea" class="mc-input" style="height: 300px; font-family: monospace; font-size: 14px; white-space: pre;" spellcheck="false"></textarea>
+            <div id="nbt-editor-error" style="color: #ff5555; margin-top: 5px; font-size: 14px; font-weight: bold;"></div>
+            
+            <div class="modal-actions">
+                <button id="btn-save-nbt" class="mc-button" style="color: #00aa00;">Сохранить NBT</button>
+                <button id="btn-close-nbt" class="mc-button btn-cancel">Отмена</button>
             </div>
         </div>
     </div>
@@ -274,14 +290,12 @@
     <div id="item-picker-modal" class="modal hidden">
         <div class="mc-panel modal-content" style="width: 1000px; max-width: 95vw;">
             <h2 class="mc-title">Выбор предмета</h2>
-            
             <div class="mc-panel admin-only" style="margin-bottom: 10px; padding: 10px; display: flex; gap: 10px; align-items: center; border-width: 2px;">
                 <span style="color:#55ffff; font-size:14px; white-space:nowrap;">Своя иконка:</span>
                 <input type="file" id="custom-item-file" accept="image/png, image/jpeg, image/gif" style="font-size:12px; width: 180px; color:#fff;">
                 <input type="text" id="custom-item-name" class="mc-input" placeholder="Название предмета..." style="padding:4px; font-size:14px;">
                 <button id="btn-upload-custom-item" class="mc-button" style="padding:4px 8px; font-size:14px;">Добавить</button>
             </div>
-
             <div style="display: flex; gap: 15px; height: 400px;">
                 <div style="flex: 2; display: flex; flex-direction: column;">
                     <div class="picker-controls" style="display: flex; gap: 10px; margin-bottom: 10px;">
@@ -290,13 +304,11 @@
                     </div>
                     <div id="picker-results" class="item-list-container" style="flex: 1; overflow-y: auto;"></div>
                 </div>
-                
                 <div style="flex: 1; display: flex; flex-direction: column; background: #1e1e1e; border: 2px solid #555; padding: 5px;">
                     <h3 style="color:#ffaa00; margin: 5px 0 10px 0; text-shadow: 1px 1px 0 #000; text-align:center; font-size: 16px;">★ Избранное</h3>
                     <div id="picker-fav-results" class="item-list-container" style="flex: 1; overflow-y: auto; border: none; padding: 0;"></div>
                 </div>
             </div>
-
             <div class="modal-actions" style="margin-top: 15px;">
                 <button id="btn-picker-cancel" class="mc-button btn-cancel">Отмена</button>
             </div>
