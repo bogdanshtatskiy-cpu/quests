@@ -11,7 +11,7 @@ export const Editor = {
     activeModId: null, 
     originalData: null, 
     isImportMode: false, 
-    lootGroups: {}, 
+    lootGroups: {}, // Хранит названия лутбоксов: { "0": "Кейс новичка", "1": "Донат кейс" }
     
     scale: 1, panX: 0, panY: 0, 
     isPanning: false, panStartX: 0, panStartY: 0, initialPanX: 0, initialPanY: 0,
@@ -29,9 +29,6 @@ export const Editor = {
         this.bindItemPickerEvents(); 
         this.bindTopBarEvents();
         this.bindNbtModalEvents(); 
-        this.renderSidebar(); 
-        this.renderCanvas(); 
-        this.centerCanvas(); 
     },
 
     addMobToDatalist(mobName) {
@@ -213,7 +210,7 @@ export const Editor = {
 
     updateTransform() { document.getElementById('quest-canvas').style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`; },
 
-    // ОПТИМИЗИРОВАННЫЙ РЕНДЕР: Используем DocumentFragment
+    // ОПТИМИЗИРОВАННЫЙ РЕНДЕР КАНВАСА
     renderCanvas(skipSave = false) {
         const nodesLayer = document.getElementById('nodes-layer');
         const linesLayer = document.getElementById('connections-layer');
@@ -248,7 +245,6 @@ export const Editor = {
             else if (quest.reqs && quest.reqs.length > 0) iconStr = quest.reqs[0].item.image;
 
             const iconPath = iconStr ? ItemsDB.getImageUrl(iconStr) : '';
-            // Ленивая загрузка иконок
             node.innerHTML = `${iconPath ? `<img src="${iconPath}" loading="lazy">` : ''}<div class="node-title">${ItemsDB.formatMC(quest.title)}</div>`;
 
             node.addEventListener('mousedown', (e) => {
@@ -292,7 +288,6 @@ export const Editor = {
             nodesFragment.appendChild(node);
         });
 
-        // Вставляем все элементы разом (в 10 раз быстрее)
         linesLayer.appendChild(linesFragment);
         nodesLayer.appendChild(nodesFragment);
 
@@ -376,7 +371,7 @@ export const Editor = {
 
         if (Object.keys(totals).length > 0) {
             summaryPanel.classList.remove('hidden');
-            let htmlStr = ''; // Оптимизация: пакетная сборка HTML
+            let htmlStr = ''; 
             for (const key in totals) {
                 const choiceTag = totals[key].isChoice ? '<span style="color:#ffff55; font-size:12px; margin-left:4px;">[На выбор]</span>' : '';
                 htmlStr += `<div class="summary-item"><img src="${ItemsDB.getImageUrl(totals[key].item.image)}" loading="lazy"> ${totals[key].count}x ${totals[key].name}${choiceTag}</div>`;
@@ -566,7 +561,7 @@ export const Editor = {
         document.getElementById('view-quest-desc').innerHTML = ItemsDB.formatMC(quest.desc || 'Нет описания.');
 
         const reqsBox = document.getElementById('view-reqs-list');
-        let reqsHtml = ''; // Оптимизация: пакетная сборка
+        let reqsHtml = '';
         if (quest.reqs && quest.reqs.length > 0) {
             quest.reqs.forEach(r => {
                 const consumeText = (r.taskType !== 'hunt' && r.taskType !== 'block_break' && r.taskType !== 'checkbox' && r.taskType !== 'xp') 
@@ -588,7 +583,7 @@ export const Editor = {
         reqsBox.innerHTML = reqsHtml;
 
         const rewsBox = document.getElementById('view-rewards-list');
-        let rewsHtml = ''; // Оптимизация: пакетная сборка
+        let rewsHtml = ''; 
         if (quest.rewards && quest.rewards.length > 0) {
             quest.rewards.forEach(r => {
                 const choiceText = r.isChoice ? '<span style="color:#ffff55;">[На выбор]</span>' : '<span style="color:#55ff55;">[Гарантировано]</span>';
@@ -800,22 +795,27 @@ export const Editor = {
         
         const resultsContainer = document.getElementById('picker-results');
         const favContainer = document.getElementById('picker-fav-results');
+        const lootContainer = document.getElementById('picker-loot-results');
 
         let currentSearchData = [];
         let itemsLimit = 50;
 
-        const createItemElement = (item) => {
+        const createItemElement = (item, isLootbox = false) => {
             const div = document.createElement('div');
             div.className = 'search-result-item';
-            const isFav = ItemsDB.favorites.includes(item.item_key);
-            // ОПТИМИЗАЦИЯ: Ленивая загрузка для поиска
-            div.innerHTML = `<span class="fav-star ${isFav ? 'active' : ''}" data-key="${item.item_key}">★</span><img src="${ItemsDB.getImageUrl(item.image)}" width="32" height="32" loading="lazy"><span>${ItemsDB.formatMC(item.name)} <small style="color:#888;">[${item.mod}]</small></span>`;
             
-            div.querySelector('.fav-star').addEventListener('click', (e) => { 
-                e.stopPropagation(); 
-                ItemsDB.toggleFavorite(item.item_key); 
-                updateBothLists(); 
-            });
+            if (isLootbox) {
+                div.innerHTML = `<img src="${ItemsDB.getImageUrl(item.image)}" width="32" height="32" loading="lazy"><span>🎁 ${item.name} <small style="color:#888;">[Лутбокс]</small></span>`;
+            } else {
+                const isFav = ItemsDB.favorites.includes(item.item_key);
+                div.innerHTML = `<span class="fav-star ${isFav ? 'active' : ''}" data-key="${item.item_key}">★</span><img src="${ItemsDB.getImageUrl(item.image)}" width="32" height="32" loading="lazy"><span>${ItemsDB.formatMC(item.name)} <small style="color:#888;">[${item.mod}]</small></span>`;
+                div.querySelector('.fav-star').addEventListener('click', (e) => { 
+                    e.stopPropagation(); 
+                    ItemsDB.toggleFavorite(item.item_key); 
+                    updateBothLists(); 
+                });
+            }
+            
             div.addEventListener('click', () => { 
                 modal.classList.add('hidden'); 
                 if (this.pickerCallback) this.pickerCallback(item); 
@@ -825,7 +825,7 @@ export const Editor = {
 
         const renderMainResults = () => {
             resultsContainer.innerHTML = '';
-            const fragment = document.createDocumentFragment(); // Оптимизация
+            const fragment = document.createDocumentFragment(); 
             currentSearchData.slice(0, itemsLimit).forEach(item => fragment.appendChild(createItemElement(item)));
             resultsContainer.appendChild(fragment);
         };
@@ -837,9 +837,35 @@ export const Editor = {
             favContainer.appendChild(fragment);
         };
 
+        // НОВОЕ: Рендер Лутбоксов в правой панели
+        const renderLootResults = () => {
+            if (!lootContainer) return;
+            lootContainer.innerHTML = '';
+            
+            if (Object.keys(this.lootGroups || {}).length === 0) {
+                lootContainer.innerHTML = '<div style="padding:10px; color:#666; font-size:14px; text-align:center;">База лутбоксов не загружена</div>';
+                return;
+            }
+
+            const fragment = document.createDocumentFragment();
+            Object.entries(this.lootGroups).forEach(([id, name]) => {
+                const mockLootItem = {
+                    item_key: 'bq_standard:loot_chest',
+                    string_id: 'bq_standard:loot_chest',
+                    name: name,
+                    image: 'chest.png', // Дефолтная иконка сундука
+                    damage: parseInt(id),
+                    mod: 'Лутбоксы'
+                };
+                fragment.appendChild(createItemElement(mockLootItem, true));
+            });
+            lootContainer.appendChild(fragment);
+        };
+
         const updateBothLists = () => {
             renderMainResults();
             renderFavResults();
+            renderLootResults();
         };
 
         const triggerSearch = () => {
@@ -976,7 +1002,7 @@ export const Editor = {
         let draggedIndex = null;
         let draggedLi = null;
 
-        const fragment = document.createDocumentFragment(); // Оптимизация сборки меню
+        const fragment = document.createDocumentFragment(); 
 
         this.data.mods.forEach((mod, index) => {
             const li = document.createElement('li');
@@ -1064,7 +1090,7 @@ export const Editor = {
             fragment.appendChild(li);
         });
         
-        list.appendChild(fragment); // Разовая вставка меню
+        list.appendChild(fragment);
     },
 
     getActiveMod() { return this.data.mods.find(m => m.id === this.activeModId); }
