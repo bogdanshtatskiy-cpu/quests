@@ -40,7 +40,7 @@ export const Editor = {
     pickerCallback: null, 
     tempReqs: [], 
     tempRewards: [], 
-    tempParents: [], // Временный массив для связей квестов
+    tempParents: [],
     tempQuestIcon: null, 
     tempQuestIconItem: null, 
     editingModId: null, 
@@ -336,7 +336,6 @@ export const Editor = {
         const nodesFragment = document.createDocumentFragment();
         const linesFragment = document.createDocumentFragment();
 
-        // 1. Линии связей (только внутри текущей ветки)
         mod.quests.forEach(quest => {
             if (quest.parents) {
                 quest.parents.forEach(pId => {
@@ -348,7 +347,6 @@ export const Editor = {
             }
         });
 
-        // 2. Узлы
         mod.quests.forEach(quest => {
             const node = document.createElement('div');
             const nodeSize = getSafeSize(quest.size);
@@ -373,11 +371,9 @@ export const Editor = {
 
             const iconPath = ItemsDB.getImageUrl(iconFile);
 
-            // Проверка на зависимости из других веток
             let hasExternalParents = false;
             if (quest.parents && quest.parents.length > 0) {
                 quest.parents.forEach(pId => {
-                    // Если родителя нет в текущей ветке, значит он из другой
                     if (!mod.quests.find(q => q.id === pId)) {
                         hasExternalParents = true;
                     }
@@ -472,12 +468,13 @@ export const Editor = {
 
     getTaskLabel(r) {
         const t = r.taskType || 'retrieval';
+        // ИСПРАВЛЕНИЕ: Выводим customName, если он есть (в нём лежит перевод жидкостей)
         let name = r.customName || (r.item ? r.item.name : 'Предмет');
         
-        if (t === 'hunt') return `Убить: ${r.target || name}`;
+        if (t === 'hunt') return `Убить: ${ItemsDB.formatMC(name)}`;
         if (t === 'block_break') return `Сломать: ${ItemsDB.formatMC(name)}`;
         if (t === 'crafting') return `Создать: ${ItemsDB.formatMC(name)}`;
-        if (t === 'fluid') return `Жидкость: ${ItemsDB.formatMC(r.target || name)}`;
+        if (t === 'fluid') return `Жидкость: ${ItemsDB.formatMC(name)}`;
         if (t === 'checkbox') return `Галочка: ${ItemsDB.formatMC(name)}`;
         
         return ItemsDB.formatMC(name);
@@ -502,7 +499,6 @@ export const Editor = {
         document.getElementById('tt-title').innerHTML = ItemsDB.formatMC(quest.title);
         document.getElementById('tt-desc').innerHTML = ItemsDB.formatMC(quest.desc || '');
         
-        // Родительские квесты
         const parentsContainer = document.getElementById('tt-parents-container');
         if (quest.parents && quest.parents.length > 0) {
             let pNames = [];
@@ -524,7 +520,6 @@ export const Editor = {
             parentsContainer.style.display = 'none';
         }
 
-        // Требования
         let reqHtml = '';
         if (quest.reqs && quest.reqs.length > 0) {
             quest.reqs.forEach(r => {
@@ -539,7 +534,6 @@ export const Editor = {
         }
         document.getElementById('tt-reqs').innerHTML = reqHtml;
 
-        // Награды
         let rewHtml = '';
         if (quest.rewards && quest.rewards.length > 0) {
             quest.rewards.forEach(r => {
@@ -636,7 +630,12 @@ export const Editor = {
             if (r.taskType === 'hunt' || r.taskType === 'fluid') {
                 if (targetInp) { 
                     r.target = targetInp.value; 
-                    r.customName = targetInp.value; 
+                    // ИСПРАВЛЕНИЕ: Если жидкость - переводим её, иначе сохраняем как есть
+                    if (r.taskType === 'fluid') {
+                        r.customName = BQ.FLUIDS[r.target] || r.target;
+                    } else {
+                        r.customName = r.target;
+                    }
                 }
             } else if (r.taskType !== 'xp' && r.taskType !== 'checkbox') {
                 if (nameInp) r.customName = nameInp.value;
@@ -698,7 +697,6 @@ export const Editor = {
         const mod = this.getActiveMod();
         mod.quests = mod.quests.filter(q => q.id !== questId);
         
-        // Удаляем связи из всех веток (не только текущей)
         this.data.mods.forEach(m => {
             m.quests.forEach(q => {
                 if (q.parents) {
@@ -711,9 +709,6 @@ export const Editor = {
         this.renderCanvas();
     },
 
-    /**
-     * Логика списка зависимостей
-     */
     populateParentsSelect() {
         const select = document.getElementById('parent-quest-select');
         select.innerHTML = '<option value="">-- Выберите квест для привязки --</option>';
@@ -723,11 +718,9 @@ export const Editor = {
             optgroup.label = ItemsDB.formatMC(mod.name);
             
             mod.quests.forEach(q => {
-                // Исключаем сам квест и те, что уже добавлены
                 if (q.id !== this.editingNodeId && !this.tempParents.includes(q.id)) {
                     const opt = document.createElement('option');
                     opt.value = q.id;
-                    // Очищаем название от § для select
                     opt.textContent = (q.title || 'Безымянный квест').replace(/[§&][0-9a-fk-or]/gi, '');
                     optgroup.appendChild(opt);
                 }
@@ -766,7 +759,7 @@ export const Editor = {
             div.querySelector('.btn-del-parent').addEventListener('click', () => {
                 this.tempParents.splice(idx, 1);
                 this.renderParentsList();
-                this.populateParentsSelect(); // Обновляем селект, чтобы удаленный квест вернулся в список
+                this.populateParentsSelect(); 
             });
             
             container.appendChild(div);
@@ -831,7 +824,6 @@ export const Editor = {
             });
         });
 
-        // Добавление родительского квеста
         document.getElementById('btn-add-parent').addEventListener('click', () => {
             const select = document.getElementById('parent-quest-select');
             const val = select.value;
@@ -859,7 +851,7 @@ export const Editor = {
                 q.iconItem = this.tempQuestIconItem; 
                 q.reqs = [...this.tempReqs]; 
                 q.rewards = [...this.tempRewards];
-                q.parents = [...this.tempParents]; // Сохраняем связи
+                q.parents = [...this.tempParents]; 
                 DB.logAction(`Отредактировал квест: ${title}`);
             } else {
                 mod.quests.push({
@@ -912,7 +904,6 @@ export const Editor = {
         document.getElementById('view-quest-title').innerHTML = ItemsDB.formatMC(quest.title);
         document.getElementById('view-quest-desc').innerHTML = ItemsDB.formatMC(quest.desc || 'Нет описания.');
 
-        // Отображение родителей в режиме просмотра
         const pContainer = document.getElementById('view-parents-container');
         const pList = document.getElementById('view-parents-list');
         if (quest.parents && quest.parents.length > 0) {
@@ -1009,7 +1000,6 @@ export const Editor = {
             document.getElementById('quest-icon-preview').innerHTML = '';
         }
 
-        // Рендерим списки
         this.renderQuestEditForm();
         this.renderParentsList();
         this.populateParentsSelect();
@@ -1028,8 +1018,9 @@ export const Editor = {
             const isChecked = r.consume !== false ? 'checked' : '';
             
             let targetInputHtml = '';
+            // ИСПРАВЛЕНИЕ: Выводим системный ID в поле ввода (target)
             if (tType === 'hunt') targetInputHtml = `<input type="text" id="req-target-${idx}" list="mob-list" class="mc-input custom-name-input" value="${r.target || r.customName || ''}" placeholder="Моб (напр. Creeper)">`;
-            else if (tType === 'fluid') targetInputHtml = `<input type="text" id="req-target-${idx}" class="mc-input custom-name-input" value="${r.target || r.customName || ''}" placeholder="Жидкость (напр. water)">`;
+            else if (tType === 'fluid') targetInputHtml = `<input type="text" id="req-target-${idx}" class="mc-input custom-name-input" value="${r.target || ''}" placeholder="Жидкость (напр. water)">`;
             else if (tType === 'checkbox') targetInputHtml = `<input type="text" id="req-name-${idx}" class="mc-input custom-name-input" value="Нажать галочку" disabled>`;
             else if (tType === 'xp') targetInputHtml = `<input type="text" id="req-name-${idx}" class="mc-input custom-name-input" value="Сдать уровни опыта" disabled>`;
             else targetInputHtml = `<input type="text" id="req-name-${idx}" class="mc-input custom-name-input" value="${r.customName || ''}" placeholder="Название">`;
