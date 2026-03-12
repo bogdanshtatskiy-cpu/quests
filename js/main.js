@@ -6,39 +6,45 @@ import { LootEditor } from './loot.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
     const loader = document.getElementById('global-loader');
+    const loaderText = document.getElementById('loader-text');
     
     Auth.init();
     
-    // Быстро качаем только квесты
-    const savedQuests = await DB.loadQuests();
-    if (savedQuests && savedQuests.length > 0) {
-        savedQuests.forEach(mod => {
-            mod.quests.forEach(q => {
-                if (q.req && !q.reqs) q.reqs = [q.req];
-                if (!q.reqs) q.reqs = [];
-                if (!q.rewards) q.rewards = [];
+    try {
+        loaderText.innerText = "Идет загрузка базы предметов (1/2)...";
+        await ItemsDB.load(); // Ждем полную загрузку предметов, чтобы не сломать импорт
+        const customItems = await DB.loadCustomItems();
+        ItemsDB.addCustomItems(customItems);
+    } catch(e) {
+        console.error("Ошибка загрузки базы предметов", e);
+    }
+
+    try {
+        loaderText.innerText = "Синхронизация квестов с сервером (2/2)...";
+        const savedQuests = await DB.loadQuests();
+        if (savedQuests && savedQuests.length > 0) {
+            savedQuests.forEach(mod => {
+                mod.quests.forEach(q => {
+                    if (q.req && !q.reqs) q.reqs = [q.req];
+                    if (!q.reqs) q.reqs = [];
+                    if (!q.rewards) q.rewards = [];
+                });
             });
-        });
-        Editor.data.mods = savedQuests;
-        Editor.activeModId = savedQuests[0].id; 
+            Editor.data.mods = savedQuests;
+            Editor.activeModId = savedQuests[0].id; 
+        }
+    } catch(e) {
+        console.error("Ошибка загрузки квестов", e);
     }
     
-    // МОМЕНТАЛЬНО отрисовываем редактор
     Editor.init();
     LootEditor.init(); 
     
-    // Скрываем экран загрузки сразу же
+    // Скрываем экран только когда всё 100% готово к работе
     loader.classList.add('hidden');
     setTimeout(() => loader.style.display = 'none', 500);
 
-    // ФОНОВАЯ ЗАГРУЗКА БАЗЫ ПРЕДМЕТОВ (не тормозит экран и не вешает вкладку)
-    ItemsDB.load().then(async () => {
-        const customItems = await DB.loadCustomItems();
-        ItemsDB.addCustomItems(customItems);
-        console.log("База предметов (10k+) успешно загружена в фоне!");
-    });
-
-    // Админка
+    // Логика Админ-панели
     document.getElementById('btn-open-admin').addEventListener('click', async () => {
         document.getElementById('admin-modal').classList.remove('hidden');
         const logsContainer = document.getElementById('logs-tbody');
