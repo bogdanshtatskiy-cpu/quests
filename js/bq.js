@@ -97,10 +97,7 @@ export const BQ = {
     parseData(jsonString, editor) {
         try {
             // ГЕНИАЛЬНЫЙ ФИКС: Замораживаем огромные числа (UUID) и дробные нули (0.0), чтобы JS их не сломал
-            let safeJson = jsonString.replace(/"(?:\\\\.|[^"\\])*"|([\[:,]\s*)(-?\d{15,}|\-?\d+\.0+)(?=\s*[,\}\]])/g, (match, prefix, num) => {
-                if (prefix) return prefix + '"__BQ_NUM__' + num + '"';
-                return match; 
-            });
+            let safeJson = jsonString.replace(/([:\[]\s*)([-]?\d+\.\d+|-?\d{15,})(?=\s*[,}\]])/g, '$1"__BQ_NUM__$2"');
 
             const rawData = JSON.parse(safeJson);
             
@@ -276,9 +273,7 @@ export const BQ = {
         mods.forEach(mod => {
             if (mod.numericId === undefined) mod.numericId = ++maxLineId; 
             mod.quests.forEach(q => {
-                if (q.numericId === undefined) {
-                    q.numericId = ++maxQuestId; 
-                }
+                if (q.numericId === undefined) q.numericId = ++maxQuestId; 
                 idMap[q.id] = q.numericId;
             });
         });
@@ -314,7 +309,6 @@ export const BQ = {
                 const preReqs = (q.parents || []).map(p => idMap[p]).filter(p => p !== undefined);
                 const tasks = {}; 
                 
-                // ВАЖНО: Ищем максимальные индексы, чтобы не ломать порядок
                 let maxTaskIdx = -1;
                 (q.reqs || []).forEach(r => {
                     if (r.rawTaskProps && r.rawTaskProps["index:3"] !== undefined) {
@@ -337,7 +331,6 @@ export const BQ = {
                         const { idKey, finalId, damage } = extractItemData(req);
                         const dictObj = { "Count:3": parseInt(req.count) || 1, "Damage:2": damage, "OreDict:8": "" };
                         dictObj[idKey] = finalId;
-                        
                         if (req.nbtTag) dictObj["tag:10"] = req.nbtTag;
                         else if (finalId === 'bq_standard:loot_chest') dictObj["tag:10"] = { "hideLootInfo:1": 1 };
                         dict[`${idx}:10`] = dictObj;
@@ -382,35 +375,37 @@ export const BQ = {
                     return props;
                 };
 
+                let tDictIdx = 0;
+
                 if (groups.retrieval.length) {
                     let p = getTaskProps(groups.retrieval, "bq_standard:retrieval");
                     p["requiredItems:9"] = createItemsDict(groups.retrieval);
-                    tasks[`${p["index:3"]}:10`] = p;
+                    tasks[`${tDictIdx++}:10`] = p;
                 }
                 if (groups.crafting.length) {
                     let p = getTaskProps(groups.crafting, "bq_standard:crafting");
                     p["requiredItems:9"] = createItemsDict(groups.crafting);
-                    tasks[`${p["index:3"]}:10`] = p;
+                    tasks[`${tDictIdx++}:10`] = p;
                 }
                 if (groups.block_break.length) {
                     let p = getTaskProps(groups.block_break, "bq_standard:block_break");
                     p["blocks:9"] = createBlocksDict(groups.block_break);
-                    tasks[`${p["index:3"]}:10`] = p;
+                    tasks[`${tDictIdx++}:10`] = p;
                 }
                 if (groups.fluid.length) {
                     let p = getTaskProps(groups.fluid, "bq_standard:fluid");
                     p["requiredFluids:9"] = createFluidsDict(groups.fluid);
-                    tasks[`${p["index:3"]}:10`] = p;
+                    tasks[`${tDictIdx++}:10`] = p;
                 }
                 if (groups.checkbox.length) {
                     let p = getTaskProps(groups.checkbox, "bq_standard:checkbox");
-                    tasks[`${p["index:3"]}:10`] = p;
+                    tasks[`${tDictIdx++}:10`] = p;
                 }
                 if (groups.xp.length) {
                     let p = getTaskProps(groups.xp, "bq_standard:xp");
                     p["amount:3"] = parseInt(groups.xp[0].count) || 1;
                     p["isLevels:1"] = 1;
-                    tasks[`${p["index:3"]}:10`] = p;
+                    tasks[`${tDictIdx++}:10`] = p;
                 }
                 
                 groups.hunt.forEach(h => {
@@ -419,7 +414,7 @@ export const BQ = {
                     p["target:8"] = h.target || h.customName || h.item.name;
                     p["required:3"] = parseInt(h.count) || 1;
                     if (h.nbtTag) p["targetNBT:10"] = h.nbtTag;
-                    tasks[`${p["index:3"]}:10`] = p;
+                    tasks[`${tDictIdx++}:10`] = p;
                 });
 
                 npcDialogs.forEach(req => {
@@ -428,10 +423,11 @@ export const BQ = {
                     let dialogId = 0;
                     if (req.nbtTag && req.nbtTag['npcDialogID:3'] !== undefined) dialogId = req.nbtTag['npcDialogID:3'];
                     p["npcDialogID:3"] = parseInt(dialogId) || 0;
-                    tasks[`${p["index:3"]}:10`] = p;
+                    tasks[`${tDictIdx++}:10`] = p;
                 });
 
-                const rewards = {};
+                const rewards = {}; 
+                let rDictIdx = 0;
                 
                 const getRewProps = (arr, defType) => {
                     let props = arr[0] && arr[0].rawRewProps ? JSON.parse(JSON.stringify(arr[0].rawRewProps)) : null;
@@ -451,12 +447,12 @@ export const BQ = {
                     if (standardRews.length > 0) {
                         let p = getRewProps(standardRews, "bq_standard:item");
                         p["rewards:9"] = createItemsDict(standardRews);
-                        rewards[`${p["index:3"]}:10`] = p;
+                        rewards[`${rDictIdx++}:10`] = p;
                     }
                     if (choiceRews.length > 0) {
                         let p = getRewProps(choiceRews, "bq_standard:choice");
                         p["choices:9"] = createItemsDict(choiceRews);
-                        rewards[`${p["index:3"]}:10`] = p;
+                        rewards[`${rDictIdx++}:10`] = p;
                     }
 
                     q.rewards.forEach(r => {
@@ -464,12 +460,12 @@ export const BQ = {
                             let p = r.rawRewProps ? JSON.parse(JSON.stringify(r.rawRewProps)) : { "rewardID:8": "bq_standard:command", "hideCommand:1": 1, "viaPlayer:1": 0 };
                             if (p["index:3"] === undefined) p["index:3"] = rewIdx++;
                             p["command:8"] = r.command || "";
-                            rewards[`${p["index:3"]}:10`] = p;
+                            rewards[`${rDictIdx++}:10`] = p;
                         } else if (r.taskType === 'xp') {
                             let p = r.rawRewProps ? JSON.parse(JSON.stringify(r.rawRewProps)) : { "rewardID:8": "bq_standard:xp", "isLevels:1": 1 };
                             if (p["index:3"] === undefined) p["index:3"] = rewIdx++;
                             p["amount:3"] = parseInt(r.count) || 1;
-                            rewards[`${p["index:3"]}:10`] = p;
+                            rewards[`${rDictIdx++}:10`] = p;
                         }
                     });
                 }
@@ -548,8 +544,8 @@ export const BQ = {
 
         let outStr = JSON.stringify(bqData, null, 2);
         
-        // ФИНАЛЬНЫЙ ШТРИХ: Снимаем защиту с чисел. Они снова станут полноценными гигантскими UUID и дробными числами без кавычек!
-        outStr = outStr.replace(/"__BQ_NUM__(-?\d{15,}|\-?\d+\.0+)"/g, '$1');
+        // ФИНАЛЬНЫЙ ШТРИХ: Снимаем защиту. Огромные числа и Float 0.0 возвращаются в игру живыми.
+        outStr = outStr.replace(/"__BQ_NUM__([-]?\d+\.\d+|-?\d{15,})"/g, '$1');
 
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(outStr);
         const downloadAnchorNode = document.createElement('a');
