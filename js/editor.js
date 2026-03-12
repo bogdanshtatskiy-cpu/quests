@@ -382,7 +382,7 @@ export const Editor = {
     showTooltip(quest) {
         const tt = document.getElementById('quest-tooltip');
         document.getElementById('tt-title').innerHTML = ItemsDB.formatMC(quest.title);
-        document.getElementById('tt-desc').innerText = quest.desc || '';
+        document.getElementById('tt-desc').innerHTML = ItemsDB.formatMC(quest.desc || '');
         
         let reqHtml = '';
         if (quest.reqs && quest.reqs.length > 0) {
