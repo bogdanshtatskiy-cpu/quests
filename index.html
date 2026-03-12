@@ -16,22 +16,36 @@
     </div>
 
     <div id="top-bar" class="mc-panel ui-element">
-        <span style="color: #ffaa00; margin-right: 15px;">👤 <span id="current-user-name">Загрузка...</span></span>
-        <button id="btn-show-login" class="mc-button guest-only" style="margin-right: 15px; font-size: 12px; padding: 4px; display: none;">Войти</button>
-        <button id="btn-logout" class="mc-button admin-only" style="margin-right: 15px; font-size: 12px; padding: 4px; display: none;">Выйти</button>
-        <button id="btn-open-admin" class="mc-button super-admin-only" style="margin-right: 15px; background-color: #550000; color:white; display: none;">⚡ Админ Панель</button>
+        <span style="color: #ffaa00; margin-right: 10px;">👤 <span id="current-user-name">Загрузка...</span></span>
         
-        <button id="btn-open-loot-editor" class="mc-button admin-only" style="margin-right: 10px; background-color: #550055; color:white; display: none;">📦 База Лутбоксов</button>
+        <button id="btn-show-login" class="mc-button guest-only" style="display: none;">Войти</button>
+        <button id="btn-logout" class="mc-button admin-only" style="display: none;">Выйти</button>
         
-        <button id="btn-import-bq" class="mc-button admin-only" style="margin-right: 10px; background-color: #000055; color:white; display: none;">📥 Импорт BQ</button>
-        <button id="btn-export-bq" class="mc-button admin-only" style="margin-right: 15px; background-color: #005555; color:white; display: none;">📤 Экспорт BQ</button>
+        <span class="admin-only" style="display: none; align-items: center;">
+            <div class="vertical-divider"></div>
+            
+            <span style="color: #aaa; margin-right: 5px; font-size: 14px;">Профиль:</span>
+            <select id="workspace-select" class="mc-input" style="width: 140px; padding: 4px; font-size: 13px; margin-right: 5px;"></select>
+            <button id="btn-add-workspace" class="mc-button" style="padding: 4px 8px; font-size: 14px; margin-right: 5px;" title="Создать новое пространство">+</button>
+            <button id="btn-delete-workspace" class="mc-button danger" style="padding: 4px 8px; font-size: 14px;" title="Удалить текущее пространство">-</button>
+            
+            <div class="vertical-divider"></div>
+            
+            <button id="btn-open-admin" class="mc-button" style="color: #ff5555; margin-right: 5px;">⚡ Админка</button>
+            <button id="btn-open-loot-editor" class="mc-button" style="color: #ffaa00; margin-right: 5px;">📦 Лутбоксы</button>
+            <button id="btn-import-bq" class="mc-button" style="color: #55ffff; margin-right: 5px;">📥 Импорт BQ</button>
+            <button id="btn-export-bq" class="mc-button" style="color: #55ff55;">📤 Экспорт BQ</button>
+        </span>
+        
         <input type="file" id="bq-file-input" accept=".json" class="hidden">
+        
+        <div class="vertical-divider"></div>
         
         <button id="btn-toggle-titles" class="mc-button">Скрыть названия</button>
         
-        <span id="save-indicator" class="hidden" style="margin-left: 20px; color: #55ff55; font-weight: bold;">Сохранение...</span>
+        <span id="save-indicator" class="hidden" style="margin-left: 15px; font-size: 14px; font-weight: bold;">Сохранение...</span>
         
-        <div class="controls-hint">ЛКМ: Просмотр / Двигать | ПКМ: Настройки | Shift+ЛКМ: Связать</div>
+        <div class="controls-hint">ЛКМ: Просмотр/Двигать | ПКМ: Настройки | Shift+ЛКМ: Связать</div>
     </div>
 
     <div id="import-mode-bar" class="mc-panel hidden ui-element" style="position: absolute; top: 45px; left: 0; width: 100%; height: 45px; z-index: 99; display: flex; align-items: center; gap: 10px; padding: 0 10px; background-color: #555500; border-bottom-width: 3px;">
@@ -231,9 +245,9 @@
         <div class="mc-panel modal-content large" style="height: 85vh; display: flex; flex-direction: column;">
             <h2 class="mc-title">Менеджер Лутбоксов (QuestLoot.json)</h2>
             <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <button id="btn-loot-import" class="mc-button" style="background-color:#000055; color:#fff;">📥 Загрузить QuestLoot.json</button>
+                <button id="btn-loot-import" class="mc-button" style="color:#55ffff;">📥 Загрузить QuestLoot.json</button>
                 <input type="file" id="loot-file-input" accept=".json" class="hidden">
-                <button id="btn-loot-export" class="mc-button" style="background-color:#005555; color:#fff;">📤 Скачать QuestLoot.json</button>
+                <button id="btn-loot-export" class="mc-button" style="color:#55ff55;">📤 Скачать QuestLoot.json</button>
             </div>
             <div class="form-row" style="flex: 1; overflow: hidden;">
                 <div class="form-group" style="flex: 1; display: flex; flex-direction: column; margin-bottom: 0;">
@@ -289,14 +303,14 @@
 
     <div id="item-picker-modal" class="modal hidden">
         <div class="mc-panel modal-content" style="width: 1000px; max-width: 95vw;">
-            <h2 class="mc-title">Выбор предмета</h2>
+            <h2 class="mc-title">Выбор предмета / Награды</h2>
             <div class="mc-panel admin-only" style="margin-bottom: 10px; padding: 10px; display: flex; gap: 10px; align-items: center; border-width: 2px;">
                 <span style="color:#55ffff; font-size:14px; white-space:nowrap;">Своя иконка:</span>
                 <input type="file" id="custom-item-file" accept="image/png, image/jpeg, image/gif" style="font-size:12px; width: 180px; color:#fff;">
                 <input type="text" id="custom-item-name" class="mc-input" placeholder="Название предмета..." style="padding:4px; font-size:14px;">
                 <button id="btn-upload-custom-item" class="mc-button" style="padding:4px 8px; font-size:14px;">Добавить</button>
             </div>
-            <div style="display: flex; gap: 15px; height: 400px;">
+            <div style="display: flex; gap: 15px; height: 500px;">
                 <div style="flex: 2; display: flex; flex-direction: column;">
                     <div class="picker-controls" style="display: flex; gap: 10px; margin-bottom: 10px;">
                         <select id="picker-mod-filter" class="mc-input" style="flex: 1; margin: 0;"></select>
@@ -304,9 +318,17 @@
                     </div>
                     <div id="picker-results" class="item-list-container" style="flex: 1; overflow-y: auto;"></div>
                 </div>
-                <div style="flex: 1; display: flex; flex-direction: column; background: #1e1e1e; border: 2px solid #555; padding: 5px;">
-                    <h3 style="color:#ffaa00; margin: 5px 0 10px 0; text-shadow: 1px 1px 0 #000; text-align:center; font-size: 16px;">★ Избранное</h3>
-                    <div id="picker-fav-results" class="item-list-container" style="flex: 1; overflow-y: auto; border: none; padding: 0;"></div>
+                
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="flex: 1; display: flex; flex-direction: column; background: #1e1e1e; border: 2px solid #555; padding: 5px;">
+                        <h3 style="color:#ffaa00; margin: 5px 0 10px 0; text-shadow: 1px 1px 0 #000; text-align:center; font-size: 16px;">★ Избранное</h3>
+                        <div id="picker-fav-results" class="item-list-container" style="flex: 1; overflow-y: auto; border: none; padding: 0;"></div>
+                    </div>
+                    
+                    <div style="flex: 1; display: flex; flex-direction: column; background: #1e1e1e; border: 2px solid #555; padding: 5px;">
+                        <h3 style="color:#55ffff; margin: 5px 0 10px 0; text-shadow: 1px 1px 0 #000; text-align:center; font-size: 16px;">🎁 Лутбоксы</h3>
+                        <div id="picker-loot-results" class="item-list-container" style="flex: 1; overflow-y: auto; border: none; padding: 0;"></div>
+                    </div>
                 </div>
             </div>
             <div class="modal-actions" style="margin-top: 15px;">
