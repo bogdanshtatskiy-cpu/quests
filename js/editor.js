@@ -15,7 +15,7 @@ export const Editor = {
     originalData: null, 
     isImportMode: false, 
     lootGroups: {}, 
-    questSettings: null, // Хранилище глобальных настроек
+    questSettings: null,
     
     scale: 1, 
     panX: 0, 
@@ -40,8 +40,9 @@ export const Editor = {
     pickerCallback: null, 
     tempReqs: [], 
     tempRewards: [], 
+    tempParents: [], // Временный массив для связей квестов
     tempQuestIcon: null, 
-    tempQuestIconItem: null, // Добавлено для сохранения полных данных иконки
+    tempQuestIconItem: null, 
     editingModId: null, 
     tempModIcon: null, 
     saveTimeout: null,
@@ -335,7 +336,7 @@ export const Editor = {
         const nodesFragment = document.createDocumentFragment();
         const linesFragment = document.createDocumentFragment();
 
-        // Линии связей
+        // 1. Линии связей (только внутри текущей ветки)
         mod.quests.forEach(quest => {
             if (quest.parents) {
                 quest.parents.forEach(pId => {
@@ -347,7 +348,7 @@ export const Editor = {
             }
         });
 
-        // Узлы
+        // 2. Узлы
         mod.quests.forEach(quest => {
             const node = document.createElement('div');
             const nodeSize = getSafeSize(quest.size);
@@ -361,28 +362,36 @@ export const Editor = {
             node.style.top = `${quest.y}px`;
             node.dataset.id = quest.id;
             
-            // Надежный поиск иконки для узла на холсте
             let iconFile = quest.icon;
-            
             if (!iconFile && quest.reqs && quest.reqs.length > 0) {
-                if (quest.reqs[0].item && quest.reqs[0].item.image) {
-                    iconFile = quest.reqs[0].item.image;
-                }
+                if (quest.reqs[0].item && quest.reqs[0].item.image) iconFile = quest.reqs[0].item.image;
             }
             if (!iconFile && quest.rewards && quest.rewards.length > 0) {
-                if (quest.rewards[0].item && quest.rewards[0].item.image) {
-                    iconFile = quest.rewards[0].item.image;
-                }
+                if (quest.rewards[0].item && quest.rewards[0].item.image) iconFile = quest.rewards[0].item.image;
             }
-            if (!iconFile) {
-                iconFile = 'book.png';
-            }
+            if (!iconFile) iconFile = 'book.png';
 
             const iconPath = ItemsDB.getImageUrl(iconFile);
+
+            // Проверка на зависимости из других веток
+            let hasExternalParents = false;
+            if (quest.parents && quest.parents.length > 0) {
+                quest.parents.forEach(pId => {
+                    // Если родителя нет в текущей ветке, значит он из другой
+                    if (!mod.quests.find(q => q.id === pId)) {
+                        hasExternalParents = true;
+                    }
+                });
+            }
+
+            const externalIndicatorHtml = hasExternalParents 
+                ? `<div style="position:absolute; top:-8px; right:-8px; background:#ffaa00; border:2px solid #333; color:#000; border-radius:50%; width:22px; height:22px; font-size:12px; display:flex; align-items:center; justify-content:center; z-index:10; box-shadow: 1px 1px 3px rgba(0,0,0,0.5);" title="Зависит от квестов из других веток">🔗</div>` 
+                : '';
 
             node.innerHTML = `
                 <img src="${iconPath}" loading="lazy">
                 <div class="node-title">${ItemsDB.formatMC(quest.title)}</div>
+                ${externalIndicatorHtml}
             `;
 
             node.addEventListener('mousedown', (e) => {
@@ -493,6 +502,29 @@ export const Editor = {
         document.getElementById('tt-title').innerHTML = ItemsDB.formatMC(quest.title);
         document.getElementById('tt-desc').innerHTML = ItemsDB.formatMC(quest.desc || '');
         
+        // Родительские квесты
+        const parentsContainer = document.getElementById('tt-parents-container');
+        if (quest.parents && quest.parents.length > 0) {
+            let pNames = [];
+            quest.parents.forEach(pId => {
+                let foundTitle = pId;
+                let foundModName = "?";
+                this.data.mods.forEach(m => {
+                    const found = m.quests.find(q => q.id === pId);
+                    if(found) {
+                        foundTitle = found.title;
+                        foundModName = m.name;
+                    }
+                });
+                pNames.push(`• ${ItemsDB.formatMC(foundTitle)} <small>[${ItemsDB.formatMC(foundModName)}]</small>`);
+            });
+            parentsContainer.innerHTML = `<div style="color:#ffaa00; font-size:13px; margin-bottom:10px; border-bottom:1px solid #555; padding-bottom:5px;">Зависит от:<br>${pNames.join('<br>')}</div>`;
+            parentsContainer.style.display = 'block';
+        } else {
+            parentsContainer.style.display = 'none';
+        }
+
+        // Требования
         let reqHtml = '';
         if (quest.reqs && quest.reqs.length > 0) {
             quest.reqs.forEach(r => {
@@ -500,7 +532,6 @@ export const Editor = {
                     ? (r.consume !== false ? ' <span style="color:#ff5555; font-size:12px; margin-left:6px;">[Забрать]</span>' : ' <span style="color:#aaaaaa; font-size:12px; margin-left:6px;">[Наличие]</span>')
                     : '';
                 const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
-                
                 reqHtml += `<div class="tt-item"><img src="${imgPath}">${this.getTaskLabel(r)} x${r.count}${consumeTag}</div>`;
             });
         } else {
@@ -508,12 +539,12 @@ export const Editor = {
         }
         document.getElementById('tt-reqs').innerHTML = reqHtml;
 
+        // Награды
         let rewHtml = '';
         if (quest.rewards && quest.rewards.length > 0) {
             quest.rewards.forEach(r => {
                 const choiceTag = r.isChoice ? ' <span style="color:#ffff55; font-size:12px; margin-left:6px;">[На выбор]</span>' : '';
                 const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
-                
                 rewHtml += `<div class="tt-item"><img src="${imgPath}">${this.getRewardLabel(r)} x${r.count}${choiceTag}</div>`;
             });
         } else {
@@ -666,13 +697,80 @@ export const Editor = {
     deleteQuest(questId) {
         const mod = this.getActiveMod();
         mod.quests = mod.quests.filter(q => q.id !== questId);
-        mod.quests.forEach(q => {
-            if (q.parents) {
-                q.parents = q.parents.filter(pId => pId !== questId);
-            }
+        
+        // Удаляем связи из всех веток (не только текущей)
+        this.data.mods.forEach(m => {
+            m.quests.forEach(q => {
+                if (q.parents) {
+                    q.parents = q.parents.filter(pId => pId !== questId);
+                }
+            });
         });
+        
         this.triggerAutoSave(); 
         this.renderCanvas();
+    },
+
+    /**
+     * Логика списка зависимостей
+     */
+    populateParentsSelect() {
+        const select = document.getElementById('parent-quest-select');
+        select.innerHTML = '<option value="">-- Выберите квест для привязки --</option>';
+        
+        this.data.mods.forEach(mod => {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = ItemsDB.formatMC(mod.name);
+            
+            mod.quests.forEach(q => {
+                // Исключаем сам квест и те, что уже добавлены
+                if (q.id !== this.editingNodeId && !this.tempParents.includes(q.id)) {
+                    const opt = document.createElement('option');
+                    opt.value = q.id;
+                    // Очищаем название от § для select
+                    opt.textContent = (q.title || 'Безымянный квест').replace(/[§&][0-9a-fk-or]/gi, '');
+                    optgroup.appendChild(opt);
+                }
+            });
+            
+            if (optgroup.children.length > 0) {
+                select.appendChild(optgroup);
+            }
+        });
+    },
+
+    renderParentsList() {
+        const container = document.getElementById('parents-list');
+        container.innerHTML = '';
+        
+        this.tempParents.forEach((pId, idx) => {
+            let pQuest = null;
+            let pMod = null;
+            
+            this.data.mods.forEach(m => {
+                const found = m.quests.find(q => q.id === pId);
+                if (found) { pQuest = found; pMod = m; }
+            });
+
+            const title = pQuest ? pQuest.title : `Неизвестный ID: ${pId}`;
+            const modName = pMod ? pMod.name : '?';
+
+            const div = document.createElement('div');
+            div.className = 'reward-row';
+            div.style.backgroundColor = '#1a1a1a';
+            div.innerHTML = `
+                <span style="flex:1; color:#fff;">🔗 ${ItemsDB.formatMC(title)} <small style="color:#aaa;">[${ItemsDB.formatMC(modName)}]</small></span>
+                <button class="mc-button danger btn-del-parent" data-idx="${idx}" style="padding: 2px 6px;">X</button>
+            `;
+            
+            div.querySelector('.btn-del-parent').addEventListener('click', () => {
+                this.tempParents.splice(idx, 1);
+                this.renderParentsList();
+                this.populateParentsSelect(); // Обновляем селект, чтобы удаленный квест вернулся в список
+            });
+            
+            container.appendChild(div);
+        });
     },
 
     bindQuestModalEvents() {
@@ -693,7 +791,7 @@ export const Editor = {
             this.saveTempState();
             this.openItemPicker((item) => {
                 this.tempQuestIcon = item.image;
-                this.tempQuestIconItem = item; // Сохраняем полный предмет
+                this.tempQuestIconItem = item; 
                 document.getElementById('quest-icon-preview').innerHTML = `<img src="${ItemsDB.getImageUrl(item.image)}" style="width: 32px; height: 32px; image-rendering: pixelated;">`;
             });
         });
@@ -703,7 +801,7 @@ export const Editor = {
             this.openItemPicker((item) => { 
                 this.tempReqs.push({ 
                     item: item, 
-                    rawId: item.string_id || item.item_key, // Сохраняем новый ID
+                    rawId: item.string_id || item.item_key, 
                     rawDamage: item.damage !== undefined ? item.damage : 0,
                     count: 1, 
                     customName: BQ.getCustomName(item, null), 
@@ -720,7 +818,7 @@ export const Editor = {
             this.openItemPicker((item) => { 
                 this.tempRewards.push({ 
                     item: item, 
-                    rawId: item.string_id || item.item_key, // Сохраняем новый ID
+                    rawId: item.string_id || item.item_key, 
                     rawDamage: item.damage !== undefined ? item.damage : 0,
                     count: 1, 
                     customName: BQ.getCustomName(item, null), 
@@ -731,6 +829,17 @@ export const Editor = {
                 }); 
                 this.renderQuestEditForm(); 
             });
+        });
+
+        // Добавление родительского квеста
+        document.getElementById('btn-add-parent').addEventListener('click', () => {
+            const select = document.getElementById('parent-quest-select');
+            const val = select.value;
+            if (val && !this.tempParents.includes(val)) {
+                this.tempParents.push(val);
+                this.renderParentsList();
+                this.populateParentsSelect();
+            }
         });
 
         document.getElementById('btn-save-quest').addEventListener('click', () => {
@@ -747,9 +856,10 @@ export const Editor = {
                 q.desc = desc; 
                 q.size = size; 
                 q.icon = this.tempQuestIcon;
-                q.iconItem = this.tempQuestIconItem; // Сохраняем иконку
+                q.iconItem = this.tempQuestIconItem; 
                 q.reqs = [...this.tempReqs]; 
                 q.rewards = [...this.tempRewards];
+                q.parents = [...this.tempParents]; // Сохраняем связи
                 DB.logAction(`Отредактировал квест: ${title}`);
             } else {
                 mod.quests.push({
@@ -760,10 +870,10 @@ export const Editor = {
                     desc: desc, 
                     size: size, 
                     icon: this.tempQuestIcon,
-                    iconItem: this.tempQuestIconItem, // Сохраняем иконку
+                    iconItem: this.tempQuestIconItem, 
                     reqs: [...this.tempReqs], 
                     rewards: [...this.tempRewards], 
-                    parents: []
+                    parents: [...this.tempParents]
                 });
                 DB.logAction(`Создал квест: ${title}`);
             }
@@ -794,30 +904,42 @@ export const Editor = {
         const modal = document.getElementById('quest-view-modal');
         
         let iconFile = quest.icon;
-        if (!iconFile && quest.reqs && quest.reqs.length > 0 && quest.reqs[0].item) {
-            iconFile = quest.reqs[0].item.image;
-        }
-        if (!iconFile && quest.rewards && quest.rewards.length > 0 && quest.rewards[0].item) {
-            iconFile = quest.rewards[0].item.image;
-        }
-        if (!iconFile) {
-            iconFile = 'book.png';
-        }
+        if (!iconFile && quest.reqs && quest.reqs.length > 0 && quest.reqs[0].item) iconFile = quest.reqs[0].item.image;
+        if (!iconFile && quest.rewards && quest.rewards.length > 0 && quest.rewards[0].item) iconFile = quest.rewards[0].item.image;
+        if (!iconFile) iconFile = 'book.png';
         
         document.getElementById('view-quest-icon').innerHTML = `<img src="${ItemsDB.getImageUrl(iconFile)}" style="width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated;">`;
         document.getElementById('view-quest-title').innerHTML = ItemsDB.formatMC(quest.title);
         document.getElementById('view-quest-desc').innerHTML = ItemsDB.formatMC(quest.desc || 'Нет описания.');
+
+        // Отображение родителей в режиме просмотра
+        const pContainer = document.getElementById('view-parents-container');
+        const pList = document.getElementById('view-parents-list');
+        if (quest.parents && quest.parents.length > 0) {
+            pContainer.classList.remove('hidden');
+            let phtml = '';
+            quest.parents.forEach(pId => {
+                let pQuest = null; let pMod = null;
+                this.data.mods.forEach(m => {
+                    const f = m.quests.find(q => q.id === pId);
+                    if (f) { pQuest = f; pMod = m; }
+                });
+                const t = pQuest ? pQuest.title : `Скрытый квест: ${pId}`;
+                const m = pMod ? pMod.name : '?';
+                phtml += `<div style="color:#fff; font-size:16px; margin-bottom:6px;">🔗 ${ItemsDB.formatMC(t)} <span style="color:#aaa; font-size:14px;">[${ItemsDB.formatMC(m)}]</span></div>`;
+            });
+            pList.innerHTML = phtml;
+        } else {
+            pContainer.classList.add('hidden');
+        }
 
         const reqsBox = document.getElementById('view-reqs-list');
         reqsBox.innerHTML = '';
         if (quest.reqs && quest.reqs.length > 0) {
             quest.reqs.forEach(r => {
                 const consumeText = (r.taskType !== 'hunt' && r.taskType !== 'block_break' && r.taskType !== 'checkbox' && r.taskType !== 'xp') 
-                    ? (r.consume !== false ? '<span style="color:#ff5555;">[Забирается]</span>' : '<span style="color:#aaaaaa;">[Только наличие]</span>')
-                    : '';
-                
+                    ? (r.consume !== false ? '<span style="color:#ff5555;">[Забирается]</span>' : '<span style="color:#aaaaaa;">[Только наличие]</span>') : '';
                 const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
-                
                 reqsBox.innerHTML += `
                     <div class="view-item-row">
                         <div class="mc-slot"><img src="${imgPath}"></div>
@@ -825,12 +947,9 @@ export const Editor = {
                             <span class="item-name">${r.count}x ${this.getTaskLabel(r)}</span>
                             <span class="item-meta">${consumeText}</span>
                         </div>
-                    </div>
-                `;
+                    </div>`;
             });
-        } else {
-            reqsBox.innerHTML = '<div style="padding: 15px; color: #aaa; font-size: 16px;">Нет требований</div>';
-        }
+        } else { reqsBox.innerHTML = '<div style="padding: 15px; color: #aaa; font-size: 16px;">Нет требований</div>'; }
 
         const rewsBox = document.getElementById('view-rewards-list');
         rewsBox.innerHTML = '';
@@ -838,7 +957,6 @@ export const Editor = {
             quest.rewards.forEach(r => {
                 const choiceText = r.isChoice ? '<span style="color:#ffff55;">[На выбор]</span>' : '<span style="color:#55ff55;">[Гарантировано]</span>';
                 const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
-                
                 rewsBox.innerHTML += `
                     <div class="view-item-row">
                         <div class="mc-slot"><img src="${imgPath}"></div>
@@ -846,12 +964,9 @@ export const Editor = {
                             <span class="item-name">${r.count}x ${this.getRewardLabel(r)}</span>
                             <span class="item-meta">${choiceText}</span>
                         </div>
-                    </div>
-                `;
+                    </div>`;
             });
-        } else {
-            rewsBox.innerHTML = '<div style="padding: 15px; color: #aaa; font-size: 16px;">Нет наград</div>';
-        }
+        } else { rewsBox.innerHTML = '<div style="padding: 15px; color: #aaa; font-size: 16px;">Нет наград</div>'; }
 
         modal.classList.remove('hidden');
     },
@@ -876,6 +991,7 @@ export const Editor = {
             
             this.tempReqs = JSON.parse(JSON.stringify(reqs));
             this.tempRewards = q.rewards ? JSON.parse(JSON.stringify(q.rewards)) : [];
+            this.tempParents = q.parents ? JSON.parse(JSON.stringify(q.parents)) : [];
         } else {
             document.getElementById('quest-title').value = '';
             document.getElementById('quest-desc').value = '';
@@ -884,6 +1000,7 @@ export const Editor = {
             this.tempQuestIconItem = null;
             this.tempReqs = []; 
             this.tempRewards = [];
+            this.tempParents = [];
         }
         
         if (this.tempQuestIcon) {
@@ -892,7 +1009,11 @@ export const Editor = {
             document.getElementById('quest-icon-preview').innerHTML = '';
         }
 
+        // Рендерим списки
         this.renderQuestEditForm();
+        this.renderParentsList();
+        this.populateParentsSelect();
+        
         modal.classList.remove('hidden');
     },
 
