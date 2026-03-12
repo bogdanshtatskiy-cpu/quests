@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     Auth.init();
     
+    // Быстро качаем только квесты
     const savedQuests = await DB.loadQuests();
     if (savedQuests && savedQuests.length > 0) {
         savedQuests.forEach(mod => {
@@ -22,17 +23,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         Editor.activeModId = savedQuests[0].id; 
     }
     
+    // МОМЕНТАЛЬНО отрисовываем редактор
     Editor.init();
-    LootEditor.init(); // Инициализация редактора лутбоксов
+    LootEditor.init(); 
     
+    // Скрываем экран загрузки сразу же
     loader.classList.add('hidden');
     setTimeout(() => loader.style.display = 'none', 500);
 
+    // ФОНОВАЯ ЗАГРУЗКА БАЗЫ ПРЕДМЕТОВ (не тормозит экран и не вешает вкладку)
     ItemsDB.load().then(async () => {
         const customItems = await DB.loadCustomItems();
         ItemsDB.addCustomItems(customItems);
+        console.log("База предметов (10k+) успешно загружена в фоне!");
     });
 
+    // Админка
     document.getElementById('btn-open-admin').addEventListener('click', async () => {
         document.getElementById('admin-modal').classList.remove('hidden');
         const logsContainer = document.getElementById('logs-tbody');
@@ -74,7 +80,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    document.getElementById('btn-close-admin').addEventListener('click', () => document.getElementById('admin-modal').classList.add('hidden'));
+    document.getElementById('btn-close-admin').addEventListener('click', () => {
+        document.getElementById('admin-modal').classList.add('hidden');
+    });
 
     document.getElementById('btn-create-user').addEventListener('click', () => {
         const login = document.getElementById('new-user-login').value;
