@@ -7,23 +7,40 @@ const SIZE_MAP = { x1: 52, x2: 104, x3: 156, x4: 208 };
 const getSafeSize = (s) => { const compat = { sm: 'x1', md: 'x1', lg: 'x2' }; return compat[s] || s || 'x1'; };
 
 export const Editor = {
-    data: { mods: [] }, activeModId: null, originalData: null, isImportMode: false, lootGroups: {}, 
-    scale: 1, panX: 0, panY: 0, isPanning: false, panStartX: 0, panStartY: 0, initialPanX: 0, initialPanY: 0,
+    data: { mods: [] }, 
+    activeModId: null, 
+    originalData: null, 
+    isImportMode: false, 
+    lootGroups: {}, 
+    
+    scale: 1, panX: 0, panY: 0, 
+    isPanning: false, panStartX: 0, panStartY: 0, initialPanX: 0, initialPanY: 0,
+    
     draggedQuestId: null, mouseStartX: 0, mouseStartY: 0, nodeStartX: 0, nodeStartY: 0, hasMovedNode: false,
     linkingFromNodeId: null, contextNodeId: null, editingNodeId: null, hoveredQuestId: null,
+    
     pickerCallback: null, tempReqs: [], tempRewards: [], tempQuestIcon: null, editingModId: null, tempModIcon: null, saveTimeout: null,
 
     init() {
-        this.bindCanvasEvents(); this.bindModModalEvents(); this.bindQuestModalEvents();
-        this.bindItemPickerEvents(); this.bindTopBarEvents();
-        this.renderSidebar(); this.renderCanvas(); this.centerCanvas(); 
+        this.bindCanvasEvents(); 
+        this.bindModModalEvents(); 
+        this.bindQuestModalEvents();
+        this.bindItemPickerEvents(); 
+        this.bindTopBarEvents();
+        this.renderSidebar(); 
+        this.renderCanvas(); 
+        this.centerCanvas(); 
     },
 
     addMobToDatalist(mobName) {
         const datalist = document.getElementById('mob-list');
         if (!datalist) return;
         const exists = Array.from(datalist.options).some(opt => opt.value === mobName);
-        if (!exists) { const opt = document.createElement('option'); opt.value = mobName; datalist.appendChild(opt); }
+        if (!exists) { 
+            const opt = document.createElement('option'); 
+            opt.value = mobName; 
+            datalist.appendChild(opt); 
+        }
     },
 
     bindTopBarEvents() {
@@ -493,6 +510,64 @@ export const Editor = {
         document.getElementById('btn-close-quest').addEventListener('click', () => modal.classList.add('hidden'));
     },
 
+    openQuestViewModal(questId) {
+        const mod = this.getActiveMod();
+        const quest = mod.quests.find(q => q.id === questId);
+        if (!quest) return;
+
+        const modal = document.getElementById('quest-view-modal');
+        
+        let iconStr = '';
+        if (quest.icon) iconStr = quest.icon;
+        else if (quest.reqs && quest.reqs.length > 0) iconStr = quest.reqs[0].item.image;
+        
+        document.getElementById('view-quest-icon').innerHTML = iconStr ? `<img src="${ItemsDB.getImageUrl(iconStr)}" style="width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated;">` : '';
+        document.getElementById('view-quest-title').innerHTML = ItemsDB.formatMC(quest.title);
+        document.getElementById('view-quest-desc').innerHTML = ItemsDB.formatMC(quest.desc || 'Нет описания.');
+
+        const reqsBox = document.getElementById('view-reqs-list');
+        reqsBox.innerHTML = '';
+        if (quest.reqs && quest.reqs.length > 0) {
+            quest.reqs.forEach(r => {
+                const consumeText = (r.taskType !== 'hunt' && r.taskType !== 'block_break' && r.taskType !== 'checkbox' && r.taskType !== 'xp') 
+                    ? (r.consume !== false ? '<span style="color:#ff5555;">[Забирается]</span>' : '<span style="color:#aaaaaa;">[Только наличие]</span>')
+                    : '';
+                reqsBox.innerHTML += `
+                    <div class="view-item-row">
+                        <div class="mc-slot"><img src="${ItemsDB.getImageUrl(r.item.image)}"></div>
+                        <div class="item-info">
+                            <span class="item-name">${r.count}x ${this.getTaskLabel(r)}</span>
+                            <span class="item-meta">${consumeText}</span>
+                        </div>
+                    </div>
+                `;
+            });
+        } else {
+            reqsBox.innerHTML = '<div style="padding: 15px; color: #aaa; font-size: 16px;">Нет требований</div>';
+        }
+
+        const rewsBox = document.getElementById('view-rewards-list');
+        rewsBox.innerHTML = '';
+        if (quest.rewards && quest.rewards.length > 0) {
+            quest.rewards.forEach(r => {
+                const choiceText = r.isChoice ? '<span style="color:#ffff55;">[На выбор]</span>' : '<span style="color:#55ff55;">[Гарантировано]</span>';
+                rewsBox.innerHTML += `
+                    <div class="view-item-row">
+                        <div class="mc-slot"><img src="${ItemsDB.getImageUrl(r.item.image)}"></div>
+                        <div class="item-info">
+                            <span class="item-name">${r.count}x ${this.getRewardLabel(r)}</span>
+                            <span class="item-meta">${choiceText}</span>
+                        </div>
+                    </div>
+                `;
+            });
+        } else {
+            rewsBox.innerHTML = '<div style="padding: 15px; color: #aaa; font-size: 16px;">Нет наград</div>';
+        }
+
+        modal.classList.remove('hidden');
+    },
+
     openQuestModal(questId = null) {
         this.editingNodeId = questId;
         const modal = document.getElementById('quest-edit-modal');
@@ -507,6 +582,7 @@ export const Editor = {
             
             let reqs = q.reqs || [];
             if (q.req && reqs.length === 0) reqs = [q.req]; 
+            
             this.tempReqs = JSON.parse(JSON.stringify(reqs));
             this.tempRewards = q.rewards ? JSON.parse(JSON.stringify(q.rewards)) : [];
         } else {
@@ -671,47 +747,120 @@ export const Editor = {
         const modal = document.getElementById('item-picker-modal');
         const filterMod = document.getElementById('picker-mod-filter');
         const searchInp = document.getElementById('picker-search');
+        
         const resultsContainer = document.getElementById('picker-results');
         const favContainer = document.getElementById('picker-fav-results');
 
-        let currentSearchData = []; let itemsLimit = 50;
+        let currentSearchData = [];
+        let itemsLimit = 50;
 
         const createItemElement = (item) => {
             const div = document.createElement('div');
             div.className = 'search-result-item';
             const isFav = ItemsDB.favorites.includes(item.item_key);
             div.innerHTML = `<span class="fav-star ${isFav ? 'active' : ''}" data-key="${item.item_key}">★</span><img src="${ItemsDB.getImageUrl(item.image)}" width="32" height="32"><span>${ItemsDB.formatMC(item.name)} <small style="color:#888;">[${item.mod}]</small></span>`;
-            div.querySelector('.fav-star').addEventListener('click', (e) => { e.stopPropagation(); ItemsDB.toggleFavorite(item.item_key); updateBothLists(); });
-            div.addEventListener('click', () => { modal.classList.add('hidden'); if (this.pickerCallback) this.pickerCallback(item); });
+            
+            div.querySelector('.fav-star').addEventListener('click', (e) => { 
+                e.stopPropagation(); 
+                ItemsDB.toggleFavorite(item.item_key); 
+                updateBothLists(); 
+            });
+            div.addEventListener('click', () => { 
+                modal.classList.add('hidden'); 
+                if (this.pickerCallback) this.pickerCallback(item); 
+            });
             return div;
         };
 
         const renderMainResults = () => {
             resultsContainer.innerHTML = '';
-            currentSearchData.slice(0, itemsLimit).forEach(item => resultsContainer.appendChild(createItemElement(item)));
+            const slice = currentSearchData.slice(0, itemsLimit);
+            slice.forEach(item => resultsContainer.appendChild(createItemElement(item)));
         };
 
         const renderFavResults = () => {
             favContainer.innerHTML = '';
-            ItemsDB.getFavorites().forEach(item => favContainer.appendChild(createItemElement(item)));
+            const favs = ItemsDB.getFavorites();
+            favs.forEach(item => favContainer.appendChild(createItemElement(item)));
         };
 
-        const updateBothLists = () => { renderMainResults(); renderFavResults(); };
+        const updateBothLists = () => {
+            renderMainResults();
+            renderFavResults();
+        };
 
         const triggerSearch = () => {
             currentSearchData = ItemsDB.search(searchInp.value, filterMod.value);
-            itemsLimit = 50; resultsContainer.scrollTop = 0; updateBothLists();
+            itemsLimit = 50; 
+            resultsContainer.scrollTop = 0;
+            updateBothLists();
         };
 
-        searchInp.addEventListener('input', triggerSearch); filterMod.addEventListener('change', triggerSearch);
+        searchInp.addEventListener('input', triggerSearch);
+        filterMod.addEventListener('change', triggerSearch);
         
         resultsContainer.addEventListener('scroll', () => {
             if (resultsContainer.scrollTop + resultsContainer.clientHeight >= resultsContainer.scrollHeight - 20) {
-                if (itemsLimit < currentSearchData.length) { itemsLimit += 50; renderMainResults(); }
+                if (itemsLimit < currentSearchData.length) {
+                    itemsLimit += 50;
+                    renderMainResults();
+                }
             }
         });
 
         document.getElementById('btn-picker-cancel').addEventListener('click', () => modal.classList.add('hidden'));
+
+        document.getElementById('btn-upload-custom-item').addEventListener('click', () => {
+            const fileInput = document.getElementById('custom-item-file');
+            const nameInput = document.getElementById('custom-item-name');
+            const file = fileInput.files[0];
+            const name = nameInput.value.trim();
+
+            if (!file) return alert("Выберите картинку!");
+            if (!name) return alert("Введите название предмета!");
+
+            const btn = document.getElementById('btn-upload-custom-item');
+            btn.innerText = "Грузим...";
+            btn.disabled = true;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = async function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_SIZE = 64; 
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
+                    } else {
+                        if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    const base64String = canvas.toDataURL('image/png');
+                    const newItem = await DB.saveCustomItem(name, base64String);
+
+                    btn.innerText = "Добавить";
+                    btn.disabled = false;
+                    fileInput.value = '';
+                    nameInput.value = '';
+
+                    if (newItem) {
+                        ItemsDB.addCustomItems([newItem]);
+                        searchInp.value = name;
+                        triggerSearch(); 
+                    }
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
 
         this.openItemPicker = (cb) => {
             this.pickerCallback = cb;
@@ -719,9 +868,168 @@ export const Editor = {
                 filterMod.innerHTML = '<option value="">Все моды</option>';
                 ItemsDB.mods.forEach(m => filterMod.innerHTML += `<option value="${m}">${m}</option>`);
             }
-            searchInp.value = ''; triggerSearch(); modal.classList.remove('hidden');
+            searchInp.value = '';
+            triggerSearch();
+            modal.classList.remove('hidden');
             setTimeout(() => searchInp.focus(), 50); 
         };
-    }
+    },
+
+    bindModModalEvents() {
+        const modal = document.getElementById('add-mod-modal');
+
+        document.getElementById('btn-add-mod').addEventListener('click', () => {
+            this.editingModId = null; this.tempModIcon = null;
+            document.getElementById('new-mod-name').value = '';
+            document.getElementById('mod-icon-preview').innerHTML = '';
+            document.getElementById('mod-modal-title').innerText = 'Новая ветка';
+            modal.classList.remove('hidden');
+        });
+
+        document.getElementById('btn-close-mod').addEventListener('click', () => modal.classList.add('hidden'));
+
+        document.getElementById('btn-select-mod-icon').addEventListener('click', () => {
+            this.openItemPicker((item) => {
+                this.tempModIcon = item.image;
+                document.getElementById('mod-icon-preview').innerHTML = `<div class="mc-slot"><img src="${ItemsDB.getImageUrl(item.image)}" width="32" height="32"></div>`;
+            });
+        });
+
+        document.getElementById('btn-save-mod').addEventListener('click', () => {
+            const name = document.getElementById('new-mod-name').value;
+            if (!name || !this.tempModIcon) return alert('Введите название и выберите иконку!');
+            
+            if (this.editingModId) {
+                const mod = this.data.mods.find(m => m.id === this.editingModId);
+                mod.name = name; mod.icon = this.tempModIcon;
+                DB.logAction(`Изменил ветку: ${name}`);
+            } else {
+                const id = 'mod_' + Date.now();
+                this.data.mods.push({ id, name, icon: this.tempModIcon, quests: [] });
+                this.activeModId = id;
+                DB.logAction(`Создал ветку: ${name}`);
+            }
+            
+            this.triggerAutoSave();
+            modal.classList.add('hidden');
+            this.renderSidebar(); this.renderCanvas();
+        });
+    },
+
+    renderSidebar() {
+        const list = document.getElementById('mod-list');
+        list.innerHTML = '';
+        
+        let draggedIndex = null;
+        let draggedLi = null;
+
+        this.data.mods.forEach((mod, index) => {
+            const li = document.createElement('li');
+            li.className = 'mod-item';
+            if (this.activeModId === mod.id) li.classList.add('active');
+            
+            li.innerHTML = `
+                <div class="mod-item-content">
+                    <img src="${ItemsDB.getImageUrl(mod.icon)}" width="24" height="24">
+                    <span>${ItemsDB.formatMC(mod.name)}</span>
+                </div>
+                <div class="mod-item-actions admin-only">
+                    <button class="mod-btn edit" title="Редактировать">✏️</button>
+                    <button class="mod-btn delete" title="Удалить">❌</button>
+                </div>
+            `;
+            
+            li.querySelector('.mod-item-content').addEventListener('click', () => {
+                this.activeModId = mod.id;
+                this.renderSidebar(); this.renderCanvas(); 
+                this.centerCanvas(); 
+            });
+
+            if (Auth.user) {
+                // ЛОГИКА ПЕРЕТАСКИВАНИЯ (Drag & Drop)
+                li.draggable = true;
+
+                li.addEventListener('dragstart', (e) => {
+                    draggedLi = li;
+                    draggedIndex = index;
+                    e.dataTransfer.effectAllowed = 'move';
+                    setTimeout(() => li.style.opacity = '0.5', 0); // Прячем оригинал при захвате
+                });
+
+                li.addEventListener('dragover', (e) => {
+                    e.preventDefault(); // Разрешаем сброс
+                    if (draggedIndex === index) return;
+                    
+                    const rect = li.getBoundingClientRect();
+                    const midY = rect.top + rect.height / 2;
+                    
+                    // Подсвечиваем верх или низ в зависимости от положения мыши
+                    if (e.clientY < midY) {
+                        li.classList.add('drag-top');
+                        li.classList.remove('drag-bottom');
+                    } else {
+                        li.classList.add('drag-bottom');
+                        li.classList.remove('drag-top');
+                    }
+                });
+
+                li.addEventListener('dragleave', () => {
+                    li.classList.remove('drag-top', 'drag-bottom');
+                });
+
+                li.addEventListener('dragend', () => {
+                    if (draggedLi) draggedLi.style.opacity = '1';
+                    document.querySelectorAll('.mod-item').forEach(el => el.classList.remove('drag-top', 'drag-bottom'));
+                });
+
+                li.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    li.classList.remove('drag-top', 'drag-bottom');
+                    if (draggedIndex === index || draggedIndex === null) return;
+
+                    const rect = li.getBoundingClientRect();
+                    const midY = rect.top + rect.height / 2;
+                    
+                    let newIndex = index;
+                    if (e.clientY > midY) newIndex++; // Если бросили на нижнюю половину, вставляем после
+
+                    // Корректируем индекс из-за сдвига массива при удалении
+                    if (draggedIndex < newIndex) newIndex--;
+
+                    // Меняем местами в данных
+                    const movedItem = this.data.mods.splice(draggedIndex, 1)[0];
+                    this.data.mods.splice(newIndex, 0, movedItem);
+
+                    DB.logAction(`Изменил порядок веток: ${movedItem.name}`);
+                    this.triggerAutoSave();
+                    this.renderSidebar();
+                });
+
+                // Кнопки редактирования и удаления
+                li.querySelector('.edit').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.editingModId = mod.id;
+                    this.tempModIcon = mod.icon;
+                    document.getElementById('new-mod-name').value = mod.name;
+                    document.getElementById('mod-icon-preview').innerHTML = `<div class="mc-slot"><img src="${ItemsDB.getImageUrl(mod.icon)}" width="32" height="32"></div>`;
+                    document.getElementById('mod-modal-title').innerText = 'Редактировать ветку';
+                    document.getElementById('add-mod-modal').classList.remove('hidden');
+                });
+
+                li.querySelector('.delete').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (confirm(`Удалить ветку "${mod.name}" со всеми квестами?`)) {
+                        this.data.mods = this.data.mods.filter(m => m.id !== mod.id);
+                        if (this.activeModId === mod.id) this.activeModId = null;
+                        DB.logAction(`Удалил ветку: ${mod.name}`);
+                        this.triggerAutoSave();
+                        this.renderSidebar(); this.renderCanvas();
+                    }
+                });
+            }
+            list.appendChild(li);
+        });
+    },
+
+    getActiveMod() { return this.data.mods.find(m => m.id === this.activeModId); }
 };
-// Убрал лишние (уже объявленные) дубли функции для экономии места. RenderSidebar остался таким же как в прошлом ответе.
