@@ -60,11 +60,21 @@
         <div id="rewards-summary-list"></div>
     </div>
 
+    <div id="canvas-context-menu" class="mc-panel context-menu hidden">
+        <div class="menu-item admin-only" id="menu-add-quest">📦 Добавить квест</div>
+        <div class="menu-item admin-only" id="menu-add-comment">💬 Добавить комментарий</div>
+    </div>
+
     <div id="node-context-menu" class="mc-panel context-menu hidden">
         <div class="menu-item admin-only" id="menu-edit">Редактировать</div>
         <div class="menu-item admin-only" id="menu-copy">Копировать</div>
         <div class="menu-item admin-only" id="menu-link">Соединить (Shift+ЛКМ)</div>
         <div class="menu-item delete admin-only" id="menu-delete">Удалить</div>
+    </div>
+
+    <div id="comment-context-menu" class="mc-panel context-menu hidden">
+        <div class="menu-item admin-only" id="menu-edit-comment">Редактировать</div>
+        <div class="menu-item delete admin-only" id="menu-delete-comment">Удалить</div>
     </div>
 
     <div id="app-container">
@@ -152,6 +162,17 @@
             <div class="modal-actions">
                 <button id="btn-save-mod" class="mc-button">Сохранить</button>
                 <button id="btn-close-mod" class="mc-button btn-cancel">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="comment-edit-modal" class="modal hidden">
+        <div class="mc-panel modal-content">
+            <h2 class="mc-title">Текст комментария</h2>
+            <textarea id="comment-text" class="mc-input" style="height: 150px; font-size: 16px;" placeholder="Введите информацию..."></textarea>
+            <div class="modal-actions" style="margin-top: 15px;">
+                <button id="btn-save-comment" class="mc-button">Сохранить</button>
+                <button id="btn-close-comment" class="mc-button btn-cancel">Отмена</button>
             </div>
         </div>
     </div>
