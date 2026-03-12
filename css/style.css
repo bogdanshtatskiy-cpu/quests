@@ -233,3 +233,29 @@ body.show-titles .quest-node .node-title { display: block; }
     box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
     pointer-events: none;
 }
+/* СТИЛИ ДЛЯ КОММЕНТАРИЕВ НА ХОЛСТЕ */
+.quest-comment {
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    background-color: rgba(0, 0, 0, 0.7);
+    border: 2px solid #ffaa00;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #ffaa00;
+    font-weight: bold;
+    font-family: Arial, sans-serif;
+    font-size: 18px;
+    font-style: italic;
+    cursor: pointer;
+    pointer-events: auto;
+    box-shadow: 0 0 5px rgba(255, 170, 0, 0.5);
+    z-index: 5;
+}
+.quest-comment:hover {
+    background-color: rgba(255, 170, 0, 0.3);
+    transform: scale(1.1);
+    box-shadow: 0 0 10px rgba(255, 170, 0, 0.8);
+}
