@@ -98,7 +98,7 @@ export const BQ = {
         try {
             const rawData = JSON.parse(jsonString);
             
-            // Сохраняем глобальные настройки сервера без изменений (чтобы не потерялись)
+            // Сохраняем глобальные настройки сервера
             const qsKey = Object.keys(rawData).find(k => k.startsWith('questSettings'));
             if (qsKey) {
                 editor.questSettings = { key: qsKey, data: rawData[qsKey] };
@@ -119,61 +119,68 @@ export const BQ = {
                 }
                 return obj;
             };
+            
             const data = cleanKeys(rawData);
             const questsMap = {};
 
-            if (data.questDatabase) {
-                Object.entries(data.questDatabase).forEach(([qKey, q]) => {
-                    let actualId = String(q.questID !== undefined ? q.questID : qKey).split(':')[0];
+            if (rawData["questDatabase:9"]) {
+                Object.entries(rawData["questDatabase:9"]).forEach(([rawQKey, rawQ]) => {
+                    let cleanQKey = rawQKey.split(':')[0];
+                    let q = data.questDatabase[cleanQKey];
+                    if (!q) return;
+
+                    let actualId = String(q.questID !== undefined ? q.questID : cleanQKey).split(':')[0];
                     let reqs = []; let rewards = [];
                     
-                    let originalTasks = rawData["questDatabase:9"][qKey] ? rawData["questDatabase:9"][qKey]["tasks:9"] : null;
+                    // БЕРЕМ ОРИГИНАЛЬНЫЕ МАССИВЫ ЗАДАЧ И НАГРАД
+                    let rawTasks = rawQ["tasks:9"] || {};
+                    let rawRewards = rawQ["rewards:9"] || {};
                     
                     if (q.tasks) {
-                        Object.values(q.tasks).forEach((task, idx) => {
-                            let rawTask = originalTasks ? originalTasks[Object.keys(originalTasks)[idx]] : null;
+                        Object.entries(q.tasks).forEach(([tKey, task]) => {
+                            let rawTKey = Object.keys(rawTasks).find(k => k.startsWith(tKey + ':') || k === tKey);
+                            let rawTaskProps = rawTKey ? rawTasks[rawTKey] : null;
                             
                             if (task.requiredItems && (task.taskID === 'bq_standard:retrieval' || task.taskID === 'bq_standard:crafting')) {
                                 Object.values(task.requiredItems).forEach(item => {
                                     const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage);
-                                    reqs.push({ item: foundItem, rawId: item.id, rawDamage: item.Damage, count: item.Count !== undefined ? item.Count : 1, customName: this.getCustomName(foundItem, item.tag), consume: task.consume || false, taskType: task.taskID.split(':')[1], nbtTag: item.tag, rawTaskProps: rawTask });
+                                    reqs.push({ item: foundItem, rawId: item.id, rawDamage: item.Damage, count: item.Count !== undefined ? item.Count : 1, customName: this.getCustomName(foundItem, item.tag), consume: task.consume || false, taskType: task.taskID.split(':')[1], nbtTag: item.tag, rawTaskProps: rawTaskProps });
                                 });
                             } else if (task.blocks && task.taskID === 'bq_standard:block_break') {
                                 Object.values(task.blocks).forEach(block => {
                                     const foundItem = ItemsDB.findItemByBQ(block.blockID || block.id, block.meta || block.Damage);
-                                    reqs.push({ item: foundItem, rawId: block.blockID || block.id, rawDamage: block.meta !== undefined ? block.meta : block.Damage, count: block.amount !== undefined ? block.amount : (block.Count !== undefined ? block.Count : 1), customName: this.getCustomName(foundItem, block.nbt), consume: false, taskType: 'block_break', nbtTag: block.nbt, rawTaskProps: rawTask });
+                                    reqs.push({ item: foundItem, rawId: block.blockID || block.id, rawDamage: block.meta !== undefined ? block.meta : block.Damage, count: block.amount !== undefined ? block.amount : (block.Count !== undefined ? block.Count : 1), customName: this.getCustomName(foundItem, block.nbt), consume: false, taskType: 'block_break', nbtTag: block.nbt, rawTaskProps: rawTaskProps });
                                 });
                             } else if (task.taskID === 'bq_standard:hunt') {
-                                 reqs.push({ item: { item_key: `mob_${task.target}`, name: task.target, image: 'skull.png', mod: 'Мобы' }, count: task.required || 1, target: task.target, customName: task.target, consume: false, taskType: 'hunt', nbtTag: task.targetNBT, rawTaskProps: rawTask });
+                                 reqs.push({ item: { item_key: `mob_${task.target}`, name: task.target, image: 'skull.png', mod: 'Мобы' }, count: task.required || 1, target: task.target, customName: task.target, consume: false, taskType: 'hunt', nbtTag: task.targetNBT, rawTaskProps: rawTaskProps });
                             } else if (task.taskID === 'bq_standard:fluid') {
                                 Object.values(task.requiredFluids || {}).forEach(f => {
-                                    reqs.push({ item: { item_key: `f_${f.FluidName}`, name: this.FLUIDS[f.FluidName] || f.FluidName, image: 'fluid_bucket.png', mod: 'Жидкость' }, rawFluid: f.FluidName || "water", count: f.Amount || 1000, target: f.FluidName, customName: this.FLUIDS[f.FluidName] || f.FluidName, consume: task.consume || false, taskType: 'fluid', rawTaskProps: rawTask });
+                                    reqs.push({ item: { item_key: `f_${f.FluidName}`, name: this.FLUIDS[f.FluidName] || f.FluidName, image: 'fluid_bucket.png', mod: 'Жидкость' }, rawFluid: f.FluidName || "water", count: f.Amount || 1000, target: f.FluidName, customName: this.FLUIDS[f.FluidName] || f.FluidName, consume: task.consume || false, taskType: 'fluid', rawTaskProps: rawTaskProps });
                                 });
                             } else if (task.taskID === 'bq_standard:checkbox') {
-                                reqs.push({ item: { item_key: 'checkbox', name: 'Галочка', image: 'checkbox.png', mod: 'Задачи' }, count: 1, customName: 'Нажать галочку', consume: false, taskType: 'checkbox', rawTaskProps: rawTask });
+                                reqs.push({ item: { item_key: 'checkbox', name: 'Галочка', image: 'checkbox.png', mod: 'Задачи' }, count: 1, customName: 'Нажать галочку', consume: false, taskType: 'checkbox', rawTaskProps: rawTaskProps });
                             } else if (task.taskID === 'bq_standard:xp') {
-                                reqs.push({ item: { item_key: 'xp', name: 'Опыт', image: 'experience_bottle.png', mod: 'Система' }, count: task.amount !== undefined ? task.amount : 1, customName: 'Уровни опыта', consume: task.consume || false, taskType: 'xp', rawTaskProps: rawTask });
+                                reqs.push({ item: { item_key: 'xp', name: 'Опыт', image: 'experience_bottle.png', mod: 'Система' }, count: task.amount !== undefined ? task.amount : 1, customName: 'Уровни опыта', consume: task.consume || false, taskType: 'xp', rawTaskProps: rawTaskProps });
                             } else if (task.taskID === 'bq_npc_integration:npc_dialog') {
-                                reqs.push({ item: { item_key: 'npc_dialog', name: 'Диалог NPC', image: 'oak_sign.png', mod: 'Задачи' }, count: 1, customName: `Диалог NPC (ID: ${task.npcDialogID})`, consume: false, taskType: 'retrieval', nbtTag: { "npcDialogID:3": task.npcDialogID || 0 }, rawTaskProps: rawTask });
+                                reqs.push({ item: { item_key: 'npc_dialog', name: 'Диалог NPC', image: 'oak_sign.png', mod: 'Задачи' }, count: 1, customName: `Диалог NPC (ID: ${task.npcDialogID})`, consume: false, taskType: 'retrieval', nbtTag: { "npcDialogID:3": task.npcDialogID || 0 }, rawTaskProps: rawTaskProps });
                             }
                         });
                     }
                     if (q.rewards) {
-                        let originalRewards = rawData["questDatabase:9"][qKey] ? rawData["questDatabase:9"][qKey]["rewards:9"] : null;
-                        
-                        Object.values(q.rewards).forEach((rew, idx) => {
-                            let rawRew = originalRewards ? originalRewards[Object.keys(originalRewards)[idx]] : null;
+                        Object.entries(q.rewards).forEach(([rKey, rew]) => {
+                            let rawRKey = Object.keys(rawRewards).find(k => k.startsWith(rKey + ':') || k === rKey);
+                            let rawRewProps = rawRKey ? rawRewards[rawRKey] : null;
                             
                             if ((rew.rewardID === 'bq_standard:item' && rew.rewards) || (rew.rewardID === 'bq_standard:choice' && rew.choices)) {
                                 const list = rew.rewards || rew.choices;
                                 Object.values(list).forEach(item => {
                                     const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage);
-                                    rewards.push({ item: foundItem, rawId: item.id, rawDamage: item.Damage, count: item.Count !== undefined ? item.Count : 1, customName: this.getCustomName(foundItem, item.tag), isChoice: rew.rewardID === 'bq_standard:choice', taskType: 'item', damage: item.Damage, nbtTag: item.tag, rawRewProps: rawRew });
+                                    rewards.push({ item: foundItem, rawId: item.id, rawDamage: item.Damage, count: item.Count !== undefined ? item.Count : 1, customName: this.getCustomName(foundItem, item.tag), isChoice: rew.rewardID === 'bq_standard:choice', taskType: 'item', damage: item.Damage, nbtTag: item.tag, rawRewProps: rawRewProps });
                                 });
                             } else if (rew.rewardID === 'bq_standard:command') {
-                                rewards.push({ item: { item_key: 'command', name: 'Команда', image: 'command_block.png', mod: 'Система' }, count: 1, customName: 'Команда', isChoice: false, taskType: 'command', command: rew.command, rawRewProps: rawRew });
+                                rewards.push({ item: { item_key: 'command', name: 'Команда', image: 'command_block.png', mod: 'Система' }, count: 1, customName: 'Команда', isChoice: false, taskType: 'command', command: rew.command, rawRewProps: rawRewProps });
                             } else if (rew.rewardID === 'bq_standard:xp') {
-                                rewards.push({ item: { item_key: 'xp', name: 'Опыт', image: 'experience_bottle.png', mod: 'Система' }, count: rew.amount !== undefined ? rew.amount : 1, customName: 'Уровни опыта', isChoice: false, taskType: 'xp', rawRewProps: rawRew });
+                                rewards.push({ item: { item_key: 'xp', name: 'Опыт', image: 'experience_bottle.png', mod: 'Система' }, count: rew.amount !== undefined ? rew.amount : 1, customName: 'Уровни опыта', isChoice: false, taskType: 'xp', rawRewProps: rawRewProps });
                             }
                         });
                     }
@@ -190,9 +197,11 @@ export const BQ = {
                         iconItemObj.rawId = q.properties.betterquesting.icon.id;
                         iconItemObj.rawDamage = q.properties.betterquesting.icon.Damage;
                         iconItemObj.rawCount = q.properties.betterquesting.icon.Count; 
+                        iconItemObj.nbtTag = q.properties.betterquesting.icon.tag || null;
                         questIconStr = iconItemObj.image || '';
                     }
 
+                    // НАДЕЖНО СОХРАНЯЕМ ОРИГИНАЛЬНЫЕ НАСТРОЙКИ КВЕСТА
                     questsMap[actualId] = {
                         id: 'bq_' + actualId, 
                         numericId: parseInt(actualId),
@@ -203,15 +212,19 @@ export const BQ = {
                         parents: parents, 
                         reqs: reqs, 
                         rewards: rewards,
-                        rawProps: rawData["questDatabase:9"][qKey] ? rawData["questDatabase:9"][qKey]["properties:10"] : null
+                        rawProps: rawQ["properties:10"] ? JSON.parse(JSON.stringify(rawQ["properties:10"])) : null
                     };
                 });
             }
             
             const newMods = [];
-            if (data.questLines) {
-                Object.keys(data.questLines).forEach(key => {
-                    const ql = data.questLines[key]; const lineQuests = []; const addedIds = new Set();
+            if (rawData["questLines:9"]) {
+                Object.entries(rawData["questLines:9"]).forEach(([rawLKey, rawL]) => {
+                    let cleanLKey = rawLKey.split(':')[0];
+                    let ql = data.questLines[cleanLKey];
+                    if (!ql) return;
+
+                    const lineQuests = []; const addedIds = new Set();
                     if (ql.quests) {
                         Object.values(ql.quests).forEach(pos => {
                             let qIdStr = String(pos.id !== undefined ? pos.id : (pos.questID !== undefined ? pos.questID : "")).split(':')[0]; 
@@ -220,12 +233,14 @@ export const BQ = {
                             if (baseQ) lineQuests.push({ ...JSON.parse(JSON.stringify(baseQ)), x: (pos.x || 0) * 3, y: (pos.y || 0) * 3, size: pos.sizeX > 24 ? 'x2' : 'x1' });
                         });
                     }
+                    
+                    // НАДЕЖНО СОХРАНЯЕМ ОРИГИНАЛЬНЫЕ НАСТРОЙКИ ВЕТКИ
                     newMods.push({ 
-                        id: 'bq_mod_' + key, 
-                        numericId: parseInt(key), 
-                        name: ql.properties?.betterquesting?.name || 'Ветка ' + key, 
+                        id: 'bq_mod_' + cleanLKey, 
+                        numericId: parseInt(cleanLKey), 
+                        name: ql.properties?.betterquesting?.name || 'Ветка ' + cleanLKey, 
                         icon: '', 
-                        rawProps: rawData["questLines:9"][key] ? rawData["questLines:9"][key]["properties:10"] : null, 
+                        rawProps: rawL["properties:10"] ? JSON.parse(JSON.stringify(rawL["properties:10"])) : null, 
                         quests: lineQuests 
                     });
                 });
@@ -241,7 +256,6 @@ export const BQ = {
     exportData(mods, editor) {
         const bqData = { "build:8": "3.0.328", "format:8": "2.0.0", "questDatabase:9": {}, "questLines:9": {} };
         
-        // ВОССТАНАВЛИВАЕМ ГЛОБАЛЬНЫЕ НАСТРОЙКИ СЕРВЕРА
         if (editor && editor.questSettings) {
             bqData[editor.questSettings.key] = editor.questSettings.data;
         }
@@ -337,13 +351,12 @@ export const BQ = {
                     else groups[r.taskType || 'retrieval'].push(r); 
                 });
 
-                // ФУНКЦИЯ ДЛЯ ГЛУБОКОГО КОПИРОВАНИЯ НАСТРОЕК ТАСКОВ (чтобы не потерять авто-консюм и т.д.)
+                // ФУНКЦИЯ ДЛЯ ГЛУБОКОГО КОПИРОВАНИЯ НАСТРОЕК ТАСКОВ (чтобы сохранить ignoreNBT и др.)
                 const getTaskProps = (arr, defType) => {
                     let props = arr[0] && arr[0].rawTaskProps ? JSON.parse(JSON.stringify(arr[0].rawTaskProps)) : null;
                     if (!props) {
                         props = { "taskID:8": defType, "autoConsume:1": 0, "consume:1": arr[0]?.consume ? 1 : 0, "groupDetect:1": 0, "ignoreNBT:1": 1, "partialMatch:1": 1 };
                     } else {
-                        // Обновляем только то, что можно менять в редакторе
                         if (arr[0] && arr[0].consume !== undefined) props["consume:1"] = arr[0].consume ? 1 : 0;
                     }
                     props["index:3"] = taskIdx++;
@@ -391,9 +404,12 @@ export const BQ = {
                 });
 
                 npcDialogs.forEach(req => {
+                    let p = req.rawTaskProps ? JSON.parse(JSON.stringify(req.rawTaskProps)) : { "taskID:8": "bq_npc_integration:npc_dialog" };
+                    p["index:3"] = taskIdx++;
                     let dialogId = 0;
                     if (req.nbtTag && req.nbtTag['npcDialogID:3'] !== undefined) dialogId = req.nbtTag['npcDialogID:3'];
-                    tasks[`${taskIdx}:10`] = { "taskID:8": "bq_npc_integration:npc_dialog", "npcDialogID:3": parseInt(dialogId) || 0, "index:3": taskIdx++ };
+                    p["npcDialogID:3"] = parseInt(dialogId) || 0;
+                    tasks[`${p["index:3"]}:10`] = p;
                 });
 
                 const rewards = {}; let rewIdx = 0;
@@ -435,7 +451,7 @@ export const BQ = {
                     });
                 }
 
-                // ВОССТАНАВЛИВАЕМ ОРИГИНАЛЬНЫЕ НАСТРОЙКИ КВЕСТА
+                // НАДЕЖНО ВОССТАНАВЛИВАЕМ НАСТРОЙКИ КВЕСТА
                 let props = q.rawProps ? JSON.parse(JSON.stringify(q.rawProps)) : { 
                     "betterquesting:10": { 
                         "autoClaim:1": 0, "globalShare:1": 0, "isMain:1": 0, "isSilent:1": 0, "lockedProgress:1": 0, 
@@ -450,7 +466,6 @@ export const BQ = {
                 props["betterquesting:10"]["name:8"] = q.title;
                 props["betterquesting:10"]["desc:8"] = q.desc || "";
                 
-                // ВОССТАНАВЛИВАЕМ ОРИГИНАЛЬНУЮ ИКОНКУ (СО ВСЕМИ ЕЁ АТРИБУТАМИ)
                 if (q.iconItem) {
                     const { idKey, finalId, damage } = extractItemData({ item: q.iconItem, rawId: q.iconItem.rawId, rawDamage: q.iconItem.rawDamage });
                     
@@ -458,11 +473,13 @@ export const BQ = {
                     if (q.iconItem.rawCount !== undefined) {
                         count = q.iconItem.rawCount;
                     } else if (props["betterquesting:10"]["icon:10"] && props["betterquesting:10"]["icon:10"]["Count:3"] !== undefined) {
-                        count = props["betterquesting:10"]["icon:10"]["Count:3"]; // Если было 64 - останется 64
+                        count = props["betterquesting:10"]["icon:10"]["Count:3"]; 
                     }
                     
                     const iconDict = { "Count:3": count, "Damage:2": damage, "OreDict:8": "" };
                     iconDict[idKey] = finalId;
+                    if (q.iconItem.nbtTag) iconDict["tag:10"] = q.iconItem.nbtTag;
+                    
                     props["betterquesting:10"]["icon:10"] = iconDict;
                 } else {
                      props["betterquesting:10"]["icon:10"] = { "id:8": "minecraft:book", "Count:3": 1, "Damage:2": 0, "OreDict:8": "" };
@@ -486,7 +503,7 @@ export const BQ = {
                 lineQuests[`${bqId}:10`] = { "x:3": Math.round(q.x / 3), "y:3": Math.round(q.y / 3), "id:3": bqId, "sizeX:3": sz, "sizeY:3": sz };
             });
 
-            // ВОССТАНАВЛИВАЕМ НАСТРОЙКИ ВЕТОК
+            // НАДЕЖНО ВОССТАНАВЛИВАЕМ НАСТРОЙКИ ВЕТОК
             let lineProps = mod.rawProps ? JSON.parse(JSON.stringify(mod.rawProps)) : {
                 "betterquesting:10": {
                     "bg_image:8": "minecraft:textures/gui/presets/window.png",
