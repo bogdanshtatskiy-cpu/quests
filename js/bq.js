@@ -2,10 +2,9 @@ import { ItemsDB } from './items.js';
 import { DB } from './db.js';
 
 export const BQ = {
-    parseData(jsonString, editor) {
+    parseLootData(jsonString, editor) {
         try {
             const rawData = JSON.parse(jsonString);
-            
             const cleanKeys = (obj) => {
                 if (Array.isArray(obj)) return obj.map(cleanKeys);
                 if (obj !== null && typeof obj === 'object') {
@@ -18,13 +17,44 @@ export const BQ = {
                 }
                 return obj;
             };
+            const data = cleanKeys(rawData);
+            
+            if (!editor.lootGroups) editor.lootGroups = {};
+            
+            if (data.groups) {
+                Object.values(data.groups).forEach(group => {
+                    editor.lootGroups[group.ID] = group.name;
+                });
+                alert('База лутбоксов (Loot Groups) успешно загружена! Теперь в квестах будут их настоящие названия.');
+            } else {
+                alert('Группы лутбоксов не найдены в файле!');
+            }
+        } catch(e) {
+            console.error(e);
+            alert('Ошибка чтения QuestLoot.json');
+        }
+    },
 
+    parseData(jsonString, editor) {
+        try {
+            const rawData = JSON.parse(jsonString);
+            const cleanKeys = (obj) => {
+                if (Array.isArray(obj)) return obj.map(cleanKeys);
+                if (obj !== null && typeof obj === 'object') {
+                    const cleaned = {};
+                    for (let key in obj) {
+                        const cleanKey = key.split(':')[0];
+                        cleaned[cleanKey] = cleanKeys(obj[key]);
+                    }
+                    return cleaned;
+                }
+                return obj;
+            };
             const data = cleanKeys(rawData);
             const questsMap = {};
 
             if (data.questDatabase) {
                 Object.entries(data.questDatabase).forEach(([qKey, q]) => {
-                    // Умное извлечение ID (Решает проблему пропадающих квестов)
                     let actualId = q.questID !== undefined ? q.questID : qKey;
                     actualId = String(actualId).split(':')[0];
                     
@@ -53,7 +83,16 @@ export const BQ = {
                             }
                             else if (task.taskID === 'bq_standard:hunt' || task.target) {
                                  const target = task.target || "Моб";
+                                 editor.addMobToDatalist(target);
                                  reqs.push({ item: { item_key: `mob_${target}`, name: target, image: '', mod: 'Мобы' }, count: task.required || 1, target: target, customName: target, consume: false, taskType: 'hunt' });
+                            }
+                            else if (task.requiredFluids && task.taskID === 'bq_standard:fluid') {
+                                Object.values(task.requiredFluids).forEach(fluid => {
+                                    reqs.push({ item: { item_key: `fluid_${fluid.FluidName}`, name: fluid.FluidName, image: '', mod: 'Жидкость' }, count: fluid.Amount || 1000, target: fluid.FluidName, customName: fluid.FluidName, consume: task.consume || false, taskType: 'fluid' });
+                                });
+                            }
+                            else if (task.taskID === 'bq_standard:checkbox') {
+                                reqs.push({ item: { item_key: 'checkbox', name: 'Галочка', image: '', mod: 'Задачи' }, count: 1, customName: 'Нажать галочку (Прочтение)', consume: false, taskType: 'checkbox' });
                             }
                         });
                     }
@@ -63,13 +102,13 @@ export const BQ = {
                             if (rew.rewards) {
                                 Object.values(rew.rewards).forEach(item => {
                                     const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage);
-                                    rewards.push({ item: foundItem, count: item.Count || 1, customName: foundItem.name === item.id ? item.id : foundItem.name, isChoice: false });
+                                    rewards.push({ item: foundItem, count: item.Count || 1, customName: foundItem.name === item.id ? item.id : foundItem.name, isChoice: false, damage: item.Damage });
                                 });
                             }
                             if (rew.choices) {
                                 Object.values(rew.choices).forEach(item => {
                                     const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage);
-                                    rewards.push({ item: foundItem, count: item.Count || 1, customName: foundItem.name === item.id ? item.id : foundItem.name, isChoice: true });
+                                    rewards.push({ item: foundItem, count: item.Count || 1, customName: foundItem.name === item.id ? item.id : foundItem.name, isChoice: true, damage: item.Damage });
                                 });
                             }
                         });
@@ -112,29 +151,17 @@ export const BQ = {
                     if (ql.quests) {
                         Object.values(ql.quests).forEach(pos => {
                             let qIdStr = pos.id !== undefined ? pos.id : (pos.questID !== undefined ? pos.questID : "");
-                            qIdStr = String(qIdStr).split(':')[0]; // Решает баг дубликатов
-                            
+                            qIdStr = String(qIdStr).split(':')[0]; 
                             if (!qIdStr || addedIds.has(qIdStr)) return;
                             addedIds.add(qIdStr);
 
                             const baseQ = questsMap[qIdStr];
                             if (baseQ) {
-                                lineQuests.push({
-                                    ...JSON.parse(JSON.stringify(baseQ)),
-                                    x: (pos.x || 0) * 3,
-                                    y: (pos.y || 0) * 3,
-                                    size: pos.sizeX > 24 ? 'x2' : 'x1' 
-                                });
+                                lineQuests.push({ ...JSON.parse(JSON.stringify(baseQ)), x: (pos.x || 0) * 3, y: (pos.y || 0) * 3, size: pos.sizeX > 24 ? 'x2' : 'x1' });
                             }
                         });
                     }
-
-                    newMods.push({
-                        id: 'bq_mod_' + key,
-                        name: ql.properties?.betterquesting?.name || 'Ветка ' + key,
-                        icon: '',
-                        quests: lineQuests
-                    });
+                    newMods.push({ id: 'bq_mod_' + key, name: ql.properties?.betterquesting?.name || 'Ветка ' + key, icon: '', quests: lineQuests });
                 });
             }
 
@@ -166,11 +193,7 @@ export const BQ = {
         let questNumericId = 0;
         const idMap = {}; 
 
-        mods.forEach(mod => {
-            mod.quests.forEach(q => {
-                if(idMap[q.id] === undefined) idMap[q.id] = questNumericId++;
-            });
-        });
+        mods.forEach(mod => { mod.quests.forEach(q => { if(idMap[q.id] === undefined) idMap[q.id] = questNumericId++; }); });
 
         mods.forEach(mod => {
             mod.quests.forEach(q => {
@@ -184,22 +207,17 @@ export const BQ = {
                 const craftings = [];
                 const blockBreaks = [];
                 const hunts = [];
+                const fluids = [];
+                const checkboxes = [];
 
                 if (q.reqs) {
                     q.reqs.forEach(req => {
-                        let tType = req.taskType;
-                        if (!tType) {
-                            const nameStr = req.customName || req.item.name || "";
-                            if (nameStr.startsWith('Убить: ')) { tType = 'hunt'; req.target = nameStr.replace('Убить: ', '').trim(); }
-                            else if (nameStr.startsWith('Сломать: ')) { tType = 'block_break'; req.customName = nameStr.replace('Сломать: ', '').trim(); }
-                            else if (nameStr.startsWith('Создать: ')) { tType = 'crafting'; req.customName = nameStr.replace('Создать: ', '').trim(); }
-                            else tType = 'retrieval';
-                            req.taskType = tType;
-                        }
-
+                        let tType = req.taskType || 'retrieval';
                         if (tType === 'hunt') hunts.push(req);
                         else if (tType === 'block_break') blockBreaks.push(req);
                         else if (tType === 'crafting') craftings.push(req);
+                        else if (tType === 'fluid') fluids.push(req);
+                        else if (tType === 'checkbox') checkboxes.push(req);
                         else retrievals.push(req);
                     });
                 }
@@ -208,12 +226,17 @@ export const BQ = {
                     const dict = {};
                     arr.forEach((req, idx) => {
                         let sysId = req.item.string_id || req.item.item_key || "minecraft:stone";
-                        let damage = req.item.damage !== undefined ? req.item.damage : 0;
+                        let damage = req.damage !== undefined ? req.damage : (req.item.damage !== undefined ? req.item.damage : 0);
                         if (!req.item.string_id && sysId.includes(':') && !sysId.match(/[a-zA-Z]/)) {
                             const parts = sysId.split(':');
-                            sysId = parts[0]; damage = parseInt(parts[1]) || 0;
+                            sysId = parts[0]; damage = req.damage !== undefined ? req.damage : (parseInt(parts[1]) || 0);
                         }
-                        dict[`${idx}:10`] = { "id:8": sysId, "Count:3": parseInt(req.count) || 1, "Damage:2": damage, "OreDict:8": "" };
+                        
+                        if (sysId === 'bq_standard:loot_chest') {
+                            dict[`${idx}:10`] = { "id:8": sysId, "Count:3": parseInt(req.count) || 1, "Damage:2": damage, "OreDict:8": "", "tag:10": { "hideLootInfo:1": 1 } };
+                        } else {
+                            dict[`${idx}:10`] = { "id:8": sysId, "Count:3": parseInt(req.count) || 1, "Damage:2": damage, "OreDict:8": "" };
+                        }
                     });
                     return dict;
                 };
@@ -232,9 +255,20 @@ export const BQ = {
                     return dict;
                 };
 
+                const createFluidsDict = (arr) => {
+                    const dict = {};
+                    arr.forEach((req, idx) => {
+                        let fluidName = req.target || req.customName || req.item.name || "water";
+                        dict[`${idx}:10`] = { "FluidName:8": fluidName, "Amount:3": parseInt(req.count) || 1000 };
+                    });
+                    return dict;
+                };
+
                 if (retrievals.length > 0) tasks[`${taskIdx++}:10`] = { "taskID:8": "bq_standard:retrieval", "consume:1": retrievals[0].consume ? 1 : 0, "requiredItems:9": createItemsDict(retrievals) };
                 if (craftings.length > 0) tasks[`${taskIdx++}:10`] = { "taskID:8": "bq_standard:crafting", "allowAnvil:1": 0, "allowSmelt:1": 0, "allowCraft:1": 1, "requiredItems:9": createItemsDict(craftings) };
                 if (blockBreaks.length > 0) tasks[`${taskIdx++}:10`] = { "taskID:8": "bq_standard:block_break", "blocks:9": createBlocksDict(blockBreaks) };
+                if (fluids.length > 0) tasks[`${taskIdx++}:10`] = { "taskID:8": "bq_standard:fluid", "consume:1": fluids[0].consume ? 1 : 0, "requiredFluids:9": createFluidsDict(fluids) };
+                if (checkboxes.length > 0) tasks[`${taskIdx++}:10`] = { "taskID:8": "bq_standard:checkbox", "index:3": 0 };
                 
                 hunts.forEach(h => {
                     let target = h.target || h.customName || h.item.name;
