@@ -174,11 +174,15 @@ export const BQ = {
                     let iconItemObj = null;
                     if (q.properties?.betterquesting?.icon) {
                         iconItemObj = ItemsDB.findItemByBQ(q.properties.betterquesting.icon.id, q.properties.betterquesting.icon.Damage);
+                        // Сохраняем сырые данные для иконки
+                        iconItemObj.rawId = q.properties.betterquesting.icon.id;
+                        iconItemObj.rawDamage = q.properties.betterquesting.icon.Damage;
                         questIconStr = iconItemObj.image || '';
                     }
 
                     questsMap[actualId] = {
                         id: 'bq_' + actualId, 
+                        numericId: parseInt(actualId), // ВАЖНО: Запоминаем оригинальный ID
                         title: q.properties?.betterquesting?.name || 'Безымянный квест',
                         desc: q.properties?.betterquesting?.desc || '', 
                         icon: questIconStr, 
@@ -190,10 +194,13 @@ export const BQ = {
                     };
                 });
             }
+            
             const newMods = [];
             if (data.questLines) {
                 Object.keys(data.questLines).forEach(key => {
-                    const ql = data.questLines[key]; const lineQuests = []; const addedIds = new Set();
+                    const ql = data.questLines[key]; 
+                    const lineQuests = []; 
+                    const addedIds = new Set();
                     if (ql.quests) {
                         Object.values(ql.quests).forEach(pos => {
                             let qIdStr = String(pos.id !== undefined ? pos.id : (pos.questID !== undefined ? pos.questID : "")).split(':')[0]; 
@@ -204,9 +211,10 @@ export const BQ = {
                     }
                     newMods.push({ 
                         id: 'bq_mod_' + key, 
+                        numericId: parseInt(key), // ВАЖНО: Запоминаем оригинальный ID ветки
                         name: ql.properties?.betterquesting?.name || 'Ветка ' + key, 
                         icon: '', 
-                        rawProps: ql.properties, // Сохраняем оригинальные настройки ветки
+                        rawProps: ql.properties, 
                         quests: lineQuests 
                     });
                 });
@@ -226,10 +234,29 @@ export const BQ = {
             bqData["questSettings:9"] = editor.questSettings;
         }
 
-        let questNumericId = 0; const idMap = {}; 
-        mods.forEach(mod => { mod.quests.forEach(q => { if(idMap[q.id] === undefined) idMap[q.id] = questNumericId++; }); });
+        // ВАЖНО: Поиск максимального ID для новых квестов
+        let maxQuestId = -1;
+        let maxLineId = -1;
 
-        // Интеллектуальный извлекатель ID, чтобы игра понимала новые предметы
+        mods.forEach(mod => {
+            if (mod.numericId !== undefined && mod.numericId > maxLineId) maxLineId = mod.numericId;
+            mod.quests.forEach(q => {
+                if (q.numericId !== undefined && q.numericId > maxQuestId) maxQuestId = q.numericId;
+            });
+        });
+
+        // Назначаем ID
+        const idMap = {}; 
+        mods.forEach(mod => {
+            if (mod.numericId === undefined) mod.numericId = ++maxLineId; // Новая ветка
+            mod.quests.forEach(q => {
+                if (q.numericId === undefined) {
+                    q.numericId = ++maxQuestId; // Новый квест
+                }
+                idMap[q.id] = q.numericId;
+            });
+        });
+
         const extractItemData = (req) => {
             let rawId = req.rawId !== undefined ? req.rawId : (req.item && (req.item.string_id || req.item.item_key) ? (req.item.string_id || req.item.item_key) : "minecraft:stone");
             let rawDamage = req.rawDamage !== undefined ? req.rawDamage : (req.damage !== undefined ? req.damage : (req.item && req.item.damage !== undefined ? req.item.damage : 0));
@@ -237,7 +264,6 @@ export const BQ = {
             let sysId = String(rawId);
             let damage = parseInt(rawDamage) || 0;
 
-            // Если это составной ключ из базы вроде "ThermalExpansion:Machine:3"
             const parts = sysId.split(':');
             if (parts.length === 3) {
                 sysId = parts[0] + ':' + parts[1];
@@ -247,14 +273,12 @@ export const BQ = {
                 damage = parseInt(parts[1]) || damage;
             }
 
-            // Проверка на числовые ID (старые моды)
             let idKey = "id:8";
             let finalId = sysId;
             if (!isNaN(parseInt(sysId)) && sysId.indexOf(':') === -1 && sysId.match(/^[0-9]+$/)) {
                 idKey = "id:2";
                 finalId = parseInt(sysId);
             }
-
             return { idKey, finalId, damage };
         };
 
@@ -359,6 +383,8 @@ export const BQ = {
                     const iconDict = { "Count:3": 1, "Damage:2": damage, "OreDict:8": "" };
                     iconDict[idKey] = finalId;
                     props["betterquesting:10"]["icon:10"] = iconDict;
+                } else {
+                     props["betterquesting:10"]["icon:10"] = { "id:8": "minecraft:book", "Count:3": 1, "Damage:2": 0, "OreDict:8": "" };
                 }
 
                 bqData["questDatabase:9"][`${bqId}:10`] = {
@@ -371,7 +397,6 @@ export const BQ = {
             });
         });
 
-        let lineId = 0;
         mods.forEach(mod => {
             const lineQuests = {};
             mod.quests.forEach(q => {
@@ -380,7 +405,6 @@ export const BQ = {
                 lineQuests[`${bqId}:10`] = { "x:3": Math.round(q.x / 3), "y:3": Math.round(q.y / 3), "id:3": bqId, "sizeX:3": sz, "sizeY:3": sz };
             });
 
-            // ИНИЦИАЛИЗАЦИЯ НАСТРОЕК ВЕТКИ (С НУЛЯ ИЛИ ВОССТАНОВЛЕНИЕ)
             let lineProps = mod.rawProps ? JSON.parse(JSON.stringify(mod.rawProps)) : {
                 "betterquesting:10": {
                     "bg_image:8": "minecraft:textures/gui/presets/window.png",
@@ -398,12 +422,11 @@ export const BQ = {
                 lineProps["betterquesting:10"]["name:8"] = mod.name;
             }
 
-            bqData["questLines:9"][`${lineId}:10`] = {
-                "lineID:3": lineId,
+            bqData["questLines:9"][`${mod.numericId}:10`] = {
+                "lineID:3": mod.numericId,
                 "properties:10": lineProps,
                 "quests:9": lineQuests
             };
-            lineId++;
         });
 
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(bqData, null, 2));
