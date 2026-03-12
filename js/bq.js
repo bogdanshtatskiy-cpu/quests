@@ -2,7 +2,7 @@ import { ItemsDB } from './items.js';
 import { DB } from './db.js';
 
 export const BQ = {
-    // Словарь перевода чар из твоего CSV
+    // Словарь перевода чар
     ENCHANTS: {
         0: "Защита", 1: "Огнеупорность", 2: "Невесомость", 3: "Взрывоустойчивость", 4: "Защита от снарядов",
         5: "Подводное дыхание", 6: "Подводник", 7: "Шипы", 8: "Печать души",
@@ -28,27 +28,52 @@ export const BQ = {
         "petrotheum": "Тектонический петротеум"
     },
 
+    // Конвертер в римские цифры для чар
+    toRoman(num) {
+        const lookup = {M:1000, CM:900, D:500, CD:400, C:100, XC:90, L:50, XL:40, X:10, IX:9, V:5, IV:4, I:1};
+        let roman = '';
+        for (let i in lookup) {
+            while (num >= lookup[i]) {
+                roman += i;
+                num -= lookup[i];
+            }
+        }
+        return roman || "0";
+    },
+
     // Помощник для поиска сырых ключей NBT (с цифрами типа :8, :3)
     getRawValue(obj, keyPrefix) {
-        if(!obj) return null;
+        if(!obj || typeof obj !== 'object') return null;
         for(let k in obj) { if (k.startsWith(keyPrefix + ':') || k === keyPrefix) return obj[k]; }
         return null;
     },
 
-    // Чтение NBT и генерация красивых названий
-    getCustomName(itemKey, origName, tag) {
-        if (!tag) return origName;
-        if (itemKey.includes('enchanted_book')) {
-            const enchs = this.getRawValue(tag, 'StoredEnchantments');
-            if (enchs) {
-                const first = Object.values(enchs)[0];
-                if (first) {
-                    const id = this.getRawValue(first, 'id');
-                    const lvl = this.getRawValue(first, 'lvl');
-                    return `Книга: ${this.ENCHANTS[id] || 'Чары ' + id} (ур.${lvl})`;
+    // Чтение NBT и генерация красивых названий с учетом базы предметов
+    getCustomName(foundItem, tag) {
+        const origName = foundItem.name; // Настоящее русское название из базы!
+        const itemKey = foundItem.item_key || foundItem.string_id || "";
+
+        if (!tag) return origName; // Если NBT нет, возвращаем просто имя предмета
+        
+        // Зачарования (Книги или инструменты)
+        let enchs = this.getRawValue(tag, 'StoredEnchantments') || this.getRawValue(tag, 'ench');
+        if (enchs) {
+            const first = Object.values(enchs)[0];
+            if (first) {
+                const id = this.getRawValue(first, 'id');
+                const lvl = this.getRawValue(first, 'lvl') || 1;
+                const enchName = this.ENCHANTS[id] || 'Чары ' + id;
+                const romanLvl = this.toRoman(lvl);
+                
+                if (itemKey.includes('enchanted_book')) {
+                    return `Книга: ${enchName} ${romanLvl} (${lvl})`;
+                } else {
+                    return `${origName} [${enchName} ${romanLvl}]`;
                 }
             }
         }
+
+        // Бабочки
         if (itemKey.includes('butterflyGE')) {
             const genome = this.getRawValue(tag, 'Genome');
             if (genome) {
@@ -62,12 +87,17 @@ export const BQ = {
                 }
             }
         }
+
+        // Тайники и Сейфы
         if (itemKey.includes('ThermalExpansion:Cache') || itemKey.includes('ThermalExpansion:Strongbox')) {
             const inner = this.getRawValue(tag, 'Item');
             if (inner) {
-                const id = this.getRawValue(inner, 'id');
-                const count = this.getRawValue(inner, 'Count');
-                return `Тайник (Внутри ID: ${id} x${count})`;
+                const innerId = this.getRawValue(inner, 'id');
+                const innerDmg = this.getRawValue(inner, 'Damage') || 0;
+                const innerCount = this.getRawValue(inner, 'Count') || 1;
+                // Ищем то, что лежит внутри тайника, по нашей базе!
+                const innerFound = ItemsDB.findItemByBQ(innerId, innerDmg);
+                return `Тайник (${innerFound.name} x${innerCount})`;
             }
         }
         return origName;
@@ -96,7 +126,7 @@ export const BQ = {
                 Object.values(data.groups).forEach(group => {
                     editor.lootGroups[group.ID] = group.name;
                 });
-                alert('База лутбоксов (Loot Groups) успешно загружена! Теперь в квестах будут их настоящие названия.');
+                console.log('База лутбоксов (QuestLoot.json) успешно загружена.');
             } else {
                 alert('Группы лутбоксов не найдены в файле!');
             }
@@ -116,8 +146,7 @@ export const BQ = {
                     const cleaned = {};
                     for (let key in obj) {
                         const cleanKey = key.split(':')[0];
-                        // Важно! Сохраняем NBT теги сырыми, не обрезаем им хвосты, 
-                        // иначе мод не сможет их прочитать после экспорта
+                        // Оставляем NBT теги сырыми
                         if (['tag', 'nbt', 'targetNBT'].includes(cleanKey)) {
                             cleaned[cleanKey] = obj[key]; 
                         } else {
@@ -142,17 +171,17 @@ export const BQ = {
                             if (task.requiredItems && task.taskID === 'bq_standard:retrieval') {
                                 Object.values(task.requiredItems).forEach(item => {
                                     const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage);
-                                    reqs.push({ item: foundItem, count: item.Count || 1, customName: this.getCustomName(foundItem.item_key, item.id, item.tag), consume: task.consume || false, taskType: 'retrieval', nbtTag: item.tag });
+                                    reqs.push({ item: foundItem, count: item.Count || 1, customName: this.getCustomName(foundItem, item.tag), consume: task.consume || false, taskType: 'retrieval', nbtTag: item.tag });
                                 });
                             } else if (task.requiredItems && task.taskID === 'bq_standard:crafting') {
                                 Object.values(task.requiredItems).forEach(item => {
                                     const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage);
-                                    reqs.push({ item: foundItem, count: item.Count || 1, customName: foundItem.name === item.id ? item.id : foundItem.name, consume: false, taskType: 'crafting', nbtTag: item.tag });
+                                    reqs.push({ item: foundItem, count: item.Count || 1, customName: foundItem.name, consume: false, taskType: 'crafting', nbtTag: item.tag });
                                 });
                             } else if (task.blocks && task.taskID === 'bq_standard:block_break') {
                                 Object.values(task.blocks).forEach(block => {
                                     const foundItem = ItemsDB.findItemByBQ(block.blockID || block.id, block.meta || block.Damage);
-                                    reqs.push({ item: foundItem, count: block.amount || block.Count || 1, customName: foundItem.name === block.blockID ? block.blockID : foundItem.name, consume: false, taskType: 'block_break', nbtTag: block.nbt });
+                                    reqs.push({ item: foundItem, count: block.amount || block.Count || 1, customName: foundItem.name, consume: false, taskType: 'block_break', nbtTag: block.nbt });
                                 });
                             } else if (task.taskID === 'bq_standard:hunt' || task.target) {
                                  const target = task.target || "Моб";
@@ -176,12 +205,12 @@ export const BQ = {
                             if (rew.rewardID === 'bq_standard:item' && rew.rewards) {
                                 Object.values(rew.rewards).forEach(item => {
                                     const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage);
-                                    rewards.push({ item: foundItem, count: item.Count || 1, customName: this.getCustomName(foundItem.item_key, item.id, item.tag), isChoice: false, taskType: 'item', damage: item.Damage, nbtTag: item.tag });
+                                    rewards.push({ item: foundItem, count: item.Count || 1, customName: this.getCustomName(foundItem, item.tag), isChoice: false, taskType: 'item', damage: item.Damage, nbtTag: item.tag });
                                 });
                             } else if (rew.rewardID === 'bq_standard:choice' && rew.choices) {
                                 Object.values(rew.choices).forEach(item => {
                                     const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage);
-                                    rewards.push({ item: foundItem, count: item.Count || 1, customName: this.getCustomName(foundItem.item_key, item.id, item.tag), isChoice: true, taskType: 'item', damage: item.Damage, nbtTag: item.tag });
+                                    rewards.push({ item: foundItem, count: item.Count || 1, customName: this.getCustomName(foundItem, item.tag), isChoice: true, taskType: 'item', damage: item.Damage, nbtTag: item.tag });
                                 });
                             } else if (rew.rewardID === 'bq_standard:command') {
                                 rewards.push({ item: { item_key: 'command', name: 'Команда', image: 'command_block.png', mod: 'Система' }, count: 1, customName: 'Команда', isChoice: false, taskType: 'command', command: rew.command });
