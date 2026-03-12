@@ -98,8 +98,13 @@ export const BQ = {
         try {
             const rawData = JSON.parse(jsonString);
             
-            if (rawData["questSettings:9"]) editor.questSettings = rawData["questSettings:9"];
-            else editor.questSettings = null;
+            // Сохраняем глобальные настройки сервера без изменений (чтобы не потерялись)
+            const qsKey = Object.keys(rawData).find(k => k.startsWith('questSettings'));
+            if (qsKey) {
+                editor.questSettings = { key: qsKey, data: rawData[qsKey] };
+            } else {
+                editor.questSettings = null;
+            }
 
             const cleanKeys = (obj) => {
                 if (Array.isArray(obj)) return obj.map(cleanKeys);
@@ -184,7 +189,7 @@ export const BQ = {
                         iconItemObj = ItemsDB.findItemByBQ(q.properties.betterquesting.icon.id, q.properties.betterquesting.icon.Damage);
                         iconItemObj.rawId = q.properties.betterquesting.icon.id;
                         iconItemObj.rawDamage = q.properties.betterquesting.icon.Damage;
-                        iconItemObj.rawCount = q.properties.betterquesting.icon.Count; // Сохраняем оригинальный Count (даже если он 64)
+                        iconItemObj.rawCount = q.properties.betterquesting.icon.Count; 
                         questIconStr = iconItemObj.image || '';
                     }
 
@@ -236,8 +241,9 @@ export const BQ = {
     exportData(mods, editor) {
         const bqData = { "build:8": "3.0.328", "format:8": "2.0.0", "questDatabase:9": {}, "questLines:9": {} };
         
+        // ВОССТАНАВЛИВАЕМ ГЛОБАЛЬНЫЕ НАСТРОЙКИ СЕРВЕРА
         if (editor && editor.questSettings) {
-            bqData["questSettings:9"] = editor.questSettings;
+            bqData[editor.questSettings.key] = editor.questSettings.data;
         }
 
         let maxQuestId = -1;
@@ -331,11 +337,14 @@ export const BQ = {
                     else groups[r.taskType || 'retrieval'].push(r); 
                 });
 
-                // Используем оригинальные настройки тасков, если они есть
+                // ФУНКЦИЯ ДЛЯ ГЛУБОКОГО КОПИРОВАНИЯ НАСТРОЕК ТАСКОВ (чтобы не потерять авто-консюм и т.д.)
                 const getTaskProps = (arr, defType) => {
-                    let props = arr[0]?.rawTaskProps ? JSON.parse(JSON.stringify(arr[0].rawTaskProps)) : null;
+                    let props = arr[0] && arr[0].rawTaskProps ? JSON.parse(JSON.stringify(arr[0].rawTaskProps)) : null;
                     if (!props) {
                         props = { "taskID:8": defType, "autoConsume:1": 0, "consume:1": arr[0]?.consume ? 1 : 0, "groupDetect:1": 0, "ignoreNBT:1": 1, "partialMatch:1": 1 };
+                    } else {
+                        // Обновляем только то, что можно менять в редакторе
+                        if (arr[0] && arr[0].consume !== undefined) props["consume:1"] = arr[0].consume ? 1 : 0;
                     }
                     props["index:3"] = taskIdx++;
                     return props;
@@ -344,32 +353,32 @@ export const BQ = {
                 if (groups.retrieval.length) {
                     let p = getTaskProps(groups.retrieval, "bq_standard:retrieval");
                     p["requiredItems:9"] = createItemsDict(groups.retrieval);
-                    tasks[`${taskIdx - 1}:10`] = p;
+                    tasks[`${p["index:3"]}:10`] = p;
                 }
                 if (groups.crafting.length) {
                     let p = getTaskProps(groups.crafting, "bq_standard:crafting");
                     p["requiredItems:9"] = createItemsDict(groups.crafting);
-                    tasks[`${taskIdx - 1}:10`] = p;
+                    tasks[`${p["index:3"]}:10`] = p;
                 }
                 if (groups.block_break.length) {
                     let p = getTaskProps(groups.block_break, "bq_standard:block_break");
                     p["blocks:9"] = createBlocksDict(groups.block_break);
-                    tasks[`${taskIdx - 1}:10`] = p;
+                    tasks[`${p["index:3"]}:10`] = p;
                 }
                 if (groups.fluid.length) {
                     let p = getTaskProps(groups.fluid, "bq_standard:fluid");
                     p["requiredFluids:9"] = createFluidsDict(groups.fluid);
-                    tasks[`${taskIdx - 1}:10`] = p;
+                    tasks[`${p["index:3"]}:10`] = p;
                 }
                 if (groups.checkbox.length) {
                     let p = getTaskProps(groups.checkbox, "bq_standard:checkbox");
-                    tasks[`${taskIdx - 1}:10`] = p;
+                    tasks[`${p["index:3"]}:10`] = p;
                 }
                 if (groups.xp.length) {
                     let p = getTaskProps(groups.xp, "bq_standard:xp");
                     p["amount:3"] = parseInt(groups.xp[0].count) || 1;
                     p["isLevels:1"] = 1;
-                    tasks[`${taskIdx - 1}:10`] = p;
+                    tasks[`${p["index:3"]}:10`] = p;
                 }
                 
                 groups.hunt.forEach(h => {
@@ -378,7 +387,7 @@ export const BQ = {
                     p["target:8"] = h.target || h.customName || h.item.name;
                     p["required:3"] = parseInt(h.count) || 1;
                     if (h.nbtTag) p["targetNBT:10"] = h.nbtTag;
-                    tasks[`${taskIdx - 1}:10`] = p;
+                    tasks[`${p["index:3"]}:10`] = p;
                 });
 
                 npcDialogs.forEach(req => {
@@ -390,7 +399,7 @@ export const BQ = {
                 const rewards = {}; let rewIdx = 0;
                 
                 const getRewProps = (arr, defType) => {
-                    let props = arr[0]?.rawRewProps ? JSON.parse(JSON.stringify(arr[0].rawRewProps)) : null;
+                    let props = arr[0] && arr[0].rawRewProps ? JSON.parse(JSON.stringify(arr[0].rawRewProps)) : null;
                     if (!props) props = { "rewardID:8": defType, "ignoreNBT:1": 1 };
                     props["index:3"] = rewIdx++;
                     return props;
@@ -403,12 +412,12 @@ export const BQ = {
                     if (standardRews.length > 0) {
                         let p = getRewProps(standardRews, "bq_standard:item");
                         p["rewards:9"] = createItemsDict(standardRews);
-                        rewards[`${rewIdx - 1}:10`] = p;
+                        rewards[`${p["index:3"]}:10`] = p;
                     }
                     if (choiceRews.length > 0) {
                         let p = getRewProps(choiceRews, "bq_standard:choice");
                         p["choices:9"] = createItemsDict(choiceRews);
-                        rewards[`${rewIdx - 1}:10`] = p;
+                        rewards[`${p["index:3"]}:10`] = p;
                     }
 
                     q.rewards.forEach(r => {
@@ -416,16 +425,17 @@ export const BQ = {
                             let p = r.rawRewProps ? JSON.parse(JSON.stringify(r.rawRewProps)) : { "rewardID:8": "bq_standard:command", "hideCommand:1": 1, "viaPlayer:1": 0 };
                             p["index:3"] = rewIdx++;
                             p["command:8"] = r.command || "";
-                            rewards[`${rewIdx - 1}:10`] = p;
+                            rewards[`${p["index:3"]}:10`] = p;
                         } else if (r.taskType === 'xp') {
                             let p = r.rawRewProps ? JSON.parse(JSON.stringify(r.rawRewProps)) : { "rewardID:8": "bq_standard:xp", "isLevels:1": 1 };
                             p["index:3"] = rewIdx++;
                             p["amount:3"] = parseInt(r.count) || 1;
-                            rewards[`${rewIdx - 1}:10`] = p;
+                            rewards[`${p["index:3"]}:10`] = p;
                         }
                     });
                 }
 
+                // ВОССТАНАВЛИВАЕМ ОРИГИНАЛЬНЫЕ НАСТРОЙКИ КВЕСТА
                 let props = q.rawProps ? JSON.parse(JSON.stringify(q.rawProps)) : { 
                     "betterquesting:10": { 
                         "autoClaim:1": 0, "globalShare:1": 0, "isMain:1": 0, "isSilent:1": 0, "lockedProgress:1": 0, 
@@ -440,10 +450,17 @@ export const BQ = {
                 props["betterquesting:10"]["name:8"] = q.title;
                 props["betterquesting:10"]["desc:8"] = q.desc || "";
                 
+                // ВОССТАНАВЛИВАЕМ ОРИГИНАЛЬНУЮ ИКОНКУ (СО ВСЕМИ ЕЁ АТРИБУТАМИ)
                 if (q.iconItem) {
                     const { idKey, finalId, damage } = extractItemData({ item: q.iconItem, rawId: q.iconItem.rawId, rawDamage: q.iconItem.rawDamage });
-                    // Используем сохраненный Count, если он был
-                    let count = q.iconItem.rawCount !== undefined ? q.iconItem.rawCount : 1;
+                    
+                    let count = 1;
+                    if (q.iconItem.rawCount !== undefined) {
+                        count = q.iconItem.rawCount;
+                    } else if (props["betterquesting:10"]["icon:10"] && props["betterquesting:10"]["icon:10"]["Count:3"] !== undefined) {
+                        count = props["betterquesting:10"]["icon:10"]["Count:3"]; // Если было 64 - останется 64
+                    }
+                    
                     const iconDict = { "Count:3": count, "Damage:2": damage, "OreDict:8": "" };
                     iconDict[idKey] = finalId;
                     props["betterquesting:10"]["icon:10"] = iconDict;
@@ -469,6 +486,7 @@ export const BQ = {
                 lineQuests[`${bqId}:10`] = { "x:3": Math.round(q.x / 3), "y:3": Math.round(q.y / 3), "id:3": bqId, "sizeX:3": sz, "sizeY:3": sz };
             });
 
+            // ВОССТАНАВЛИВАЕМ НАСТРОЙКИ ВЕТОК
             let lineProps = mod.rawProps ? JSON.parse(JSON.stringify(mod.rawProps)) : {
                 "betterquesting:10": {
                     "bg_image:8": "minecraft:textures/gui/presets/window.png",
