@@ -11,7 +11,7 @@ export const Editor = {
     activeModId: null, 
     originalData: null, 
     isImportMode: false, 
-    lootGroups: {}, // Хранит названия лутбоксов: { "0": "Кейс новичка", "1": "Донат кейс" }
+    lootGroups: {}, 
     
     scale: 1, panX: 0, panY: 0, 
     isPanning: false, panStartX: 0, panStartY: 0, initialPanX: 0, initialPanY: 0,
@@ -90,13 +90,17 @@ export const Editor = {
     triggerAutoSave() {
         if (!Auth.user || this.isImportMode) return; 
         const indicator = document.getElementById('save-indicator');
-        indicator.classList.remove('hidden'); indicator.innerText = "Сохранение..."; indicator.style.color = "#ffaa00";
+        indicator.classList.remove('hidden'); indicator.innerText = "Сохранение..."; 
+        indicator.style.display = 'block';
 
         clearTimeout(this.saveTimeout);
         this.saveTimeout = setTimeout(async () => {
             await DB.saveQuestsSilent(this.data.mods);
-            indicator.innerText = "Сохранено ✔"; indicator.style.color = "#55ff55";
-            setTimeout(() => indicator.classList.add('hidden'), 2000);
+            indicator.innerText = "Сохранено ✔"; 
+            setTimeout(() => {
+                indicator.classList.add('hidden');
+                indicator.style.display = 'none';
+            }, 2000);
         }, 1500);
     },
 
@@ -210,7 +214,6 @@ export const Editor = {
 
     updateTransform() { document.getElementById('quest-canvas').style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`; },
 
-    // ОПТИМИЗИРОВАННЫЙ РЕНДЕР КАНВАСА
     renderCanvas(skipSave = false) {
         const nodesLayer = document.getElementById('nodes-layer');
         const linesLayer = document.getElementById('connections-layer');
@@ -246,44 +249,6 @@ export const Editor = {
 
             const iconPath = iconStr ? ItemsDB.getImageUrl(iconStr) : '';
             node.innerHTML = `${iconPath ? `<img src="${iconPath}" loading="lazy">` : ''}<div class="node-title">${ItemsDB.formatMC(quest.title)}</div>`;
-
-            node.addEventListener('mousedown', (e) => {
-                if (e.button === 0 && Auth.user) {
-                    if (e.shiftKey || this.linkingFromNodeId) {
-                        e.stopPropagation();
-                        if (!this.linkingFromNodeId) this.linkingFromNodeId = quest.id;
-                        else {
-                            if (this.linkingFromNodeId !== quest.id) {
-                                if (!quest.parents) quest.parents = [];
-                                const idx = quest.parents.indexOf(this.linkingFromNodeId);
-                                if (idx > -1) quest.parents.splice(idx, 1);
-                                else quest.parents.push(this.linkingFromNodeId);
-                                this.triggerAutoSave(); 
-                            }
-                            this.linkingFromNodeId = null;
-                        }
-                        this.renderCanvas();
-                    } else {
-                        e.stopPropagation(); this.draggedQuestId = quest.id; this.hasMovedNode = false;
-                        this.mouseStartX = e.clientX; this.mouseStartY = e.clientY;
-                        this.nodeStartX = quest.x; this.nodeStartY = quest.y;
-                    }
-                }
-            });
-
-            node.addEventListener('click', (e) => {
-                if (e.button !== 0 || (e.shiftKey && Auth.user) || this.hasMovedNode) return; 
-                this.openQuestViewModal(quest.id);
-            });
-
-            node.addEventListener('contextmenu', (e) => {
-                e.preventDefault(); e.stopPropagation();
-                if (!Auth.user) return; 
-                this.contextNodeId = quest.id;
-                const menu = document.getElementById('node-context-menu');
-                menu.style.left = `${e.clientX}px`; menu.style.top = `${e.clientY}px`;
-                menu.classList.remove('hidden');
-            });
 
             nodesFragment.appendChild(node);
         });
@@ -335,7 +300,7 @@ export const Editor = {
                 const consumeTag = (r.taskType !== 'hunt' && r.taskType !== 'block_break' && r.taskType !== 'checkbox' && r.taskType !== 'xp') 
                     ? (r.consume !== false ? '<span style="color:#ff5555; font-size:12px; margin-left:6px;">[Забрать]</span>' : '<span style="color:#aaaaaa; font-size:12px; margin-left:6px;">[Наличие]</span>')
                     : '';
-                reqHtml += `<div class="tt-item"><img src="${ItemsDB.getImageUrl(r.item.image)}" loading="lazy">${r.count}x ${this.getTaskLabel(r)}${consumeTag}</div>`; 
+                reqHtml += `<div class="tt-item"><img src="${ItemsDB.getImageUrl(r.item.image)}" loading="lazy">${this.getTaskLabel(r)} x${r.count}${consumeTag}</div>`; 
             });
         } else reqHtml = 'Нет требований';
         document.getElementById('tt-reqs').innerHTML = reqHtml;
@@ -344,7 +309,7 @@ export const Editor = {
         if (quest.rewards && quest.rewards.length > 0) {
             quest.rewards.forEach(r => { 
                 const choiceTag = r.isChoice ? '<span style="color:#ffff55; font-size:12px; margin-left:6px;">[На выбор]</span>' : '';
-                rewHtml += `<div class="tt-item"><img src="${ItemsDB.getImageUrl(r.item.image)}" loading="lazy">${r.count}x ${this.getRewardLabel(r)}${choiceTag}</div>`; 
+                rewHtml += `<div class="tt-item"><img src="${ItemsDB.getImageUrl(r.item.image)}" loading="lazy">${this.getRewardLabel(r)} x${r.count}${choiceTag}</div>`; 
             });
         } else rewHtml = 'Нет наград';
         document.getElementById('tt-rewards').innerHTML = rewHtml;
@@ -392,21 +357,16 @@ export const Editor = {
         document.getElementById('btn-save-nbt').addEventListener('click', () => {
             const text = document.getElementById('nbt-editor-textarea').value;
             const errDiv = document.getElementById('nbt-editor-error');
-            
             try {
                 const parsed = text.trim() === '' || text.trim() === '{}' ? null : JSON.parse(text);
-                
                 if (this.tempNbtTarget) {
                     this.tempNbtTarget.nbtTag = parsed;
                     this.tempNbtTarget.customName = BQ.getCustomName(this.tempNbtTarget.item, parsed);
                 }
-                
                 document.getElementById('nbt-editor-modal').classList.add('hidden');
                 errDiv.innerText = '';
                 this.renderQuestEditForm(); 
-            } catch(e) {
-                errDiv.innerText = 'Ошибка JSON! Проверьте скобки и запятые. Подробно: ' + e.message;
-            }
+            } catch(e) { errDiv.innerText = 'Ошибка JSON! ' + e.message; }
         });
     },
 
@@ -414,40 +374,29 @@ export const Editor = {
         this.tempReqs.forEach((r, idx) => {
             const typeSel = document.getElementById(`req-type-${idx}`);
             if(typeSel) r.taskType = typeSel.value;
-
             const countInp = document.getElementById(`req-count-${idx}`);
             if (countInp) r.count = countInp.value;
-            
             const targetInp = document.getElementById(`req-target-${idx}`);
             const nameInp = document.getElementById(`req-name-${idx}`);
-
             if (r.taskType === 'hunt' || r.taskType === 'fluid') {
                 if (targetInp) { r.target = targetInp.value; r.customName = targetInp.value; }
             } else if (r.taskType !== 'xp' && r.taskType !== 'checkbox') {
                 if (nameInp) r.customName = nameInp.value;
             }
-
             const consumeCb = document.getElementById(`req-consume-${idx}`);
             if (consumeCb) r.consume = consumeCb.checked;
         });
-        
         this.tempRewards.forEach((r, idx) => {
             const typeSel = document.getElementById(`rew-type-${idx}`);
             if(typeSel) r.taskType = typeSel.value;
-
             const countInp = document.getElementById(`rew-count-${idx}`);
             if (countInp) r.count = countInp.value;
-
             const nameInp = document.getElementById(`rew-name-${idx}`);
             const cmdInp = document.getElementById(`rew-command-${idx}`);
             const tierSel = document.getElementById(`rew-tier-${idx}`);
             const choiceCb = document.getElementById(`rew-choice-${idx}`);
-
-            if (r.taskType === 'command') {
-                if (cmdInp) r.command = cmdInp.value;
-            } else if (r.taskType !== 'xp') {
-                if (nameInp) r.customName = nameInp.value;
-            }
+            if (r.taskType === 'command') { if (cmdInp) r.command = cmdInp.value; } 
+            else if (r.taskType !== 'xp') { if (nameInp) r.customName = nameInp.value; }
             if (tierSel) r.damage = parseInt(tierSel.value);
             if (choiceCb) r.isChoice = choiceCb.checked;
         });
@@ -455,44 +404,33 @@ export const Editor = {
 
     copyQuest(questId) {
         const mod = this.getActiveMod();
-        const originalQuest = mod.quests.find(q => q.id === questId);
-        if (!originalQuest) return;
-
+        const q = mod.quests.find(q => q.id === questId);
+        if (!q) return;
         const newQuest = {
-            id: 'q_' + Date.now(),
-            x: originalQuest.x + 60, y: originalQuest.y + 60, 
-            title: originalQuest.title + ' (Копия)', desc: originalQuest.desc,
-            size: originalQuest.size, icon: originalQuest.icon,
-            reqs: JSON.parse(JSON.stringify(originalQuest.reqs || [])),
-            rewards: JSON.parse(JSON.stringify(originalQuest.rewards || [])),
-            parents: [] 
+            id: 'q_' + Date.now(), x: q.x + 60, y: q.y + 60, title: q.title + ' (Копия)', desc: q.desc,
+            size: q.size, icon: q.icon, reqs: JSON.parse(JSON.stringify(q.reqs || [])),
+            rewards: JSON.parse(JSON.stringify(q.rewards || [])), parents: [] 
         };
-
         mod.quests.push(newQuest);
-        DB.logAction(`Скопировал квест: ${originalQuest.title}`);
         this.triggerAutoSave(); this.renderCanvas();
     },
 
     bindQuestModalEvents() {
         const modal = document.getElementById('quest-edit-modal');
-        
         document.getElementById('btn-close-view').addEventListener('click', () => document.getElementById('quest-view-modal').classList.add('hidden'));
-        
         document.getElementById('btn-toggle-all-consume').addEventListener('click', () => {
             this.saveTempState(); 
-            const targetState = this.tempReqs.some(r => r.consume === false);
-            this.tempReqs.forEach(r => r.consume = targetState);
+            const target = this.tempReqs.some(r => r.consume === false);
+            this.tempReqs.forEach(r => r.consume = target);
             this.renderQuestEditForm();
         });
-
         document.getElementById('btn-select-quest-icon').addEventListener('click', () => {
             this.saveTempState();
             this.openItemPicker((item) => {
                 this.tempQuestIcon = item.image;
-                document.getElementById('quest-icon-preview').innerHTML = `<img src="${ItemsDB.getImageUrl(item.image)}" style="width: 32px; height: 32px; image-rendering: pixelated;">`;
+                document.getElementById('quest-icon-preview').innerHTML = `<img src="${ItemsDB.getImageUrl(item.image)}" style="width:32px; height:32px; image-rendering:pixelated;">`;
             });
         });
-
         document.getElementById('btn-add-req').addEventListener('click', () => {
             this.saveTempState();
             this.openItemPicker((item) => { 
@@ -500,7 +438,6 @@ export const Editor = {
                 this.renderQuestEditForm(); 
             });
         });
-
         document.getElementById('btn-add-reward').addEventListener('click', () => {
             this.saveTempState();
             this.openItemPicker((item) => { 
@@ -508,40 +445,27 @@ export const Editor = {
                 this.renderQuestEditForm(); 
             });
         });
-
         document.getElementById('btn-save-quest').addEventListener('click', () => {
             this.saveTempState(); 
-            
             const mod = this.getActiveMod();
-            const title = document.getElementById('quest-title').value || 'Новый квест';
-            const desc = document.getElementById('quest-desc').value;
-            const size = document.getElementById('quest-size').value;
-
-            if (this.editingNodeId) {
-                const q = mod.quests.find(q => q.id === this.editingNodeId);
-                q.title = title; q.desc = desc; q.size = size; q.icon = this.tempQuestIcon;
-                q.reqs = [...this.tempReqs]; q.rewards = [...this.tempRewards];
-                DB.logAction(`Отредактировал квест: ${title}`);
-            } else {
-                mod.quests.push({
-                    id: 'q_' + Date.now(), x: this.newQuestX, y: this.newQuestY,
-                    title: title, desc: desc, size: size, icon: this.tempQuestIcon,
-                    reqs: [...this.tempReqs], rewards: [...this.tempRewards], parents: []
-                });
-                DB.logAction(`Создал квест: ${title}`);
-            }
-            this.triggerAutoSave();
-            modal.classList.add('hidden');
-            this.renderCanvas();
+            const q = this.editingNodeId ? mod.quests.find(q => q.id === this.editingNodeId) : null;
+            const data = {
+                title: document.getElementById('quest-title').value || 'Безымянный квест',
+                desc: document.getElementById('quest-desc').value,
+                size: document.getElementById('quest-size').value,
+                icon: this.tempQuestIcon, reqs: [...this.tempReqs], rewards: [...this.tempRewards]
+            };
+            if (q) Object.assign(q, data);
+            else mod.quests.push({ id: 'q_' + Date.now(), x: this.newQuestX, y: this.newQuestY, parents: [], ...data });
+            this.triggerAutoSave(); modal.classList.add('hidden'); this.renderCanvas();
         });
-
         document.getElementById('btn-delete-quest').addEventListener('click', () => {
             if(this.editingNodeId && confirm('Удалить квест?')) {
-                this.deleteQuest(this.editingNodeId);
-                modal.classList.add('hidden');
+                const mod = this.getActiveMod();
+                mod.quests = mod.quests.filter(q => q.id !== this.editingNodeId);
+                this.triggerAutoSave(); modal.classList.add('hidden'); this.renderCanvas();
             }
         });
-
         document.getElementById('btn-close-quest').addEventListener('click', () => modal.classList.add('hidden'));
     },
 
@@ -549,273 +473,91 @@ export const Editor = {
         const mod = this.getActiveMod();
         const quest = mod.quests.find(q => q.id === questId);
         if (!quest) return;
-
         const modal = document.getElementById('quest-view-modal');
-        
-        let iconStr = '';
-        if (quest.icon) iconStr = quest.icon;
-        else if (quest.reqs && quest.reqs.length > 0) iconStr = quest.reqs[0].item.image;
-        
-        document.getElementById('view-quest-icon').innerHTML = iconStr ? `<img src="${ItemsDB.getImageUrl(iconStr)}" style="width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated;">` : '';
+        let iconStr = quest.icon || (quest.reqs?.[0]?.item?.image);
+        document.getElementById('view-quest-icon').innerHTML = iconStr ? `<img src="${ItemsDB.getImageUrl(iconStr)}" style="width:100%; height:100%; object-fit:contain; image-rendering:pixelated;">` : '';
         document.getElementById('view-quest-title').innerHTML = ItemsDB.formatMC(quest.title);
         document.getElementById('view-quest-desc').innerHTML = ItemsDB.formatMC(quest.desc || 'Нет описания.');
+        
+        document.getElementById('view-reqs-list').innerHTML = (quest.reqs || []).map(r => `
+            <div class="view-item-row">
+                <div class="mc-slot"><img src="${ItemsDB.getImageUrl(r.item.image)}"></div>
+                <div class="item-info"><span class="item-name">${this.getTaskLabel(r)} x${r.count}</span></div>
+            </div>
+        `).join('') || '<div style="padding:15px; color:#aaa;">Нет требований</div>';
 
-        const reqsBox = document.getElementById('view-reqs-list');
-        let reqsHtml = '';
-        if (quest.reqs && quest.reqs.length > 0) {
-            quest.reqs.forEach(r => {
-                const consumeText = (r.taskType !== 'hunt' && r.taskType !== 'block_break' && r.taskType !== 'checkbox' && r.taskType !== 'xp') 
-                    ? (r.consume !== false ? '<span style="color:#ff5555;">[Забирается]</span>' : '<span style="color:#aaaaaa;">[Только наличие]</span>')
-                    : '';
-                reqsHtml += `
-                    <div class="view-item-row">
-                        <div class="mc-slot"><img src="${ItemsDB.getImageUrl(r.item.image)}" loading="lazy"></div>
-                        <div class="item-info">
-                            <span class="item-name">${r.count}x ${this.getTaskLabel(r)}</span>
-                            <span class="item-meta">${consumeText}</span>
-                        </div>
-                    </div>
-                `;
-            });
-        } else {
-            reqsHtml = '<div style="padding: 15px; color: #aaa; font-size: 16px;">Нет требований</div>';
-        }
-        reqsBox.innerHTML = reqsHtml;
-
-        const rewsBox = document.getElementById('view-rewards-list');
-        let rewsHtml = ''; 
-        if (quest.rewards && quest.rewards.length > 0) {
-            quest.rewards.forEach(r => {
-                const choiceText = r.isChoice ? '<span style="color:#ffff55;">[На выбор]</span>' : '<span style="color:#55ff55;">[Гарантировано]</span>';
-                rewsHtml += `
-                    <div class="view-item-row">
-                        <div class="mc-slot"><img src="${ItemsDB.getImageUrl(r.item.image)}" loading="lazy"></div>
-                        <div class="item-info">
-                            <span class="item-name">${r.count}x ${this.getRewardLabel(r)}</span>
-                            <span class="item-meta">${choiceText}</span>
-                        </div>
-                    </div>
-                `;
-            });
-        } else {
-            rewsHtml = '<div style="padding: 15px; color: #aaa; font-size: 16px;">Нет наград</div>';
-        }
-        rewsBox.innerHTML = rewsHtml;
-
+        document.getElementById('view-rewards-list').innerHTML = (quest.rewards || []).map(r => `
+            <div class="view-item-row">
+                <div class="mc-slot"><img src="${ItemsDB.getImageUrl(r.item.image)}"></div>
+                <div class="item-info"><span class="item-name">${this.getRewardLabel(r)} x${r.count}</span></div>
+            </div>
+        `).join('') || '<div style="padding:15px; color:#aaa;">Нет наград</div>';
         modal.classList.remove('hidden');
     },
 
     openQuestModal(questId = null) {
         this.editingNodeId = questId;
         const modal = document.getElementById('quest-edit-modal');
-        document.getElementById('btn-delete-quest').style.display = questId ? 'inline-block' : 'none';
-
-        if (questId) {
-            const q = this.getActiveMod().quests.find(q => q.id === questId);
-            document.getElementById('quest-title').value = q.title || '';
-            document.getElementById('quest-desc').value = q.desc || '';
-            document.getElementById('quest-size').value = getSafeSize(q.size);
-            this.tempQuestIcon = q.icon || null;
-            
-            let reqs = q.reqs || [];
-            if (q.req && reqs.length === 0) reqs = [q.req]; 
-            
-            this.tempReqs = JSON.parse(JSON.stringify(reqs));
-            this.tempRewards = q.rewards ? JSON.parse(JSON.stringify(q.rewards)) : [];
-        } else {
-            document.getElementById('quest-title').value = '';
-            document.getElementById('quest-desc').value = '';
-            document.getElementById('quest-size').value = 'x1';
-            this.tempQuestIcon = null;
-            this.tempReqs = []; this.tempRewards = [];
-        }
-        
-        document.getElementById('quest-icon-preview').innerHTML = this.tempQuestIcon ? `<img src="${ItemsDB.getImageUrl(this.tempQuestIcon)}" style="width: 32px; height: 32px; image-rendering: pixelated;">` : '';
+        const q = questId ? this.getActiveMod().quests.find(q => q.id === questId) : null;
+        document.getElementById('quest-title').value = q ? q.title : '';
+        document.getElementById('quest-desc').value = q ? q.desc : '';
+        document.getElementById('quest-size').value = q ? getSafeSize(q.size) : 'x1';
+        this.tempQuestIcon = q ? q.icon : null;
+        this.tempReqs = q ? JSON.parse(JSON.stringify(q.reqs || [])) : [];
+        this.tempRewards = q ? JSON.parse(JSON.stringify(q.rewards || [])) : [];
+        document.getElementById('quest-icon-preview').innerHTML = this.tempQuestIcon ? `<img src="${ItemsDB.getImageUrl(this.tempQuestIcon)}" style="width:32px; height:32px; image-rendering:pixelated;">` : '';
         this.renderQuestEditForm();
         modal.classList.remove('hidden');
     },
 
     renderQuestEditForm() {
-        const reqBox = document.getElementById('reqs-list');
-        reqBox.innerHTML = '';
-        this.tempReqs.forEach((r, idx) => {
-            const div = document.createElement('div');
-            div.className = 'reward-row';
-            const tType = r.taskType || 'retrieval';
-            const isChecked = r.consume !== false ? 'checked' : '';
+        const renderList = (box, list, isRew) => {
+            box.innerHTML = list.map((r, idx) => {
+                const t = r.taskType || (isRew ? 'item' : 'retrieval');
+                const nbtStyle = r.nbtTag ? 'color:#55ffff; border-color:#55ffff;' : '';
+                const isLoot = isRew && r.item?.item_key === 'bq_standard:loot_chest';
+                return `
+                    <div class="reward-row">
+                        <div class="mc-slot item-icon-btn" data-idx="${idx}" style="cursor:pointer; flex-shrink:0;">
+                            <img src="${ItemsDB.getImageUrl(r.item.image)}" width="24" height="24">
+                        </div>
+                        <input type="number" id="${isRew?'rew':'req'}-count-${idx}" class="mc-input" style="width:60px;" value="${r.count}">
+                        <input type="text" id="${isRew?'rew':'req'}-name-${idx}" class="mc-input custom-name-input" value="${r.customName || ''}">
+                        <button class="mc-button btn-nbt" data-idx="${idx}" style="${nbtStyle}">[NBT]</button>
+                        <button class="mc-button danger" data-idx="${idx}">X</button>
+                    </div>
+                `;
+            }).join('');
             
-            let targetInputHtml = '';
-            if (tType === 'hunt') targetInputHtml = `<input type="text" id="req-target-${idx}" list="mob-list" class="mc-input custom-name-input" value="${r.target || r.customName || ''}" placeholder="Моб (напр. Creeper)">`;
-            else if (tType === 'fluid') targetInputHtml = `<input type="text" id="req-target-${idx}" class="mc-input custom-name-input" value="${r.target || r.customName || ''}" placeholder="Жидкость (напр. water)">`;
-            else if (tType === 'checkbox') targetInputHtml = `<input type="text" id="req-name-${idx}" class="mc-input custom-name-input" value="Нажать галочку" disabled>`;
-            else if (tType === 'xp') targetInputHtml = `<input type="text" id="req-name-${idx}" class="mc-input custom-name-input" value="Сдать уровни опыта" disabled>`;
-            else targetInputHtml = `<input type="text" id="req-name-${idx}" class="mc-input custom-name-input" value="${r.customName || ''}" placeholder="Название">`;
-
-            const showConsume = (tType === 'hunt' || tType === 'block_break' || tType === 'checkbox' || tType === 'xp') ? 'display:none;' : '';
-
-            let nbtBtnStyle = r.nbtTag ? 'color: #55ffff; border-color: #55ffff;' : '';
-
-            div.innerHTML = `
-                <div class="mc-slot item-icon-btn" title="Кликните чтобы изменить иконку" style="cursor: pointer; flex-shrink:0;">
-                    <img src="${ItemsDB.getImageUrl(r.item.image)}" width="24" height="24" loading="lazy">
-                </div>
-                
-                <select id="req-type-${idx}" class="mc-input task-type-select">
-                    <option value="retrieval" ${tType === 'retrieval' ? 'selected' : ''}>Принести</option>
-                    <option value="crafting" ${tType === 'crafting' ? 'selected' : ''}>Создать</option>
-                    <option value="block_break" ${tType === 'block_break' ? 'selected' : ''}>Сломать</option>
-                    <option value="hunt" ${tType === 'hunt' ? 'selected' : ''}>Убить</option>
-                    <option value="fluid" ${tType === 'fluid' ? 'selected' : ''}>Жидкость</option>
-                    <option value="xp" ${tType === 'xp' ? 'selected' : ''}>Опыт (Сдать)</option>
-                    <option value="checkbox" ${tType === 'checkbox' ? 'selected' : ''}>Галочка</option>
-                </select>
-
-                <input type="number" id="req-count-${idx}" class="mc-input" value="${r.count}" title="Количество">
-                ${targetInputHtml}
-                
-                <button class="mc-button btn-nbt" style="padding: 4px; font-size:12px; margin-left:5px; ${nbtBtnStyle}" title="NBT Данные">[NBT]</button>
-
-                <label class="mc-checkbox" title="Забирать предмет при сдаче квеста?" style="${showConsume}">
-                    <input type="checkbox" id="req-consume-${idx}" ${isChecked}> Забрать
-                </label>
-                <button class="mc-button danger" data-idx="${idx}">X</button>
-            `;
-            
-            div.querySelector('.item-icon-btn').addEventListener('click', () => {
+            box.querySelectorAll('.item-icon-btn').forEach(btn => btn.addEventListener('click', (e) => {
                 this.saveTempState();
-                this.openItemPicker((pickedItem) => { 
-                    this.tempReqs[idx].item = pickedItem; 
-                    this.tempReqs[idx].customName = BQ.getCustomName(pickedItem, this.tempReqs[idx].nbtTag);
+                this.openItemPicker((item) => { 
+                    list[btn.dataset.idx].item = item; 
+                    list[btn.dataset.idx].customName = BQ.getCustomName(item, list[btn.dataset.idx].nbtTag);
                     this.renderQuestEditForm(); 
                 });
-            });
-            div.querySelector('.task-type-select').addEventListener('change', (e) => {
-                this.saveTempState(); this.tempReqs[idx].taskType = e.target.value;
-                if(e.target.value === 'xp') this.tempReqs[idx].item = { item_key: 'xp', name: 'Опыт', image: 'experience_bottle.png', mod: 'Система' };
-                if(e.target.value === 'checkbox') this.tempReqs[idx].item = { item_key: 'checkbox', name: 'Галочка', image: 'checkbox.png', mod: 'Система' };
-                this.renderQuestEditForm(); 
-            });
-            
-            div.querySelector('.btn-nbt').addEventListener('click', () => {
+            }));
+            box.querySelectorAll('.btn-nbt').forEach(btn => btn.addEventListener('click', () => {
                 this.saveTempState();
-                this.tempNbtTarget = this.tempReqs[idx];
-                const currentNbt = this.tempReqs[idx].nbtTag ? JSON.stringify(this.tempReqs[idx].nbtTag, null, 2) : "";
-                document.getElementById('nbt-editor-textarea').value = currentNbt;
-                document.getElementById('nbt-editor-error').innerText = '';
+                this.tempNbtTarget = list[btn.dataset.idx];
+                document.getElementById('nbt-editor-textarea').value = JSON.stringify(this.tempNbtTarget.nbtTag || {}, null, 2);
                 document.getElementById('nbt-editor-modal').classList.remove('hidden');
-            });
-
-            div.querySelector('.danger').addEventListener('click', () => { this.tempReqs.splice(idx, 1); this.renderQuestEditForm(); });
-            reqBox.appendChild(div);
-        });
-
-        const rewBox = document.getElementById('rewards-list');
-        rewBox.innerHTML = '';
-        this.tempRewards.forEach((r, idx) => {
-            const div = document.createElement('div');
-            div.className = 'reward-row';
-            const rType = r.taskType || 'item';
-            const isChoice = r.isChoice ? 'checked' : '';
-            const isLootBox = (rType === 'item' && r.item && (r.item.string_id === 'bq_standard:loot_chest' || r.item.item_key === 'bq_standard:loot_chest'));
-            
-            let tierSelectHtml = '';
-            if (isLootBox) {
-                const groups = this.lootGroups || {};
-                const options = Object.entries(groups).map(([id, name]) => `<option value="${id}" ${r.damage == id ? 'selected' : ''}>${name}</option>`).join('');
-                const fallbackOption = !(r.damage in groups) ? `<option value="${r.damage || 0}" selected>Тир ${r.damage || 0}</option>` : '';
-                tierSelectHtml = `<select id="rew-tier-${idx}" class="mc-input task-type-select" style="width: 140px;">${options}${fallbackOption}</select>`;
-            }
-
-            let targetInputHtml = '';
-            if (rType === 'command') targetInputHtml = `<input type="text" id="rew-command-${idx}" class="mc-input custom-name-input" value="${r.command || ''}" placeholder="Консольная команда (без /)">`;
-            else if (rType === 'xp') targetInputHtml = `<input type="text" id="rew-name-${idx}" class="mc-input custom-name-input" value="Выдать уровни опыта" disabled>`;
-            else targetInputHtml = `<input type="text" id="rew-name-${idx}" class="mc-input custom-name-input" value="${r.customName || ''}" placeholder="Название">`;
-
-            const showChoice = (rType === 'command' || rType === 'xp') ? 'display:none;' : '';
-            let nbtBtnStyle = r.nbtTag ? 'color: #55ffff; border-color: #55ffff;' : '';
-
-            div.innerHTML = `
-                <div class="mc-slot item-icon-btn" title="Кликните чтобы изменить иконку" style="cursor: pointer; flex-shrink:0;">
-                    <img src="${ItemsDB.getImageUrl(r.item.image)}" width="24" height="24" loading="lazy">
-                </div>
-                
-                <select id="rew-type-${idx}" class="mc-input task-type-select">
-                    <option value="item" ${rType === 'item' ? 'selected' : ''}>Предмет</option>
-                    <option value="command" ${rType === 'command' ? 'selected' : ''}>Команда</option>
-                    <option value="xp" ${rType === 'xp' ? 'selected' : ''}>Опыт</option>
-                </select>
-
-                <input type="number" id="rew-count-${idx}" class="mc-input" value="${r.count}" title="Количество">
-                
-                ${isLootBox ? tierSelectHtml : ''}
-                ${targetInputHtml}
-
-                <button class="mc-button btn-nbt" style="padding: 4px; font-size:12px; margin-left:5px; ${rType !== 'item' ? 'display:none;' : ''} ${nbtBtnStyle}" title="NBT Данные">[NBT]</button>
-
-                <label class="mc-checkbox" title="Предлагать этот предмет на выбор?" style="${showChoice}">
-                    <input type="checkbox" id="rew-choice-${idx}" ${isChoice}> На выбор
-                </label>
-                <button class="mc-button danger" data-idx="${idx}">X</button>
-            `;
-            
-            div.querySelector('.item-icon-btn').addEventListener('click', () => {
-                this.saveTempState();
-                this.openItemPicker((pickedItem) => { 
-                    this.tempRewards[idx].item = pickedItem; 
-                    this.tempRewards[idx].customName = BQ.getCustomName(pickedItem, this.tempRewards[idx].nbtTag);
-                    this.renderQuestEditForm(); 
-                });
-            });
-            div.querySelector('.task-type-select').addEventListener('change', (e) => {
-                this.saveTempState(); this.tempRewards[idx].taskType = e.target.value;
-                if(e.target.value === 'xp') this.tempRewards[idx].item = { item_key: 'xp', name: 'Опыт', image: 'experience_bottle.png', mod: 'Система' };
-                if(e.target.value === 'command') this.tempRewards[idx].item = { item_key: 'command', name: 'Команда', image: 'command_block.png', mod: 'Система' };
-                this.renderQuestEditForm(); 
-            });
-            
-            if(rType === 'item') {
-                div.querySelector('.btn-nbt').addEventListener('click', () => {
-                    this.saveTempState();
-                    this.tempNbtTarget = this.tempRewards[idx];
-                    const currentNbt = this.tempRewards[idx].nbtTag ? JSON.stringify(this.tempRewards[idx].nbtTag, null, 2) : "";
-                    document.getElementById('nbt-editor-textarea').value = currentNbt;
-                    document.getElementById('nbt-editor-error').innerText = '';
-                    document.getElementById('nbt-editor-modal').classList.remove('hidden');
-                });
-            }
-            div.querySelector('.danger').addEventListener('click', () => { this.tempRewards.splice(idx, 1); this.renderQuestEditForm(); });
-            rewBox.appendChild(div);
-        });
+            }));
+            box.querySelectorAll('.danger').forEach(btn => btn.addEventListener('click', () => { list.splice(btn.dataset.idx, 1); this.renderQuestEditForm(); }));
+        };
+        renderList(document.getElementById('reqs-list'), this.tempReqs, false);
+        renderList(document.getElementById('rewards-list'), this.tempRewards, true);
     },
 
     bindItemPickerEvents() {
         const modal = document.getElementById('item-picker-modal');
-        const filterMod = document.getElementById('picker-mod-filter');
+        const resultsContainer = document.getElementById('picker-results');
         const searchInp = document.getElementById('picker-search');
         
-        const resultsContainer = document.getElementById('picker-results');
-        const favContainer = document.getElementById('picker-fav-results');
-        const lootContainer = document.getElementById('picker-loot-results');
-
-        let currentSearchData = [];
-        let itemsLimit = 50;
-
-        const createItemElement = (item, isLootbox = false) => {
+        const createItemElement = (item, isLoot = false) => {
             const div = document.createElement('div');
             div.className = 'search-result-item';
-            
-            if (isLootbox) {
-                div.innerHTML = `<img src="${ItemsDB.getImageUrl(item.image)}" width="32" height="32" loading="lazy"><span>🎁 ${item.name} <small style="color:#888;">[Лутбокс]</small></span>`;
-            } else {
-                const isFav = ItemsDB.favorites.includes(item.item_key);
-                div.innerHTML = `<span class="fav-star ${isFav ? 'active' : ''}" data-key="${item.item_key}">★</span><img src="${ItemsDB.getImageUrl(item.image)}" width="32" height="32" loading="lazy"><span>${ItemsDB.formatMC(item.name)} <small style="color:#888;">[${item.mod}]</small></span>`;
-                div.querySelector('.fav-star').addEventListener('click', (e) => { 
-                    e.stopPropagation(); 
-                    ItemsDB.toggleFavorite(item.item_key); 
-                    updateBothLists(); 
-                });
-            }
-            
+            div.innerHTML = `<img src="${ItemsDB.getImageUrl(item.image)}" width="32" height="32" loading="lazy"><span>${ItemsDB.formatMC(item.name)}</span>`;
             div.addEventListener('click', () => { 
                 modal.classList.add('hidden'); 
                 if (this.pickerCallback) this.pickerCallback(item); 
@@ -823,274 +565,80 @@ export const Editor = {
             return div;
         };
 
-        const renderMainResults = () => {
-            resultsContainer.innerHTML = '';
-            const fragment = document.createDocumentFragment(); 
-            currentSearchData.slice(0, itemsLimit).forEach(item => fragment.appendChild(createItemElement(item)));
-            resultsContainer.appendChild(fragment);
-        };
-
-        const renderFavResults = () => {
-            favContainer.innerHTML = '';
-            const fragment = document.createDocumentFragment();
-            ItemsDB.getFavorites().forEach(item => fragment.appendChild(createItemElement(item)));
-            favContainer.appendChild(fragment);
-        };
-
-        // НОВОЕ: Рендер Лутбоксов в правой панели
-        const renderLootResults = () => {
-            if (!lootContainer) return;
-            lootContainer.innerHTML = '';
-            
-            if (Object.keys(this.lootGroups || {}).length === 0) {
-                lootContainer.innerHTML = '<div style="padding:10px; color:#666; font-size:14px; text-align:center;">База лутбоксов не загружена</div>';
-                return;
-            }
-
-            const fragment = document.createDocumentFragment();
-            Object.entries(this.lootGroups).forEach(([id, name]) => {
-                const mockLootItem = {
-                    item_key: 'bq_standard:loot_chest',
-                    string_id: 'bq_standard:loot_chest',
-                    name: name,
-                    image: 'chest.png', // Дефолтная иконка сундука
-                    damage: parseInt(id),
-                    mod: 'Лутбоксы'
-                };
-                fragment.appendChild(createItemElement(mockLootItem, true));
-            });
-            lootContainer.appendChild(fragment);
-        };
-
-        const updateBothLists = () => {
-            renderMainResults();
-            renderFavResults();
-            renderLootResults();
-        };
-
         const triggerSearch = () => {
-            currentSearchData = ItemsDB.search(searchInp.value, filterMod.value);
-            itemsLimit = 50; 
-            resultsContainer.scrollTop = 0;
-            updateBothLists();
+            const data = ItemsDB.search(searchInp.value, '');
+            resultsContainer.innerHTML = '';
+            const frag = document.createDocumentFragment();
+            data.slice(0, 50).forEach(item => frag.appendChild(createItemElement(item)));
+            resultsContainer.appendChild(frag);
         };
 
         searchInp.addEventListener('input', triggerSearch);
-        filterMod.addEventListener('change', triggerSearch);
-        
-        resultsContainer.addEventListener('scroll', () => {
-            if (resultsContainer.scrollTop + resultsContainer.clientHeight >= resultsContainer.scrollHeight - 20) {
-                if (itemsLimit < currentSearchData.length) {
-                    itemsLimit += 50;
-                    renderMainResults();
-                }
-            }
-        });
-
         document.getElementById('btn-picker-cancel').addEventListener('click', () => modal.classList.add('hidden'));
-
-        document.getElementById('btn-upload-custom-item').addEventListener('click', () => {
-            const fileInput = document.getElementById('custom-item-file');
-            const nameInput = document.getElementById('custom-item-name');
-            const file = fileInput.files[0];
-            const name = nameInput.value.trim();
-
-            if (!file) return alert("Выберите картинку!");
-            if (!name) return alert("Введите название предмета!");
-
-            const btn = document.getElementById('btn-upload-custom-item');
-            btn.innerText = "Грузим...";
-            btn.disabled = true;
-
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                const img = new Image();
-                img.onload = async function() {
-                    const canvas = document.createElement('canvas');
-                    const MAX_SIZE = 64; 
-                    let width = img.width;
-                    let height = img.height;
-
-                    if (width > height) {
-                        if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
-                    } else {
-                        if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-
-                    const base64String = canvas.toDataURL('image/png');
-                    const newItem = await DB.saveCustomItem(name, base64String);
-
-                    btn.innerText = "Добавить";
-                    btn.disabled = false;
-                    fileInput.value = '';
-                    nameInput.value = '';
-
-                    if (newItem) {
-                        ItemsDB.addCustomItems([newItem]);
-                        searchInp.value = name;
-                        triggerSearch(); 
-                    }
-                };
-                img.src = event.target.result;
-            };
-            reader.readAsDataURL(file);
-        });
 
         this.openItemPicker = (cb) => {
             this.pickerCallback = cb;
-            if (filterMod.options.length <= 1) {
-                filterMod.innerHTML = '<option value="">Все моды</option>';
-                ItemsDB.mods.forEach(m => filterMod.innerHTML += `<option value="${m}">${m}</option>`);
-            }
             searchInp.value = '';
             triggerSearch();
+            
+            // Рендер лутбоксов в правую панель
+            const lootBox = document.getElementById('picker-loot-results');
+            lootBox.innerHTML = Object.entries(this.lootGroups).map(([id, name]) => `
+                <div class="search-result-item loot-item" data-id="${id}" data-name="${name}">
+                    <img src="${ItemsDB.getImageUrl('chest.png')}" width="24" height="24">
+                    <span>${ItemsDB.formatMC(name)}</span>
+                </div>
+            `).join('') || '<div style="color:#666; font-size:12px; padding:10px;">Нет лутбоксов</div>';
+            
+            lootBox.querySelectorAll('.loot-item').forEach(btn => btn.addEventListener('click', () => {
+                modal.classList.add('hidden');
+                cb({ item_key: 'bq_standard:loot_chest', string_id: 'bq_standard:loot_chest', name: btn.dataset.name, image: 'chest.png', damage: parseInt(btn.dataset.id) });
+            }));
+
             modal.classList.remove('hidden');
-            setTimeout(() => searchInp.focus(), 50); 
         };
     },
 
     bindModModalEvents() {
         const modal = document.getElementById('add-mod-modal');
-
         document.getElementById('btn-add-mod').addEventListener('click', () => {
             this.editingModId = null; this.tempModIcon = null;
             document.getElementById('new-mod-name').value = '';
             document.getElementById('mod-icon-preview').innerHTML = '';
-            document.getElementById('mod-modal-title').innerText = 'Новая ветка';
             modal.classList.remove('hidden');
         });
-
         document.getElementById('btn-close-mod').addEventListener('click', () => modal.classList.add('hidden'));
-
         document.getElementById('btn-select-mod-icon').addEventListener('click', () => {
             this.openItemPicker((item) => {
                 this.tempModIcon = item.image;
-                document.getElementById('mod-icon-preview').innerHTML = `<div class="mc-slot"><img src="${ItemsDB.getImageUrl(item.image)}" width="32" height="32" loading="lazy"></div>`;
+                document.getElementById('mod-icon-preview').innerHTML = `<div class="mc-slot"><img src="${ItemsDB.getImageUrl(item.image)}" width="32" height="32"></div>`;
             });
         });
-
         document.getElementById('btn-save-mod').addEventListener('click', () => {
             const name = document.getElementById('new-mod-name').value;
-            if (!name || !this.tempModIcon) return alert('Введите название и выберите иконку!');
-            
+            if (!name || !this.tempModIcon) return alert('Заполните данные!');
             if (this.editingModId) {
-                const mod = this.data.mods.find(m => m.id === this.editingModId);
-                mod.name = name; mod.icon = this.tempModIcon;
-                DB.logAction(`Изменил ветку: ${name}`);
+                const m = this.data.mods.find(m => m.id === this.editingModId);
+                m.name = name; m.icon = this.tempModIcon;
             } else {
-                const id = 'mod_' + Date.now();
-                this.data.mods.push({ id, name, icon: this.tempModIcon, quests: [] });
-                this.activeModId = id;
-                DB.logAction(`Создал ветку: ${name}`);
+                this.data.mods.push({ id: 'mod_' + Date.now(), name, icon: this.tempModIcon, quests: [] });
             }
-            
-            this.triggerAutoSave();
-            modal.classList.add('hidden');
-            this.renderSidebar(); this.renderCanvas();
+            this.triggerAutoSave(); modal.classList.add('hidden'); this.renderSidebar();
         });
     },
 
     renderSidebar() {
-        const list = document.getElementById('mod-list');
-        list.innerHTML = '';
-        
-        let draggedIndex = null;
-        let draggedLi = null;
-
-        const fragment = document.createDocumentFragment(); 
-
-        this.data.mods.forEach((mod, index) => {
-            const li = document.createElement('li');
-            li.className = 'mod-item';
-            if (this.activeModId === mod.id) li.classList.add('active');
-            
-            li.innerHTML = `
+        document.getElementById('mod-list').innerHTML = this.data.mods.map((mod) => `
+            <li class="mod-item ${this.activeModId === mod.id ? 'active' : ''}" data-id="${mod.id}">
                 <div class="mod-item-content">
-                    <img src="${ItemsDB.getImageUrl(mod.icon)}" width="24" height="24" loading="lazy">
+                    <img src="${ItemsDB.getImageUrl(mod.icon)}" width="24" height="24">
                     <span>${ItemsDB.formatMC(mod.name)}</span>
                 </div>
-                <div class="mod-item-actions admin-only">
-                    <button class="mod-btn edit" title="Редактировать">✏️</button>
-                    <button class="mod-btn delete" title="Удалить">❌</button>
-                </div>
-            `;
-            
-            li.querySelector('.mod-item-content').addEventListener('click', () => {
-                this.activeModId = mod.id;
-                this.renderSidebar(); this.renderCanvas(); 
-                this.centerCanvas(); 
-            });
-
-            if (Auth.user) {
-                li.draggable = true;
-
-                li.addEventListener('dragstart', (e) => {
-                    draggedLi = li; draggedIndex = index; e.dataTransfer.effectAllowed = 'move';
-                    setTimeout(() => li.style.opacity = '0.5', 0); 
-                });
-
-                li.addEventListener('dragover', (e) => {
-                    e.preventDefault(); 
-                    if (draggedIndex === index) return;
-                    const rect = li.getBoundingClientRect();
-                    const midY = rect.top + rect.height / 2;
-                    if (e.clientY < midY) { li.classList.add('drag-top'); li.classList.remove('drag-bottom'); } 
-                    else { li.classList.add('drag-bottom'); li.classList.remove('drag-top'); }
-                });
-
-                li.addEventListener('dragleave', () => li.classList.remove('drag-top', 'drag-bottom'));
-                li.addEventListener('dragend', () => {
-                    if (draggedLi) draggedLi.style.opacity = '1';
-                    document.querySelectorAll('.mod-item').forEach(el => el.classList.remove('drag-top', 'drag-bottom'));
-                });
-
-                li.addEventListener('drop', (e) => {
-                    e.preventDefault(); li.classList.remove('drag-top', 'drag-bottom');
-                    if (draggedIndex === index || draggedIndex === null) return;
-
-                    const rect = li.getBoundingClientRect();
-                    const midY = rect.top + rect.height / 2;
-                    let newIndex = index;
-                    if (e.clientY > midY) newIndex++;
-                    if (draggedIndex < newIndex) newIndex--;
-
-                    const movedItem = this.data.mods.splice(draggedIndex, 1)[0];
-                    this.data.mods.splice(newIndex, 0, movedItem);
-
-                    DB.logAction(`Изменил порядок веток: ${movedItem.name}`);
-                    this.triggerAutoSave();
-                    this.renderSidebar();
-                });
-
-                li.querySelector('.edit').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.editingModId = mod.id; this.tempModIcon = mod.icon;
-                    document.getElementById('new-mod-name').value = mod.name;
-                    document.getElementById('mod-icon-preview').innerHTML = `<div class="mc-slot"><img src="${ItemsDB.getImageUrl(mod.icon)}" width="32" height="32"></div>`;
-                    document.getElementById('mod-modal-title').innerText = 'Редактировать ветку';
-                    document.getElementById('add-mod-modal').classList.remove('hidden');
-                });
-
-                li.querySelector('.delete').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    if (confirm(`Удалить ветку "${mod.name}" со всеми квестами?`)) {
-                        this.data.mods = this.data.mods.filter(m => m.id !== mod.id);
-                        if (this.activeModId === mod.id) this.activeModId = null;
-                        DB.logAction(`Удалил ветку: ${mod.name}`);
-                        this.triggerAutoSave();
-                        this.renderSidebar(); this.renderCanvas();
-                    }
-                });
-            }
-            fragment.appendChild(li);
-        });
-        
-        list.appendChild(fragment);
+            </li>
+        `).join('');
+        document.querySelectorAll('.mod-item').forEach(li => li.addEventListener('click', () => {
+            this.activeModId = li.dataset.id; this.renderSidebar(); this.renderCanvas(); this.centerCanvas();
+        }));
     },
 
     getActiveMod() { return this.data.mods.find(m => m.id === this.activeModId); }
