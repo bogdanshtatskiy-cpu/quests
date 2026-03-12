@@ -2,125 +2,159 @@ import { ItemsDB } from './items.js';
 import { DB } from './db.js';
 
 export const BQ = {
-    parseLootData(jsonString, editor) {
-        try {
-            const rawData = JSON.parse(jsonString);
-            const cleanKeys = (obj) => {
-                if (Array.isArray(obj)) return obj.map(cleanKeys);
-                if (obj !== null && typeof obj === 'object') {
-                    const cleaned = {};
-                    for (let key in obj) {
-                        const cleanKey = key.split(':')[0];
-                        cleaned[cleanKey] = cleanKeys(obj[key]);
-                    }
-                    return cleaned;
+    ENCHANTS: {
+        0: "Защита", 1: "Огнеупорность", 2: "Невесомость", 3: "Взрывоустойчивость", 4: "Защита от снарядов",
+        5: "Подводное дыхание", 6: "Подводник", 7: "Шипы", 8: "Печать души",
+        16: "Острота", 17: "Небесная кара", 18: "Бич членистоногих", 19: "Отбрасывание", 20: "Заговор огня", 21: "Добыча",
+        32: "Эффективность", 33: "Шелковое касание", 34: "Прочность", 35: "Удача",
+        45: "Опыт", 48: "Сила", 49: "Откидывание", 50: "Воспламенение", 51: "Бесконечность",
+        61: "Удача (Море)", 62: "Приманка", 100: "Урон (Кровь)", 101: "Яд", 102: "Замешательство", 103: "Бесконечность (Кровь)",
+        104: "Вместимость", 105: "Мультивыстрел", 180: "Жнец", 211: "Взрыв (OB)", 212: "Последний рывок", 213: "Флим-Флам"
+    },
+    FLUIDS: {
+        "water": "Вода", "lava": "Лава", "ender": "Жидкий эндериум", "redstone": "Дестабилизированный красный камень", 
+        "liquidnitrogen": "Жидкий азот", "sewage": "Нечистоты", "milk": "Молоко", "liquiddna": "Жидкая ДНК", 
+        "mutagen": "Мутаген", "aerotheum": "Зефирный аэротэум", "cryotheum": "Тектоновый криотэум", 
+        "for.honey": "Мёд", "meat": "Мясной сок", "protein": "Протеин", "pyrotheum": "Пылающий пиротеум", 
+        "chocolatemilk": "Шоколадное молоко", "poison": "Яд", "short.mead": "Медовуха", "juice": "Фруктовый сок", 
+        "ice": "Лед", "mushroomsoup": "Грибной суп", "rocket_fuel": "Ракетное топливо", "bioethanol": "Биоэтанол", 
+        "cloud_seed": "Облачное семя", "biofuel": "Биотопливо", "coal": "Жидкий уголь", "fire_water": "Огненная вода", 
+        "cloud_seed_concentrated": "Конц. облачное семя", "turpentine": "Скипидар", "pinkslime": "Розовая слизь", 
+        "biomass": "Биомасса", "glowstone": "Энергизированный светокамень", "hootch": "Самогон", 
+        "mobessence": "Эссенция мобов", "acid": "Кислота", "resin": "Смола", "nutrient_distillation": "Питательный дистиллят", 
+        "petrotheum": "Тектонический петротеум"
+    },
+
+    getRawValue(obj, keyPrefix) {
+        if(!obj) return null;
+        for(let k in obj) { if (k.startsWith(keyPrefix + ':') || k === keyPrefix) return obj[k]; }
+        return null;
+    },
+
+    getCustomName(itemKey, origName, tag) {
+        if (!tag) return origName;
+        if (itemKey.includes('enchanted_book')) {
+            const enchs = this.getRawValue(tag, 'StoredEnchantments');
+            if (enchs) {
+                const first = Object.values(enchs)[0];
+                if (first) {
+                    const id = this.getRawValue(first, 'id');
+                    const lvl = this.getRawValue(first, 'lvl');
+                    return `Книга: ${this.ENCHANTS[id] || 'Чары ' + id} (ур.${lvl})`;
                 }
-                return obj;
-            };
-            const data = cleanKeys(rawData);
-            
-            if (!editor.lootGroups) editor.lootGroups = {};
-            
-            if (data.groups) {
-                Object.values(data.groups).forEach(group => {
-                    editor.lootGroups[group.ID] = group.name;
-                });
-                alert('База лутбоксов (Loot Groups) успешно загружена! Теперь в квестах будут их настоящие названия.');
-            } else {
-                alert('Группы лутбоксов не найдены в файле!');
             }
-        } catch(e) {
-            console.error(e);
-            alert('Ошибка чтения QuestLoot.json');
         }
+        if (itemKey.includes('butterflyGE')) {
+            const genome = this.getRawValue(tag, 'Genome');
+            if (genome) {
+                const chromo = this.getRawValue(genome, 'Chromosomes');
+                if (chromo) {
+                    const zero = this.getRawValue(chromo, '0');
+                    if (zero) {
+                        const uid = this.getRawValue(zero, 'UID0');
+                        if (uid) return `Бабочка: ${uid.replace('forestry.lepi', '').replace('extrabutterflies.species.', '').replace('forestry.moth', '')}`;
+                    }
+                }
+            }
+        }
+        if (itemKey.includes('ThermalExpansion:Cache') || itemKey.includes('ThermalExpansion:Strongbox')) {
+            const inner = this.getRawValue(tag, 'Item');
+            if (inner) {
+                const id = this.getRawValue(inner, 'id');
+                const count = this.getRawValue(inner, 'Count');
+                return `Тайник (Внутри ID: ${id} x${count})`;
+            }
+        }
+        return origName;
     },
 
     parseData(jsonString, editor) {
         try {
             const rawData = JSON.parse(jsonString);
+            
             const cleanKeys = (obj) => {
                 if (Array.isArray(obj)) return obj.map(cleanKeys);
                 if (obj !== null && typeof obj === 'object') {
                     const cleaned = {};
                     for (let key in obj) {
                         const cleanKey = key.split(':')[0];
-                        cleaned[cleanKey] = cleanKeys(obj[key]);
+                        if (['tag', 'nbt', 'targetNBT'].includes(cleanKey)) {
+                            cleaned[cleanKey] = obj[key]; // Оставляем NBT сырым для правильного экспорта
+                        } else {
+                            cleaned[cleanKey] = cleanKeys(obj[key]);
+                        }
                     }
                     return cleaned;
                 }
                 return obj;
             };
+
             const data = cleanKeys(rawData);
             const questsMap = {};
 
             if (data.questDatabase) {
                 Object.entries(data.questDatabase).forEach(([qKey, q]) => {
-                    let actualId = q.questID !== undefined ? q.questID : qKey;
-                    actualId = String(actualId).split(':')[0];
-                    
-                    let reqs = [];
-                    let rewards = [];
+                    let actualId = String(q.questID !== undefined ? q.questID : qKey).split(':')[0];
+                    let reqs = []; let rewards = [];
                     
                     if (q.tasks) {
                         Object.values(q.tasks).forEach(task => {
                             if (task.requiredItems && task.taskID === 'bq_standard:retrieval') {
                                 Object.values(task.requiredItems).forEach(item => {
                                     const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage);
-                                    reqs.push({ item: foundItem, count: item.Count || 1, customName: foundItem.name === item.id ? item.id : foundItem.name, consume: task.consume || false, taskType: 'retrieval' });
+                                    reqs.push({ item: foundItem, count: item.Count || 1, customName: this.getCustomName(foundItem.item_key, item.id, item.tag), consume: task.consume || false, taskType: 'retrieval', nbtTag: item.tag });
                                 });
-                            }
-                            else if (task.requiredItems && task.taskID === 'bq_standard:crafting') {
+                            } else if (task.requiredItems && task.taskID === 'bq_standard:crafting') {
                                 Object.values(task.requiredItems).forEach(item => {
                                     const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage);
-                                    reqs.push({ item: foundItem, count: item.Count || 1, customName: foundItem.name === item.id ? item.id : foundItem.name, consume: false, taskType: 'crafting' });
+                                    reqs.push({ item: foundItem, count: item.Count || 1, customName: foundItem.name === item.id ? item.id : foundItem.name, consume: false, taskType: 'crafting', nbtTag: item.tag });
                                 });
-                            }
-                            else if (task.blocks && task.taskID === 'bq_standard:block_break') {
+                            } else if (task.blocks && task.taskID === 'bq_standard:block_break') {
                                 Object.values(task.blocks).forEach(block => {
                                     const foundItem = ItemsDB.findItemByBQ(block.blockID || block.id, block.meta || block.Damage);
-                                    reqs.push({ item: foundItem, count: block.amount || block.Count || 1, customName: foundItem.name === block.blockID ? block.blockID : foundItem.name, consume: false, taskType: 'block_break' });
+                                    reqs.push({ item: foundItem, count: block.amount || block.Count || 1, customName: foundItem.name === block.blockID ? block.blockID : foundItem.name, consume: false, taskType: 'block_break', nbtTag: block.nbt });
                                 });
-                            }
-                            else if (task.taskID === 'bq_standard:hunt' || task.target) {
+                            } else if (task.taskID === 'bq_standard:hunt' || task.target) {
                                  const target = task.target || "Моб";
                                  editor.addMobToDatalist(target);
-                                 reqs.push({ item: { item_key: `mob_${target}`, name: target, image: '', mod: 'Мобы' }, count: task.required || 1, target: target, customName: target, consume: false, taskType: 'hunt' });
-                            }
-                            else if (task.requiredFluids && task.taskID === 'bq_standard:fluid') {
+                                 reqs.push({ item: { item_key: `mob_${target}`, name: target, image: '', mod: 'Мобы' }, count: task.required || 1, target: target, customName: target, consume: false, taskType: 'hunt', nbtTag: task.targetNBT });
+                            } else if (task.requiredFluids && task.taskID === 'bq_standard:fluid') {
                                 Object.values(task.requiredFluids).forEach(fluid => {
-                                    reqs.push({ item: { item_key: `fluid_${fluid.FluidName}`, name: fluid.FluidName, image: '', mod: 'Жидкость' }, count: fluid.Amount || 1000, target: fluid.FluidName, customName: fluid.FluidName, consume: task.consume || false, taskType: 'fluid' });
+                                    const fname = fluid.FluidName || "water";
+                                    reqs.push({ item: { item_key: `fluid_${fname}`, name: this.FLUIDS[fname] || fname, image: 'fluid_bucket.png', mod: 'Жидкость' }, count: fluid.Amount || 1000, target: fname, customName: this.FLUIDS[fname] || fname, consume: task.consume || false, taskType: 'fluid' });
                                 });
-                            }
-                            else if (task.taskID === 'bq_standard:checkbox') {
-                                reqs.push({ item: { item_key: 'checkbox', name: 'Галочка', image: '', mod: 'Задачи' }, count: 1, customName: 'Нажать галочку (Прочтение)', consume: false, taskType: 'checkbox' });
+                            } else if (task.taskID === 'bq_standard:checkbox') {
+                                reqs.push({ item: { item_key: 'checkbox', name: 'Галочка', image: 'checkbox.png', mod: 'Задачи' }, count: 1, customName: 'Нажать галочку (Прочтение)', consume: false, taskType: 'checkbox' });
+                            } else if (task.taskID === 'bq_standard:xp') {
+                                reqs.push({ item: { item_key: 'xp', name: 'Опыт', image: 'experience_bottle.png', mod: 'Система' }, count: task.amount || 1, customName: 'Уровни опыта', consume: task.consume || false, taskType: 'xp' });
                             }
                         });
                     }
                     
                     if (q.rewards) {
                         Object.values(q.rewards).forEach(rew => {
-                            if (rew.rewards) {
+                            if (rew.rewardID === 'bq_standard:item' && rew.rewards) {
                                 Object.values(rew.rewards).forEach(item => {
                                     const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage);
-                                    rewards.push({ item: foundItem, count: item.Count || 1, customName: foundItem.name === item.id ? item.id : foundItem.name, isChoice: false, damage: item.Damage });
+                                    rewards.push({ item: foundItem, count: item.Count || 1, customName: this.getCustomName(foundItem.item_key, item.id, item.tag), isChoice: false, taskType: 'item', damage: item.Damage, nbtTag: item.tag });
                                 });
-                            }
-                            if (rew.choices) {
+                            } else if (rew.rewardID === 'bq_standard:choice' && rew.choices) {
                                 Object.values(rew.choices).forEach(item => {
                                     const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage);
-                                    rewards.push({ item: foundItem, count: item.Count || 1, customName: foundItem.name === item.id ? item.id : foundItem.name, isChoice: true, damage: item.Damage });
+                                    rewards.push({ item: foundItem, count: item.Count || 1, customName: this.getCustomName(foundItem.item_key, item.id, item.tag), isChoice: true, taskType: 'item', damage: item.Damage, nbtTag: item.tag });
                                 });
+                            } else if (rew.rewardID === 'bq_standard:command') {
+                                rewards.push({ item: { item_key: 'command', name: 'Команда', image: 'command_block.png', mod: 'Система' }, count: 1, customName: 'Команда', isChoice: false, taskType: 'command', command: rew.command });
+                            } else if (rew.rewardID === 'bq_standard:xp') {
+                                rewards.push({ item: { item_key: 'xp', name: 'Опыт', image: 'experience_bottle.png', mod: 'Система' }, count: rew.amount || 1, customName: 'Уровни опыта', isChoice: false, taskType: 'xp' });
                             }
                         });
                     }
 
                     let parents = [];
                     if (q.preRequisites) {
-                        if (Array.isArray(q.preRequisites)) {
-                            parents = q.preRequisites.map(p => 'bq_' + String(p).split(':')[0]);
-                        } else {
-                            parents = Object.values(q.preRequisites).map(p => 'bq_' + String(p).split(':')[0]);
-                        }
+                        if (Array.isArray(q.preRequisites)) parents = q.preRequisites.map(p => 'bq_' + String(p).split(':')[0]);
+                        else parents = Object.values(q.preRequisites).map(p => 'bq_' + String(p).split(':')[0]);
                     }
 
                     let questIconStr = '';
@@ -130,13 +164,8 @@ export const BQ = {
                     }
 
                     questsMap[actualId] = {
-                        id: 'bq_' + actualId,
-                        title: q.properties?.betterquesting?.name || 'Безымянный квест',
-                        desc: q.properties?.betterquesting?.desc || '',
-                        icon: questIconStr,
-                        parents: parents,
-                        reqs: reqs,
-                        rewards: rewards
+                        id: 'bq_' + actualId, title: q.properties?.betterquesting?.name || 'Безымянный квест',
+                        desc: q.properties?.betterquesting?.desc || '', icon: questIconStr, parents: parents, reqs: reqs, rewards: rewards
                     };
                 });
             }
@@ -150,15 +179,12 @@ export const BQ = {
                     
                     if (ql.quests) {
                         Object.values(ql.quests).forEach(pos => {
-                            let qIdStr = pos.id !== undefined ? pos.id : (pos.questID !== undefined ? pos.questID : "");
-                            qIdStr = String(qIdStr).split(':')[0]; 
+                            let qIdStr = String(pos.id !== undefined ? pos.id : (pos.questID !== undefined ? pos.questID : "")).split(':')[0]; 
                             if (!qIdStr || addedIds.has(qIdStr)) return;
                             addedIds.add(qIdStr);
 
                             const baseQ = questsMap[qIdStr];
-                            if (baseQ) {
-                                lineQuests.push({ ...JSON.parse(JSON.stringify(baseQ)), x: (pos.x || 0) * 3, y: (pos.y || 0) * 3, size: pos.sizeX > 24 ? 'x2' : 'x1' });
-                            }
+                            if (baseQ) lineQuests.push({ ...JSON.parse(JSON.stringify(baseQ)), x: (pos.x || 0) * 3, y: (pos.y || 0) * 3, size: pos.sizeX > 24 ? 'x2' : 'x1' });
                         });
                     }
                     newMods.push({ id: 'bq_mod_' + key, name: ql.properties?.betterquesting?.name || 'Ветка ' + key, icon: '', quests: lineQuests });
@@ -173,9 +199,7 @@ export const BQ = {
             document.getElementById('import-mode-bar').classList.remove('hidden');
             document.body.classList.add('import-mode');
             
-            editor.renderSidebar(); 
-            editor.renderCanvas(); 
-            editor.centerCanvas();
+            editor.renderSidebar(); editor.renderCanvas(); editor.centerCanvas();
         } catch (e) {
             console.error(e);
             alert('Ошибка парсинга файла! Убедитесь, что это QuestDatabase.json');
@@ -183,15 +207,8 @@ export const BQ = {
     },
 
     exportData(mods) {
-        const bqData = {
-            "build:8": "3.0.328",
-            "format:8": "2.0.0",
-            "questDatabase:9": {},
-            "questLines:9": {}
-        };
-
-        let questNumericId = 0;
-        const idMap = {}; 
+        const bqData = { "build:8": "3.0.328", "format:8": "2.0.0", "questDatabase:9": {}, "questLines:9": {} };
+        let questNumericId = 0; const idMap = {}; 
 
         mods.forEach(mod => { mod.quests.forEach(q => { if(idMap[q.id] === undefined) idMap[q.id] = questNumericId++; }); });
 
@@ -200,15 +217,9 @@ export const BQ = {
                 const bqId = idMap[q.id];
                 const preReqs = (q.parents || []).map(p => idMap[p]).filter(p => p !== undefined);
 
-                const tasks = {};
-                let taskIdx = 0;
-
-                const retrievals = [];
-                const craftings = [];
-                const blockBreaks = [];
-                const hunts = [];
-                const fluids = [];
-                const checkboxes = [];
+                const tasks = {}; let taskIdx = 0;
+                const retrievals = []; const craftings = []; const blockBreaks = []; 
+                const hunts = []; const fluids = []; const checkboxes = []; const xps = [];
 
                 if (q.reqs) {
                     q.reqs.forEach(req => {
@@ -218,6 +229,7 @@ export const BQ = {
                         else if (tType === 'crafting') craftings.push(req);
                         else if (tType === 'fluid') fluids.push(req);
                         else if (tType === 'checkbox') checkboxes.push(req);
+                        else if (tType === 'xp') xps.push(req);
                         else retrievals.push(req);
                     });
                 }
@@ -232,11 +244,10 @@ export const BQ = {
                             sysId = parts[0]; damage = req.damage !== undefined ? req.damage : (parseInt(parts[1]) || 0);
                         }
                         
-                        if (sysId === 'bq_standard:loot_chest') {
-                            dict[`${idx}:10`] = { "id:8": sysId, "Count:3": parseInt(req.count) || 1, "Damage:2": damage, "OreDict:8": "", "tag:10": { "hideLootInfo:1": 1 } };
-                        } else {
-                            dict[`${idx}:10`] = { "id:8": sysId, "Count:3": parseInt(req.count) || 1, "Damage:2": damage, "OreDict:8": "" };
-                        }
+                        const dictObj = { "id:8": sysId, "Count:3": parseInt(req.count) || 1, "Damage:2": damage, "OreDict:8": "" };
+                        if (req.nbtTag) dictObj["tag:10"] = req.nbtTag;
+                        else if (sysId === 'bq_standard:loot_chest') dictObj["tag:10"] = { "hideLootInfo:1": 1 };
+                        dict[`${idx}:10`] = dictObj;
                     });
                     return dict;
                 };
@@ -250,7 +261,7 @@ export const BQ = {
                             const parts = sysId.split(':');
                             sysId = parts[0]; damage = parseInt(parts[1]) || -1;
                         }
-                        dict[`${idx}:10`] = { "blockID:8": sysId, "amount:3": parseInt(req.count) || 1, "meta:3": damage, "oreDict:8": "", "nbt:10": {} };
+                        dict[`${idx}:10`] = { "blockID:8": sysId, "amount:3": parseInt(req.count) || 1, "meta:3": damage, "oreDict:8": "", "nbt:10": req.nbtTag || {} };
                     });
                     return dict;
                 };
@@ -258,7 +269,7 @@ export const BQ = {
                 const createFluidsDict = (arr) => {
                     const dict = {};
                     arr.forEach((req, idx) => {
-                        let fluidName = req.target || req.customName || req.item.name || "water";
+                        let fluidName = req.target || req.customName || "water";
                         dict[`${idx}:10`] = { "FluidName:8": fluidName, "Amount:3": parseInt(req.count) || 1000 };
                     });
                     return dict;
@@ -269,34 +280,36 @@ export const BQ = {
                 if (blockBreaks.length > 0) tasks[`${taskIdx++}:10`] = { "taskID:8": "bq_standard:block_break", "blocks:9": createBlocksDict(blockBreaks) };
                 if (fluids.length > 0) tasks[`${taskIdx++}:10`] = { "taskID:8": "bq_standard:fluid", "consume:1": fluids[0].consume ? 1 : 0, "requiredFluids:9": createFluidsDict(fluids) };
                 if (checkboxes.length > 0) tasks[`${taskIdx++}:10`] = { "taskID:8": "bq_standard:checkbox", "index:3": 0 };
+                if (xps.length > 0) tasks[`${taskIdx++}:10`] = { "taskID:8": "bq_standard:xp", "amount:3": parseInt(xps[0].count) || 1, "isLevels:1": 1, "consume:1": xps[0].consume ? 1 : 0 };
                 
                 hunts.forEach(h => {
                     let target = h.target || h.customName || h.item.name;
-                    tasks[`${taskIdx++}:10`] = { "taskID:8": "bq_standard:hunt", "target:8": target, "required:3": parseInt(h.count) || 1, "subtypes:1": 1 };
+                    const huntDict = { "taskID:8": "bq_standard:hunt", "target:8": target, "required:3": parseInt(h.count) || 1, "subtypes:1": 1 };
+                    if (h.nbtTag) huntDict["targetNBT:10"] = h.nbtTag;
+                    tasks[`${taskIdx++}:10`] = huntDict;
                 });
 
-                const rewards = {};
-                let rewIdx = 0;
+                const rewards = {}; let rewIdx = 0;
                 if (q.rewards) {
-                    const standardRews = q.rewards.filter(r => !r.isChoice);
-                    const choiceRews = q.rewards.filter(r => r.isChoice);
+                    const standardRews = q.rewards.filter(r => (!r.taskType || r.taskType === 'item') && !r.isChoice);
+                    const choiceRews = q.rewards.filter(r => (!r.taskType || r.taskType === 'item') && r.isChoice);
 
                     if (standardRews.length > 0) rewards[`${rewIdx++}:10`] = { "rewardID:8": "bq_standard:item", "rewards:9": createItemsDict(standardRews) };
                     if (choiceRews.length > 0) rewards[`${rewIdx++}:10`] = { "rewardID:8": "bq_standard:choice", "choices:9": createItemsDict(choiceRews) };
+
+                    q.rewards.forEach(r => {
+                        if (r.taskType === 'command') {
+                            rewards[`${rewIdx++}:10`] = { "rewardID:8": "bq_standard:command", "command:8": r.command || "", "hideCommand:1": 1, "viaPlayer:1": 0 };
+                        } else if (r.taskType === 'xp') {
+                            rewards[`${rewIdx++}:10`] = { "rewardID:8": "bq_standard:xp", "amount:3": parseInt(r.count) || 1, "isLevels:1": 1 };
+                        }
+                    });
                 }
 
                 bqData["questDatabase:9"][`${bqId}:10`] = {
-                    "questID:3": bqId,
-                    "preRequisites:11": preReqs,
-                    "properties:10": {
-                        "betterquesting:10": {
-                            "name:8": q.title,
-                            "desc:8": q.desc || "",
-                            "icon:10": { "id:8": "minecraft:stone", "Count:3": 1, "Damage:2": 0, "OreDict:8": "" }
-                        }
-                    },
-                    "tasks:9": tasks,
-                    "rewards:9": rewards
+                    "questID:3": bqId, "preRequisites:11": preReqs,
+                    "properties:10": { "betterquesting:10": { "name:8": q.title, "desc:8": q.desc || "", "icon:10": { "id:8": "minecraft:stone", "Count:3": 1, "Damage:2": 0, "OreDict:8": "" } } },
+                    "tasks:9": tasks, "rewards:9": rewards
                 };
             });
         });
@@ -307,13 +320,7 @@ export const BQ = {
             mod.quests.forEach(q => {
                 const bqId = idMap[q.id];
                 const sz = q.size === 'x2' ? 48 : 24;
-                lineQuests[`${bqId}:10`] = {
-                    "x:3": Math.round(q.x / 3),
-                    "y:3": Math.round(q.y / 3),
-                    "id:3": bqId,
-                    "sizeX:3": sz,
-                    "sizeY:3": sz
-                };
+                lineQuests[`${bqId}:10`] = { "x:3": Math.round(q.x / 3), "y:3": Math.round(q.y / 3), "id:3": bqId, "sizeX:3": sz, "sizeY:3": sz };
             });
 
             bqData["questLines:9"][`${lineId}:10`] = {
