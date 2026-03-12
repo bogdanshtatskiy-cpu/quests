@@ -703,7 +703,6 @@ export const Editor = {
                 <button class="mc-button danger" data-idx="${idx}">X</button>
             `;
             
-            // Замена картинки по клику
             div.querySelector('.item-icon-btn').addEventListener('click', () => {
                 this.saveTempState();
                 this.openItemPicker((pickedItem) => {
@@ -743,7 +742,6 @@ export const Editor = {
                 <button class="mc-button danger" data-idx="${idx}">X</button>
             `;
             
-            // Замена картинки по клику для наград
             div.querySelector('.item-icon-btn').addEventListener('click', () => {
                 this.saveTempState();
                 this.openItemPicker((pickedItem) => {
@@ -946,7 +944,11 @@ export const Editor = {
     renderSidebar() {
         const list = document.getElementById('mod-list');
         list.innerHTML = '';
-        this.data.mods.forEach(mod => {
+        
+        let draggedIndex = null;
+        let draggedLi = null;
+
+        this.data.mods.forEach((mod, index) => {
             const li = document.createElement('li');
             li.className = 'mod-item';
             if (this.activeModId === mod.id) li.classList.add('active');
@@ -969,6 +971,66 @@ export const Editor = {
             });
 
             if (Auth.user) {
+                // ЛОГИКА ПЕРЕТАСКИВАНИЯ (Drag & Drop)
+                li.draggable = true;
+
+                li.addEventListener('dragstart', (e) => {
+                    draggedLi = li;
+                    draggedIndex = index;
+                    e.dataTransfer.effectAllowed = 'move';
+                    setTimeout(() => li.style.opacity = '0.5', 0); // Прячем оригинал при захвате
+                });
+
+                li.addEventListener('dragover', (e) => {
+                    e.preventDefault(); // Разрешаем сброс
+                    if (draggedIndex === index) return;
+                    
+                    const rect = li.getBoundingClientRect();
+                    const midY = rect.top + rect.height / 2;
+                    
+                    // Подсвечиваем верх или низ в зависимости от положения мыши
+                    if (e.clientY < midY) {
+                        li.classList.add('drag-top');
+                        li.classList.remove('drag-bottom');
+                    } else {
+                        li.classList.add('drag-bottom');
+                        li.classList.remove('drag-top');
+                    }
+                });
+
+                li.addEventListener('dragleave', () => {
+                    li.classList.remove('drag-top', 'drag-bottom');
+                });
+
+                li.addEventListener('dragend', () => {
+                    if (draggedLi) draggedLi.style.opacity = '1';
+                    document.querySelectorAll('.mod-item').forEach(el => el.classList.remove('drag-top', 'drag-bottom'));
+                });
+
+                li.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    li.classList.remove('drag-top', 'drag-bottom');
+                    if (draggedIndex === index || draggedIndex === null) return;
+
+                    const rect = li.getBoundingClientRect();
+                    const midY = rect.top + rect.height / 2;
+                    
+                    let newIndex = index;
+                    if (e.clientY > midY) newIndex++; // Если бросили на нижнюю половину, вставляем после
+
+                    // Корректируем индекс из-за сдвига массива при удалении
+                    if (draggedIndex < newIndex) newIndex--;
+
+                    // Меняем местами в данных
+                    const movedItem = this.data.mods.splice(draggedIndex, 1)[0];
+                    this.data.mods.splice(newIndex, 0, movedItem);
+
+                    DB.logAction(`Изменил порядок веток: ${movedItem.name}`);
+                    this.triggerAutoSave();
+                    this.renderSidebar();
+                });
+
+                // Кнопки редактирования и удаления
                 li.querySelector('.edit').addEventListener('click', (e) => {
                     e.stopPropagation();
                     this.editingModId = mod.id;
