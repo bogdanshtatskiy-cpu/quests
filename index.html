@@ -19,9 +19,8 @@
         <button id="btn-logout" class="mc-button admin-only" style="margin-right: 15px; font-size: 12px; padding: 4px; display: none;">Выйти</button>
         <button id="btn-open-admin" class="mc-button super-admin-only" style="margin-right: 15px; background-color: #550000; color:white; display: none;">⚡ Админ Панель</button>
         
-        <button id="btn-import-loot" class="mc-button admin-only" style="margin-right: 10px; background-color: #550055; color:white; display: none;">📦 База Лутбоксов</button>
-        <input type="file" id="loot-file-input" accept=".json" class="hidden">
-
+        <button id="btn-open-loot-editor" class="mc-button admin-only" style="margin-right: 10px; background-color: #550055; color:white; display: none;">📦 База Лутбоксов</button>
+        
         <button id="btn-import-bq" class="mc-button admin-only" style="margin-right: 10px; background-color: #000055; color:white; display: none;">📥 Импорт BQ</button>
         <button id="btn-export-bq" class="mc-button admin-only" style="margin-right: 15px; background-color: #005555; color:white; display: none;">📤 Экспорт BQ</button>
         <input type="file" id="bq-file-input" accept=".json" class="hidden">
@@ -178,7 +177,6 @@
                     <div id="reqs-list" class="item-list-container big-list"></div>
                     <button id="btn-add-req" class="mc-button mt-5">+ Добавить условие</button>
                 </div>
-                
                 <div class="form-group" style="flex: 1;">
                     <div class="form-group-header">
                         <label>Награды:</label>
@@ -223,6 +221,52 @@
             </div>
             <div class="modal-actions" style="margin-top: 20px;">
                 <button id="btn-close-view" class="mc-button btn-cancel" style="width: 100%; font-size: 18px; padding: 12px;">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="loot-editor-modal" class="modal hidden">
+        <div class="mc-panel modal-content large" style="height: 85vh; display: flex; flex-direction: column;">
+            <h2 class="mc-title">Менеджер Лутбоксов (QuestLoot.json)</h2>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <button id="btn-loot-import" class="mc-button" style="background-color:#000055; color:#fff;">📥 Загрузить QuestLoot.json</button>
+                <input type="file" id="loot-file-input" accept=".json" class="hidden">
+                <button id="btn-loot-export" class="mc-button" style="background-color:#005555; color:#fff;">📤 Скачать QuestLoot.json</button>
+            </div>
+
+            <div class="form-row" style="flex: 1; overflow: hidden;">
+                <div class="form-group" style="flex: 1; display: flex; flex-direction: column; margin-bottom: 0;">
+                    <div class="form-group-header">
+                        <label>Группы лута (Рулетки):</label>
+                        <button id="btn-add-loot-group" class="mc-button" style="padding: 2px 6px; font-size: 12px;">+ Группа</button>
+                    </div>
+                    <div id="loot-groups-list" class="item-list-container" style="flex: 1; background: rgba(0,0,0,0.5);"></div>
+                </div>
+                
+                <div id="loot-group-settings" class="form-group hidden" style="flex: 3; display: flex; flex-direction: column; margin-bottom: 0; border-left: 2px solid #555; padding-left: 15px;">
+                    <h3 id="loot-selected-group-name" style="color:#55ffff; margin-bottom:10px;">Выберите группу</h3>
+                    <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                        <div style="flex: 2;">
+                            <label>Название рулетки (для редактора):</label>
+                            <input type="text" id="loot-group-name" class="mc-input">
+                        </div>
+                        <div style="flex: 1;">
+                            <label>Общий вес группы:</label>
+                            <input type="number" id="loot-group-weight" class="mc-input" title="Шанс выпадения всей группы">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group-header">
+                        <label>Варианты дропа (Каждая карточка - один возможный исход):</label>
+                        <button id="btn-add-loot-reward" class="mc-button" style="padding: 2px 6px; font-size: 12px;">+ Вариант дропа</button>
+                    </div>
+                    <div id="loot-rewards-list" class="item-list-container" style="flex: 1; background: rgba(0,0,0,0.3); padding: 10px; display: flex; flex-direction: column; gap: 10px;"></div>
+                </div>
+            </div>
+            
+            <div class="modal-actions" style="margin-top: 15px;">
+                <button id="btn-close-loot" class="mc-button btn-cancel" style="width: 100%;">Сохранить и закрыть менеджер</button>
             </div>
         </div>
     </div>
