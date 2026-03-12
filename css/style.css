@@ -200,3 +200,6 @@ body.show-titles .quest-node .node-title { display: block; }
     animation: spin 1s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+/* Drag & Drop для веток квестов в меню */
+.mod-item.drag-top { box-shadow: inset 0 4px 0 #55ffff; }
+.mod-item.drag-bottom { box-shadow: inset 0 -4px 0 #55ffff; }
