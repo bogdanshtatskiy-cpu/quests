@@ -20,9 +20,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Показываем фоновый статус загрузки
     indicator.classList.remove('hidden');
     indicator.style.color = "#ffaa00";
-    indicator.innerText = "⏳ Загрузка данных с сервера...";
+    indicator.innerText = "⏳ Синхронизация данных...";
 
-    // 3. ПАРАЛЛЕЛЬНАЯ ЗАГРУЗКА (в 2 раза быстрее)
+    // 3. ПАРАЛЛЕЛЬНАЯ ЗАГРУЗКА БЕЗ БЛОКИРОВКИ
     const loadItemsTask = ItemsDB.load().then(async () => {
         const customItems = await DB.loadCustomItems();
         ItemsDB.addCustomItems(customItems);
@@ -32,7 +32,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 4. Ждем завершения обеих задач
     Promise.all([loadItemsTask, loadQuestsTask]).then(([_, savedQuests]) => {
-        // Как только квесты прилетели - отрисовываем их
         if (savedQuests && savedQuests.length > 0) {
             savedQuests.forEach(mod => {
                 mod.quests.forEach(q => {
@@ -67,13 +66,15 @@ document.addEventListener('DOMContentLoaded', () => {
         logsContainer.innerHTML = '<tr><td colspan="3">Загрузка...</td></tr>';
         
         const logs = await DB.getLogs();
-        logsContainer.innerHTML = logs.map(l => {
+        let logsHtml = '';
+        logs.forEach(l => {
             let d = new Date(l.timestamp);
             if (isNaN(d.getTime())) d = new Date(); 
             const time = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second:'2-digit' });
             const date = d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
-            return `<tr><td>${date} ${time}</td><td><b style="color:#55ffff;">${l.username}</b></td><td>${l.action}</td></tr>`;
-        }).join('');
+            logsHtml += `<tr><td>${date} ${time}</td><td><b style="color:#55ffff;">${l.username}</b></td><td>${l.action}</td></tr>`;
+        });
+        logsContainer.innerHTML = logsHtml;
         
         renderUsersTable();
     });
@@ -82,16 +83,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const usersTbody = document.getElementById('users-tbody');
         usersTbody.innerHTML = '<tr><td colspan="2">Загрузка...</td></tr>';
         const users = await DB.getUsers();
-        usersTbody.innerHTML = '';
+        let usersHtml = '';
         users.forEach(u => {
-            const tr = document.createElement('tr');
             if(u.toLowerCase() === 'desoope') {
-                tr.innerHTML = `<td><b style="color:#ffaa00;">${u} (Создатель)</b></td><td>-</td>`;
+                usersHtml += `<tr><td><b style="color:#ffaa00;">${u} (Создатель)</b></td><td>-</td></tr>`;
             } else {
-                tr.innerHTML = `<td>${u}</td><td><button class="mc-button danger btn-delete-user" data-user="${u}" style="font-size:12px; padding:2px 5px;">Удалить</button></td>`;
+                usersHtml += `<tr><td>${u}</td><td><button class="mc-button danger btn-delete-user" data-user="${u}" style="font-size:12px; padding:2px 5px;">Удалить</button></td></tr>`;
             }
-            usersTbody.appendChild(tr);
         });
+        usersTbody.innerHTML = usersHtml;
 
         document.querySelectorAll('.btn-delete-user').forEach(btn => {
             btn.addEventListener('click', async (e) => {
