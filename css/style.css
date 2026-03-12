@@ -216,3 +216,20 @@ body.show-titles .quest-node .node-title { display: block; }
 .loot-reward-header { display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center; }
 .loot-items-list { display: flex; flex-direction: column; gap: 5px; }
 .loot-item-row { display: flex; align-items: center; gap: 10px; background: #1a1a1a; padding: 5px; border: 1px solid #333; }
+
+/* ИНДИКАТОР СОХРАНЕНИЯ (Уведомление снизу справа) */
+#save-indicator {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 9999;
+    background-color: rgba(0, 0, 0, 0.8);
+    border: 2px solid #555;
+    border-left-color: #777;
+    border-top-color: #777;
+    padding: 10px 20px;
+    font-size: 16px;
+    font-weight: bold;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+    pointer-events: none;
+}
