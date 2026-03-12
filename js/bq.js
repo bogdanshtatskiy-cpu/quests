@@ -44,17 +44,17 @@ export const BQ = {
         let name = foundItem.name; 
         if (!tag) return name;
 
-        // Читаем display -> Name (с очисткой от §)
+        // 1. ЧИТАЕМ display -> Name (СОХРАНЯЕМ ФОРМАТИРОВАНИЕ §)
         const display = this.getRawValue(tag, 'display');
         if (display) {
             const customName = this.getRawValue(display, 'Name');
             if (customName) {
-                name = customName.replace(/[§&][0-9a-fk-or]/gi, '').trim();
-                if (name.endsWith('ğ')) name = name.slice(0, -1).trim(); 
+                // Больше не удаляем §! Убираем только артефакты кодировки ğ, если они есть
+                name = customName.trim().replace(/ğ/g, '');
             }
         }
 
-        // Зачарования
+        // 2. ЗАЧАРОВАНИЯ
         const enchs = this.getRawValue(tag, 'ench') || this.getRawValue(tag, 'StoredEnchantments');
         if (enchs && typeof enchs === 'object') {
             const firstEnch = Object.values(enchs)[0];
@@ -63,19 +63,19 @@ export const BQ = {
                 const lvl = this.getRawValue(firstEnch, 'lvl') || 1;
                 const roman = this.toRoman(lvl);
                 const enchTitle = this.ENCHANTS[id] || `Чары:${id}`;
-                if (foundItem.item_key.includes('enchanted_book')) name = `Книга: ${enchTitle} ${roman}`;
-                else name += ` [${enchTitle} ${roman}]`;
+                if (foundItem.item_key.includes('enchanted_book')) name = `§eКнига:§r ${enchTitle} ${roman}`;
+                else name += ` §7[${enchTitle} ${roman}]§r`;
             }
         }
 
-        // Содержимое тайников
+        // 3. СОДЕРЖИМОЕ ТАЙНИКОВ
         const innerItem = this.getRawValue(tag, 'Item');
         if (innerItem) {
             const innerId = this.getRawValue(innerItem, 'id');
             const innerCount = this.getRawValue(innerItem, 'Count') || 1;
             const innerFound = ItemsDB.findItemByBQ(innerId, 0);
             const innerName = innerFound.name !== innerId ? innerFound.name : `ID:${innerId}`;
-            name += ` (${innerName} x${innerCount})`;
+            name += ` §8(${innerName} x${innerCount})§r`;
         }
         return name;
     },
@@ -153,7 +153,8 @@ export const BQ = {
                     if (q.rewards) {
                         Object.values(q.rewards).forEach(rew => {
                             if ((rew.rewardID === 'bq_standard:item' && rew.rewards) || (rew.rewardID === 'bq_standard:choice' && rew.choices)) {
-                                Object.values(rew.rewards || rew.choices).forEach(item => {
+                                const list = rew.rewards || rew.choices;
+                                Object.values(list).forEach(item => {
                                     const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage);
                                     rewards.push({ item: foundItem, count: item.Count || 1, customName: this.getCustomName(foundItem, item.tag), isChoice: rew.rewardID === 'bq_standard:choice', taskType: 'item', damage: item.Damage, nbtTag: item.tag });
                                 });
@@ -191,5 +192,50 @@ export const BQ = {
             document.body.classList.add('import-mode');
             editor.renderSidebar(); editor.renderCanvas(); editor.centerCanvas();
         } catch (e) { console.error(e); }
+    },
+
+    exportData(mods) {
+        const bqData = { "build:8": "3.0.328", "format:8": "2.0.0", "questDatabase:9": {}, "questLines:9": {} };
+        let questNumericId = 0; const idMap = {}; 
+        mods.forEach(mod => { mod.quests.forEach(q => { if(idMap[q.id] === undefined) idMap[q.id] = questNumericId++; }); });
+
+        mods.forEach(mod => {
+            mod.quests.forEach(q => {
+                const bqId = idMap[q.id];
+                const preReqs = (q.parents || []).map(p => idMap[p]).filter(p => p !== undefined);
+                const tasks = {}; let taskIdx = 0;
+                
+                const createItemsDict = (arr) => {
+                    const dict = {};
+                    arr.forEach((req, idx) => {
+                        let sysId = req.item.string_id || req.item.item_key || "minecraft:stone";
+                        let damage = req.damage !== undefined ? req.damage : (req.item.damage !== undefined ? req.item.damage : 0);
+                        const dictObj = { "id:8": sysId, "Count:3": parseInt(req.count) || 1, "Damage:2": damage, "OreDict:8": "" };
+                        if (req.nbtTag) dictObj["tag:10"] = req.nbtTag;
+                        dict[`${idx}:10`] = dictObj;
+                    });
+                    return dict;
+                };
+
+                const groups = { retrieval: [], crafting: [], block_break: [], hunt: [], fluid: [], checkbox: [], xp: [] };
+                (q.reqs || []).forEach(r => { groups[r.taskType || 'retrieval'].push(r); });
+
+                if (groups.retrieval.length) tasks[`${taskIdx++}:10`] = { "taskID:8": "bq_standard:retrieval", "consume:1": groups.retrieval[0].consume ? 1 : 0, "requiredItems:9": createItemsDict(groups.retrieval) };
+                if (groups.crafting.length) tasks[`${taskIdx++}:10`] = { "taskID:8": "bq_standard:crafting", "allowCraft:1": 1, "requiredItems:9": createItemsDict(groups.crafting) };
+                if (groups.xp.length) tasks[`${taskIdx++}:10`] = { "taskID:8": "bq_standard:xp", "amount:3": parseInt(groups.xp[0].count), "isLevels:1": 1, "consume:1": groups.xp[0].consume ? 1 : 0 };
+                
+                bqData["questDatabase:9"][`${bqId}:10`] = {
+                    "questID:3": bqId, "preRequisites:11": preReqs,
+                    "properties:10": { "betterquesting:10": { "name:8": q.title, "desc:8": q.desc || "" } },
+                    "tasks:9": tasks, "rewards:9": {}
+                };
+            });
+        });
+
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(bqData, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "QuestDatabase_Export.json");
+        downloadAnchorNode.click();
     }
 };
