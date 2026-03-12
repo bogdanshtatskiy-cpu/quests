@@ -4,11 +4,9 @@ import { Auth } from './auth.js';
 import { BQ } from './bq.js';
 
 const SIZE_MAP = { x1: 52, x2: 104, x3: 156, x4: 208 };
-
-// Совместимость со старыми размерами
-const getSafeSize = (sizeStr) => { 
+const getSafeSize = (s) => { 
     const compat = { sm: 'x1', md: 'x1', lg: 'x2' }; 
-    return compat[sizeStr] || sizeStr || 'x1'; 
+    return compat[s] || s || 'x1'; 
 };
 
 export const Editor = {
@@ -17,8 +15,8 @@ export const Editor = {
     originalData: null, 
     isImportMode: false, 
     lootGroups: {}, 
+    questSettings: null, // Хранилище глобальных настроек
     
-    // Переменные для управления холстом (камера)
     scale: 1, 
     panX: 0, 
     panY: 0, 
@@ -28,7 +26,6 @@ export const Editor = {
     initialPanX: 0, 
     initialPanY: 0,
     
-    // Переменные для перетаскивания и связей
     draggedQuestId: null, 
     mouseStartX: 0, 
     mouseStartY: 0, 
@@ -40,11 +37,11 @@ export const Editor = {
     editingNodeId: null, 
     hoveredQuestId: null,
     
-    // Временные переменные модальных окон
     pickerCallback: null, 
     tempReqs: [], 
     tempRewards: [], 
     tempQuestIcon: null, 
+    tempQuestIconItem: null, // Добавлено для сохранения полных данных иконки
     editingModId: null, 
     tempModIcon: null, 
     saveTimeout: null,
@@ -59,12 +56,9 @@ export const Editor = {
         this.bindNbtModalEvents(); 
     },
 
-    // Функция скрытия тултипа принудительно
     hideTooltip() {
         const tooltip = document.getElementById('quest-tooltip');
-        if (tooltip) {
-            tooltip.classList.add('hidden');
-        }
+        if (tooltip) tooltip.classList.add('hidden');
         this.hoveredQuestId = null;
     },
 
@@ -89,11 +83,8 @@ export const Editor = {
         
         btnToggleSummary.addEventListener('click', () => {
             summaryPanel.classList.toggle('minimized');
-            if (summaryPanel.classList.contains('minimized')) {
-                btnToggleSummary.innerText = '▲';
-            } else {
-                btnToggleSummary.innerText = '▼';
-            }
+            if (summaryPanel.classList.contains('minimized')) btnToggleSummary.innerText = '▲';
+            else btnToggleSummary.innerText = '▼';
         });
 
         const fileInput = document.getElementById('bq-file-input');
@@ -117,18 +108,12 @@ export const Editor = {
             if (confirm('Отменить импорт? Все текущие незагруженные изменения пропадут.')) {
                 this.isImportMode = false;
                 this.data.mods = JSON.parse(JSON.stringify(this.originalData)); 
-                
-                if (this.data.mods.length > 0) {
-                    this.activeModId = this.data.mods[0].id;
-                } else {
-                    this.activeModId = null;
-                }
+                if (this.data.mods.length > 0) this.activeModId = this.data.mods[0].id;
+                else this.activeModId = null;
                 
                 document.getElementById('import-mode-bar').classList.add('hidden');
                 document.body.classList.remove('import-mode');
-                this.renderSidebar(); 
-                this.renderCanvas(); 
-                this.centerCanvas();
+                this.renderSidebar(); this.renderCanvas(); this.centerCanvas();
             }
         });
 
@@ -145,13 +130,12 @@ export const Editor = {
 
         document.getElementById('btn-export-bq').addEventListener('click', () => {
             this.hideTooltip();
-            BQ.exportData(this.data.mods);
+            BQ.exportData(this.data.mods, this);
         });
     },
 
     triggerAutoSave() {
         if (!Auth.user || this.isImportMode) return; 
-        
         const indicator = document.getElementById('save-indicator');
         indicator.classList.remove('hidden'); 
         indicator.innerText = "Сохранение..."; 
@@ -162,9 +146,7 @@ export const Editor = {
             await DB.saveQuestsSilent(this.data.mods);
             indicator.innerText = "Сохранено ✔"; 
             indicator.style.color = "#55ff55";
-            setTimeout(() => {
-                indicator.classList.add('hidden');
-            }, 2000);
+            setTimeout(() => { indicator.classList.add('hidden'); }, 2000);
         }, 1500);
     },
 
@@ -273,9 +255,7 @@ export const Editor = {
                 if (this.hoveredQuestId !== questId) {
                     this.hoveredQuestId = questId;
                     const quest = this.getActiveMod().quests.find(q => q.id === questId);
-                    if (quest) {
-                        this.showTooltip(quest);
-                    }
+                    if (quest) this.showTooltip(quest);
                 }
                 tooltip.style.left = (e.clientX + 15) + 'px'; 
                 tooltip.style.top = (e.clientY + 15) + 'px';
@@ -287,24 +267,20 @@ export const Editor = {
         container.addEventListener('mouseleave', () => {
             this.hideTooltip();
             this.isPanning = false;
-            if (this.draggedQuestId && this.hasMovedNode) {
-                this.triggerAutoSave();
-            }
+            if (this.draggedQuestId && this.hasMovedNode) this.triggerAutoSave();
             this.draggedQuestId = null;
         });
 
         window.addEventListener('mouseup', () => {
             this.isPanning = false;
-            if (this.draggedQuestId && this.hasMovedNode) {
-                this.triggerAutoSave();
-            }
+            if (this.draggedQuestId && this.hasMovedNode) this.triggerAutoSave();
             this.draggedQuestId = null; 
             container.style.cursor = 'default';
         });
 
         container.addEventListener('contextmenu', (e) => {
             e.preventDefault();
-            this.hideTooltip(); // Исправление: Прячем тултип при клике ПКМ
+            this.hideTooltip(); 
             
             if (!Auth.user) return; 
             if (!this.activeModId) return alert('Сначала выберите или создайте ветку квестов!');
@@ -317,7 +293,6 @@ export const Editor = {
             this.openQuestModal();
         });
 
-        // Слушатели кнопок контекстного меню узла
         document.getElementById('menu-copy').addEventListener('click', () => { 
             contextMenu.classList.add('hidden'); 
             this.copyQuest(this.contextNodeId); 
@@ -360,7 +335,7 @@ export const Editor = {
         const nodesFragment = document.createDocumentFragment();
         const linesFragment = document.createDocumentFragment();
 
-        // 1. Отрисовка линий связей
+        // Линии связей
         mod.quests.forEach(quest => {
             if (quest.parents) {
                 quest.parents.forEach(pId => {
@@ -372,7 +347,7 @@ export const Editor = {
             }
         });
 
-        // 2. Отрисовка самих квестов
+        // Узлы
         mod.quests.forEach(quest => {
             const node = document.createElement('div');
             const nodeSize = getSafeSize(quest.size);
@@ -386,24 +361,19 @@ export const Editor = {
             node.style.top = `${quest.y}px`;
             node.dataset.id = quest.id;
             
-            // ИСПРАВЛЕНИЕ: Надежный поиск иконки
+            // Надежный поиск иконки для узла на холсте
             let iconFile = quest.icon;
             
-            // Если нет иконки квеста, ищем первую задачу
             if (!iconFile && quest.reqs && quest.reqs.length > 0) {
                 if (quest.reqs[0].item && quest.reqs[0].item.image) {
                     iconFile = quest.reqs[0].item.image;
                 }
             }
-            
-            // Если всё еще нет, ищем первую награду
             if (!iconFile && quest.rewards && quest.rewards.length > 0) {
                 if (quest.rewards[0].item && quest.rewards[0].item.image) {
                     iconFile = quest.rewards[0].item.image;
                 }
             }
-
-            // Если вообще ничего нет (пустой квест), ставим заглушку
             if (!iconFile) {
                 iconFile = 'book.png';
             }
@@ -415,7 +385,6 @@ export const Editor = {
                 <div class="node-title">${ItemsDB.formatMC(quest.title)}</div>
             `;
 
-            // Событие зажатия мыши (Перемещение и Связи)
             node.addEventListener('mousedown', (e) => {
                 if (e.button === 0 && Auth.user) {
                     if (e.shiftKey || this.linkingFromNodeId) {
@@ -448,18 +417,16 @@ export const Editor = {
                 }
             });
 
-            // Событие клика (Просмотр)
             node.addEventListener('click', (e) => {
-                this.hideTooltip(); // ИСПРАВЛЕНИЕ: Скрываем тултип
+                this.hideTooltip(); 
                 if (e.button !== 0 || (e.shiftKey && Auth.user) || this.hasMovedNode) return; 
                 this.openQuestViewModal(quest.id);
             });
 
-            // Событие ПКМ (Контекстное меню)
             node.addEventListener('contextmenu', (e) => {
                 e.preventDefault(); 
                 e.stopPropagation();
-                this.hideTooltip(); // ИСПРАВЛЕНИЕ: Скрываем тултип
+                this.hideTooltip(); 
                 
                 if (!Auth.user) return; 
                 this.contextNodeId = quest.id;
@@ -472,7 +439,6 @@ export const Editor = {
             nodesFragment.appendChild(node);
         });
 
-        // Применяем фрагменты
         linesLayer.appendChild(linesFragment);
         nodesLayer.appendChild(nodesFragment);
 
@@ -611,7 +577,6 @@ export const Editor = {
                 
                 if (this.tempNbtTarget) {
                     this.tempNbtTarget.nbtTag = parsed;
-                    // Обновляем имя через bq.js
                     if (this.tempNbtTarget.item) {
                         this.tempNbtTarget.customName = BQ.getCustomName(this.tempNbtTarget.item, parsed);
                     }
@@ -627,7 +592,6 @@ export const Editor = {
     },
 
     saveTempState() {
-        // Сохраняем требования
         this.tempReqs.forEach((r, idx) => {
             const typeSel = document.getElementById(`req-type-${idx}`);
             if(typeSel) r.taskType = typeSel.value;
@@ -651,7 +615,6 @@ export const Editor = {
             if (consumeCb) r.consume = consumeCb.checked;
         });
         
-        // Сохраняем награды
         this.tempRewards.forEach((r, idx) => {
             const typeSel = document.getElementById(`rew-type-${idx}`);
             if(typeSel) r.taskType = typeSel.value;
@@ -688,6 +651,7 @@ export const Editor = {
             desc: originalQuest.desc,
             size: originalQuest.size, 
             icon: originalQuest.icon,
+            iconItem: originalQuest.iconItem,
             reqs: JSON.parse(JSON.stringify(originalQuest.reqs || [])),
             rewards: JSON.parse(JSON.stringify(originalQuest.rewards || [])),
             parents: [] 
@@ -702,7 +666,6 @@ export const Editor = {
     deleteQuest(questId) {
         const mod = this.getActiveMod();
         mod.quests = mod.quests.filter(q => q.id !== questId);
-        // Удаляем связи с удаленным квестом
         mod.quests.forEach(q => {
             if (q.parents) {
                 q.parents = q.parents.filter(pId => pId !== questId);
@@ -730,6 +693,7 @@ export const Editor = {
             this.saveTempState();
             this.openItemPicker((item) => {
                 this.tempQuestIcon = item.image;
+                this.tempQuestIconItem = item; // Сохраняем полный предмет
                 document.getElementById('quest-icon-preview').innerHTML = `<img src="${ItemsDB.getImageUrl(item.image)}" style="width: 32px; height: 32px; image-rendering: pixelated;">`;
             });
         });
@@ -739,6 +703,8 @@ export const Editor = {
             this.openItemPicker((item) => { 
                 this.tempReqs.push({ 
                     item: item, 
+                    rawId: item.string_id || item.item_key, // Сохраняем новый ID
+                    rawDamage: item.damage !== undefined ? item.damage : 0,
                     count: 1, 
                     customName: BQ.getCustomName(item, null), 
                     consume: true, 
@@ -754,6 +720,8 @@ export const Editor = {
             this.openItemPicker((item) => { 
                 this.tempRewards.push({ 
                     item: item, 
+                    rawId: item.string_id || item.item_key, // Сохраняем новый ID
+                    rawDamage: item.damage !== undefined ? item.damage : 0,
                     count: 1, 
                     customName: BQ.getCustomName(item, null), 
                     isChoice: false, 
@@ -779,6 +747,7 @@ export const Editor = {
                 q.desc = desc; 
                 q.size = size; 
                 q.icon = this.tempQuestIcon;
+                q.iconItem = this.tempQuestIconItem; // Сохраняем иконку
                 q.reqs = [...this.tempReqs]; 
                 q.rewards = [...this.tempRewards];
                 DB.logAction(`Отредактировал квест: ${title}`);
@@ -791,6 +760,7 @@ export const Editor = {
                     desc: desc, 
                     size: size, 
                     icon: this.tempQuestIcon,
+                    iconItem: this.tempQuestIconItem, // Сохраняем иконку
                     reqs: [...this.tempReqs], 
                     rewards: [...this.tempRewards], 
                     parents: []
@@ -815,7 +785,7 @@ export const Editor = {
     },
 
     openQuestViewModal(questId) {
-        this.hideTooltip(); // ИСПРАВЛЕНИЕ: Скрываем тултип
+        this.hideTooltip(); 
         
         const mod = this.getActiveMod();
         const quest = mod.quests.find(q => q.id === questId);
@@ -827,7 +797,12 @@ export const Editor = {
         if (!iconFile && quest.reqs && quest.reqs.length > 0 && quest.reqs[0].item) {
             iconFile = quest.reqs[0].item.image;
         }
-        if (!iconFile) iconFile = 'book.png';
+        if (!iconFile && quest.rewards && quest.rewards.length > 0 && quest.rewards[0].item) {
+            iconFile = quest.rewards[0].item.image;
+        }
+        if (!iconFile) {
+            iconFile = 'book.png';
+        }
         
         document.getElementById('view-quest-icon').innerHTML = `<img src="${ItemsDB.getImageUrl(iconFile)}" style="width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated;">`;
         document.getElementById('view-quest-title').innerHTML = ItemsDB.formatMC(quest.title);
@@ -882,7 +857,7 @@ export const Editor = {
     },
 
     openQuestModal(questId = null) {
-        this.hideTooltip(); // ИСПРАВЛЕНИЕ: Скрываем тултип
+        this.hideTooltip(); 
 
         this.editingNodeId = questId;
         const modal = document.getElementById('quest-edit-modal');
@@ -894,6 +869,7 @@ export const Editor = {
             document.getElementById('quest-desc').value = q.desc || '';
             document.getElementById('quest-size').value = getSafeSize(q.size);
             this.tempQuestIcon = q.icon || null;
+            this.tempQuestIconItem = q.iconItem || null;
             
             let reqs = q.reqs || [];
             if (q.req && reqs.length === 0) reqs = [q.req]; 
@@ -905,6 +881,7 @@ export const Editor = {
             document.getElementById('quest-desc').value = '';
             document.getElementById('quest-size').value = 'x1';
             this.tempQuestIcon = null;
+            this.tempQuestIconItem = null;
             this.tempReqs = []; 
             this.tempRewards = [];
         }
@@ -919,7 +896,6 @@ export const Editor = {
         modal.classList.remove('hidden');
     },
 
-    // ПОДРОБНАЯ ОТРИСОВКА СПИСКОВ РЕДАКТИРОВАНИЯ
     renderQuestEditForm() {
         const reqBox = document.getElementById('reqs-list');
         reqBox.innerHTML = '';
@@ -971,6 +947,8 @@ export const Editor = {
                 this.saveTempState();
                 this.openItemPicker((pickedItem) => { 
                     this.tempReqs[idx].item = pickedItem; 
+                    this.tempReqs[idx].rawId = pickedItem.string_id || pickedItem.item_key;
+                    this.tempReqs[idx].rawDamage = pickedItem.damage || 0;
                     this.tempReqs[idx].customName = BQ.getCustomName(pickedItem, this.tempReqs[idx].nbtTag);
                     this.renderQuestEditForm(); 
                 });
@@ -1056,6 +1034,8 @@ export const Editor = {
                 this.saveTempState();
                 this.openItemPicker((pickedItem) => { 
                     this.tempRewards[idx].item = pickedItem; 
+                    this.tempRewards[idx].rawId = pickedItem.string_id || pickedItem.item_key;
+                    this.tempRewards[idx].rawDamage = pickedItem.damage || 0;
                     this.tempRewards[idx].customName = BQ.getCustomName(pickedItem, this.tempRewards[idx].nbtTag);
                     this.renderQuestEditForm(); 
                 });
