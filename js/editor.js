@@ -3,25 +3,37 @@ import { DB } from './db.js';
 import { Auth } from './auth.js';
 import { BQ } from './bq.js';
 
+// Константы размеров квестов в пикселях
 const SIZE_MAP = { x1: 52, x2: 104, x3: 156, x4: 208 };
-const getSafeSize = (s) => { const compat = { sm: 'x1', md: 'x1', lg: 'x2' }; return compat[s] || s || 'x1'; };
+
+// Помощник для безопасного определения размера (совместимость со старыми форматами)
+const getSafeSize = (s) => { 
+    const compat = { sm: 'x1', md: 'x1', lg: 'x2' }; 
+    return compat[s] || s || 'x1'; 
+};
 
 export const Editor = {
     data: { mods: [] }, 
     activeModId: null, 
     originalData: null, 
     isImportMode: false, 
-    lootGroups: {}, 
+    lootGroups: {}, // Список загруженных лутбоксов
     
+    // Параметры холста (Зум и Панорама)
     scale: 1, panX: 0, panY: 0, 
     isPanning: false, panStartX: 0, panStartY: 0, initialPanX: 0, initialPanY: 0,
     
+    // Состояние перетаскивания и связей
     draggedQuestId: null, mouseStartX: 0, mouseStartY: 0, nodeStartX: 0, nodeStartY: 0, hasMovedNode: false,
     linkingFromNodeId: null, contextNodeId: null, editingNodeId: null, hoveredQuestId: null,
     
+    // Временные данные для модальных окон
     pickerCallback: null, tempReqs: [], tempRewards: [], tempQuestIcon: null, editingModId: null, tempModIcon: null, saveTimeout: null,
     tempNbtTarget: null,
 
+    /**
+     * Инициализация всех систем редактора
+     */
     init() {
         this.bindCanvasEvents(); 
         this.bindModModalEvents(); 
@@ -29,8 +41,13 @@ export const Editor = {
         this.bindItemPickerEvents(); 
         this.bindTopBarEvents();
         this.bindNbtModalEvents(); 
+        
+        console.log("Визуальный редактор инициализирован");
     },
 
+    /**
+     * Добавление моба в список автодополнения
+     */
     addMobToDatalist(mobName) {
         const datalist = document.getElementById('mob-list');
         if (!datalist) return;
@@ -42,16 +59,26 @@ export const Editor = {
         }
     },
 
+    /**
+     * Кнопки верхней панели управления
+     */
     bindTopBarEvents() {
-        document.getElementById('btn-toggle-titles').addEventListener('click', () => document.body.classList.toggle('show-titles'));
+        // Показать/Скрыть названия под иконками
+        document.getElementById('btn-toggle-titles').addEventListener('click', () => {
+            document.body.classList.toggle('show-titles');
+            const isShown = document.body.classList.contains('show-titles');
+            document.getElementById('btn-toggle-titles').innerText = isShown ? "Скрыть названия" : "Показать названия";
+        });
+
+        // Сворачивание панели статистики
         const btnToggleSummary = document.getElementById('btn-toggle-summary-size');
         const summaryPanel = document.getElementById('rewards-summary');
-        
         btnToggleSummary.addEventListener('click', () => {
             summaryPanel.classList.toggle('minimized');
             btnToggleSummary.innerText = summaryPanel.classList.contains('minimized') ? '▲' : '▼';
         });
 
+        // Кнопка импорта BetterQuesting
         const fileInput = document.getElementById('bq-file-input');
         document.getElementById('btn-import-bq').addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', (e) => {
@@ -62,8 +89,9 @@ export const Editor = {
             reader.readAsText(file);
         });
 
+        // Отмена импорта (возврат к старым данным)
         document.getElementById('btn-cancel-import').addEventListener('click', () => {
-            if (confirm('Отменить импорт? Вернется старая база квестов.')) {
+            if (confirm('Отменить импорт? Все незагруженные изменения пропадут.')) {
                 this.isImportMode = false;
                 this.data.mods = JSON.parse(JSON.stringify(this.originalData)); 
                 this.activeModId = this.data.mods.length > 0 ? this.data.mods[0].id : null;
@@ -73,25 +101,31 @@ export const Editor = {
             }
         });
 
+        // Применить импорт (сохранение в Firebase)
         document.getElementById('btn-apply-import').addEventListener('click', async () => {
-            if (confirm('ВНИМАНИЕ! Это перезапишет базу квестов. Вы уверены?')) {
+            if (confirm('ВНИМАНИЕ! Это полностью перезапишет текущую базу квестов. Продолжить?')) {
                 this.isImportMode = false;
                 document.getElementById('import-mode-bar').classList.add('hidden');
                 document.body.classList.remove('import-mode');
                 await DB.saveQuestsSilent(this.data.mods);
                 DB.logAction('Выполнил импорт базы BetterQuesting');
-                alert('Импорт успешно сохранен!');
+                alert('Импорт успешно завершен и сохранен!');
             }
         });
 
+        // Экспорт
         document.getElementById('btn-export-bq').addEventListener('click', () => BQ.exportData(this.data.mods));
     },
 
+    /**
+     * Автосохранение в базу Firebase
+     */
     triggerAutoSave() {
         if (!Auth.user || this.isImportMode) return; 
         const indicator = document.getElementById('save-indicator');
-        indicator.classList.remove('hidden'); indicator.innerText = "Сохранение..."; 
+        indicator.classList.remove('hidden'); 
         indicator.style.display = 'block';
+        indicator.innerText = "Сохранение..."; 
 
         clearTimeout(this.saveTimeout);
         this.saveTimeout = setTimeout(async () => {
@@ -104,11 +138,16 @@ export const Editor = {
         }, 1500);
     },
 
+    /**
+     * Автоматическая центровка камеры на квестах
+     */
     centerCanvas() {
         const mod = this.getActiveMod();
         const container = document.getElementById('canvas-container');
         if (!mod || !mod.quests || mod.quests.length === 0) {
-            this.scale = 1; this.panX = container.clientWidth / 2 - 26; this.panY = container.clientHeight / 2 - 26;
+            this.scale = 1; 
+            this.panX = container.clientWidth / 2 - 26; 
+            this.panY = container.clientHeight / 2 - 26;
             this.updateTransform(); return;
         }
 
@@ -119,56 +158,81 @@ export const Editor = {
             if (q.x + size > maxX) maxX = q.x + size; if (q.y + size > maxY) maxY = q.y + size;
         });
 
-        const padding = 100; const boxWidth = maxX - minX; const boxHeight = maxY - minY;
-        const contW = container.clientWidth; const contH = container.clientHeight;
-        const scaleX = (contW - padding * 2) / (boxWidth || 1); const scaleY = (contH - padding * 2) / (boxHeight || 1);
+        const padding = 100;
+        const boxWidth = maxX - minX;
+        const boxHeight = maxY - minY;
+        const contW = container.clientWidth;
+        const contH = container.clientHeight;
+        const scaleX = (contW - padding * 2) / (boxWidth || 1);
+        const scaleY = (contH - padding * 2) / (boxHeight || 1);
         
         this.scale = Math.max(0.1, Math.min(scaleX, scaleY, 1.5));
-        const centerX = minX + boxWidth / 2; const centerY = minY + boxHeight / 2;
-        this.panX = (contW / 2) - centerX * this.scale; this.panY = (contH / 2) - centerY * this.scale;
+        const centerX = minX + boxWidth / 2;
+        const centerY = minY + boxHeight / 2;
+        this.panX = (contW / 2) - centerX * this.scale;
+        this.panY = (contH / 2) - centerY * this.scale;
         this.updateTransform();
     },
 
+    /**
+     * Управление холстом (Мышь, зум, клики)
+     */
     bindCanvasEvents() {
         const container = document.getElementById('canvas-container');
         const tooltip = document.getElementById('quest-tooltip');
         const contextMenu = document.getElementById('node-context-menu');
 
+        // Зум колесиком
         container.addEventListener('wheel', (e) => {
             e.preventDefault();
             const zoomAmount = e.deltaY > 0 ? 0.9 : 1.1;
             const rect = container.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left; const mouseY = e.clientY - rect.top;
-            const canvasX = (mouseX - this.panX) / this.scale; const canvasY = (mouseY - this.panY) / this.scale;
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            const canvasX = (mouseX - this.panX) / this.scale;
+            const canvasY = (mouseY - this.panY) / this.scale;
 
             this.scale = Math.min(Math.max(0.1, this.scale * zoomAmount), 3);
-            this.panX = mouseX - canvasX * this.scale; this.panY = mouseY - canvasY * this.scale;
+            this.panX = mouseX - canvasX * this.scale;
+            this.panY = mouseY - canvasY * this.scale;
             this.updateTransform();
         });
 
+        // Начало перемещения холста (Панорама)
         container.addEventListener('mousedown', (e) => {
             contextMenu.classList.add('hidden');
             if (!e.target.closest('.quest-node') && !e.target.closest('.ui-element') && e.button === 0) {
-                this.isPanning = true; this.panStartX = e.clientX; this.panStartY = e.clientY;
-                this.initialPanX = this.panX; this.initialPanY = this.panY; container.style.cursor = 'grabbing';
+                this.isPanning = true; 
+                this.panStartX = e.clientX; 
+                this.panStartY = e.clientY;
+                this.initialPanX = this.panX; 
+                this.initialPanY = this.panY; 
+                container.style.cursor = 'grabbing';
             }
         });
 
         container.addEventListener('mousemove', (e) => {
             if (this.isPanning || this.draggedQuestId) tooltip.classList.add('hidden');
+            
+            // Двигаем камеру
             if (this.isPanning) {
                 this.panX = this.initialPanX + (e.clientX - this.panStartX);
                 this.panY = this.initialPanY + (e.clientY - this.panStartY);
                 this.updateTransform();
             }
+
+            // Двигаем узел квеста
             if (this.draggedQuestId) {
                 const quest = this.getActiveMod().quests.find(q => q.id === this.draggedQuestId);
-                const dx = (e.clientX - this.mouseStartX) / this.scale; const dy = (e.clientY - this.mouseStartY) / this.scale;
+                const dx = (e.clientX - this.mouseStartX) / this.scale; 
+                const dy = (e.clientY - this.mouseStartY) / this.scale;
                 if (Math.abs(dx) > 3 || Math.abs(dy) > 3) this.hasMovedNode = true;
-                quest.x = this.nodeStartX + dx; quest.y = this.nodeStartY + dy;
+                quest.x = this.nodeStartX + dx; 
+                quest.y = this.nodeStartY + dy;
                 this.renderCanvas(true); 
             }
 
+            // Подсветка при наведении (Тултип)
             const hoveredNode = e.target.closest('.quest-node');
             if (hoveredNode && !this.isPanning && !this.draggedQuestId && contextMenu.classList.contains('hidden')) {
                 const questId = hoveredNode.dataset.id;
@@ -177,26 +241,26 @@ export const Editor = {
                     const quest = this.getActiveMod().quests.find(q => q.id === questId);
                     if (quest) this.showTooltip(quest);
                 }
-                tooltip.style.left = (e.clientX + 15) + 'px'; tooltip.style.top = (e.clientY + 15) + 'px';
-            } else { this.hoveredQuestId = null; tooltip.classList.add('hidden'); }
-        });
-
-        container.addEventListener('mouseleave', () => {
-            tooltip.classList.add('hidden'); this.hoveredQuestId = null; this.isPanning = false;
-            if(this.draggedQuestId && this.hasMovedNode) this.triggerAutoSave();
-            this.draggedQuestId = null;
+                tooltip.style.left = (e.clientX + 15) + 'px'; 
+                tooltip.style.top = (e.clientY + 15) + 'px';
+            } else { 
+                this.hoveredQuestId = null; 
+                tooltip.classList.add('hidden'); 
+            }
         });
 
         window.addEventListener('mouseup', () => {
             this.isPanning = false;
             if (this.draggedQuestId && this.hasMovedNode) this.triggerAutoSave();
-            this.draggedQuestId = null; container.style.cursor = 'default';
+            this.draggedQuestId = null; 
+            container.style.cursor = 'default';
         });
 
+        // Создание квеста (ПКМ по пустому месту)
         container.addEventListener('contextmenu', (e) => {
             e.preventDefault();
             if (!Auth.user) return; 
-            if (!this.activeModId) return alert('Выберите ветку квестов!');
+            if (!this.activeModId) return alert('Сначала создайте ветку квестов!');
             if (e.target.closest('.quest-node') || e.target.closest('.ui-element')) return;
 
             contextMenu.classList.add('hidden');
@@ -206,18 +270,25 @@ export const Editor = {
             this.openQuestModal();
         });
 
+        // Кнопки контекстного меню
         document.getElementById('menu-copy').addEventListener('click', () => { contextMenu.classList.add('hidden'); this.copyQuest(this.contextNodeId); });
         document.getElementById('menu-delete').addEventListener('click', () => { contextMenu.classList.add('hidden'); this.deleteQuest(this.contextNodeId); });
         document.getElementById('menu-edit').addEventListener('click', () => { contextMenu.classList.add('hidden'); this.openQuestModal(this.contextNodeId); });
         document.getElementById('menu-link').addEventListener('click', () => { contextMenu.classList.add('hidden'); this.linkingFromNodeId = this.contextNodeId; this.renderCanvas(); });
     },
 
-    updateTransform() { document.getElementById('quest-canvas').style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`; },
+    updateTransform() { 
+        document.getElementById('quest-canvas').style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`; 
+    },
 
+    /**
+     * ОТРИСОВКА ХОЛСТА (Оптимизирована через Fragments)
+     */
     renderCanvas(skipSave = false) {
         const nodesLayer = document.getElementById('nodes-layer');
         const linesLayer = document.getElementById('connections-layer');
-        nodesLayer.innerHTML = ''; linesLayer.innerHTML = '';
+        nodesLayer.innerHTML = ''; 
+        linesLayer.innerHTML = '';
         
         const mod = this.getActiveMod();
         if (!mod) { this.updateSummary(); return; }
@@ -225,6 +296,7 @@ export const Editor = {
         const nodesFragment = document.createDocumentFragment();
         const linesFragment = document.createDocumentFragment();
 
+        // Рисуем линии связей
         mod.quests.forEach(quest => {
             if (quest.parents) {
                 quest.parents.forEach(pId => {
@@ -234,25 +306,75 @@ export const Editor = {
             }
         });
 
+        // Рисуем узлы квестов
         mod.quests.forEach(quest => {
             const node = document.createElement('div');
             const nodeSize = getSafeSize(quest.size);
             node.className = `quest-node size-${nodeSize}`;
             
             if (this.linkingFromNodeId === quest.id) node.classList.add('selected');
-            node.style.left = `${quest.x}px`; node.style.top = `${quest.y}px`;
+            node.style.left = `${quest.x}px`; 
+            node.style.top = `${quest.y}px`;
             node.dataset.id = quest.id;
             
-            let iconStr = '';
-            if (quest.icon) iconStr = quest.icon;
-            else if (quest.reqs && quest.reqs.length > 0) iconStr = quest.reqs[0].item.image;
-
+            let iconStr = quest.icon || (quest.reqs?.[0]?.item?.image);
             const iconPath = iconStr ? ItemsDB.getImageUrl(iconStr) : '';
-            node.innerHTML = `${iconPath ? `<img src="${iconPath}" loading="lazy">` : ''}<div class="node-title">${ItemsDB.formatMC(quest.title)}</div>`;
+
+            // Отрисовка контента узла (с цветным названием из Minecraft)
+            node.innerHTML = `
+                ${iconPath ? `<img src="${iconPath}" loading="lazy">` : ''}
+                <div class="node-title">${ItemsDB.formatMC(quest.title)}</div>
+            `;
+
+            // Обработка кликов по узлу
+            node.addEventListener('mousedown', (e) => {
+                if (e.button === 0 && Auth.user) {
+                    if (e.shiftKey || this.linkingFromNodeId) {
+                        e.stopPropagation();
+                        if (!this.linkingFromNodeId) {
+                            this.linkingFromNodeId = quest.id;
+                        } else {
+                            if (this.linkingFromNodeId !== quest.id) {
+                                if (!quest.parents) quest.parents = [];
+                                const idx = quest.parents.indexOf(this.linkingFromNodeId);
+                                if (idx > -1) quest.parents.splice(idx, 1);
+                                else quest.parents.push(this.linkingFromNodeId);
+                                this.triggerAutoSave(); 
+                            }
+                            this.linkingFromNodeId = null;
+                        }
+                        this.renderCanvas();
+                    } else {
+                        e.stopPropagation(); 
+                        this.draggedQuestId = quest.id; 
+                        this.hasMovedNode = false;
+                        this.mouseStartX = e.clientX; 
+                        this.mouseStartY = e.clientY;
+                        this.nodeStartX = quest.x; 
+                        this.nodeStartY = quest.y;
+                    }
+                }
+            });
+
+            node.addEventListener('click', (e) => {
+                if (e.button !== 0 || (e.shiftKey && Auth.user) || this.hasMovedNode) return; 
+                this.openQuestViewModal(quest.id);
+            });
+
+            node.addEventListener('contextmenu', (e) => {
+                e.preventDefault(); e.stopPropagation();
+                if (!Auth.user) return; 
+                this.contextNodeId = quest.id;
+                const menu = document.getElementById('node-context-menu');
+                menu.style.left = `${e.clientX}px`; 
+                menu.style.top = `${e.clientY}px`;
+                menu.classList.remove('hidden');
+            });
 
             nodesFragment.appendChild(node);
         });
 
+        // Массовая вставка в DOM
         linesLayer.appendChild(linesFragment);
         nodesLayer.appendChild(nodesFragment);
 
@@ -260,13 +382,20 @@ export const Editor = {
     },
 
     drawLine(svg, parent, child) {
-        const pSize = SIZE_MAP[getSafeSize(parent.size)] / 2; const cSize = SIZE_MAP[getSafeSize(child.size)] / 2;
+        const pSize = SIZE_MAP[getSafeSize(parent.size)] / 2; 
+        const cSize = SIZE_MAP[getSafeSize(child.size)] / 2;
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        line.setAttribute('x1', parent.x + pSize); line.setAttribute('y1', parent.y + pSize);
-        line.setAttribute('x2', child.x + cSize); line.setAttribute('y2', child.y + cSize);
-        line.setAttribute('class', 'quest-line'); svg.appendChild(line);
+        line.setAttribute('x1', parent.x + pSize); 
+        line.setAttribute('y1', parent.y + pSize);
+        line.setAttribute('x2', child.x + cSize); 
+        line.setAttribute('y2', child.y + cSize);
+        line.setAttribute('class', 'quest-line'); 
+        svg.appendChild(line);
     },
 
+    /**
+     * Вспомогательные функции для меток (Тултипы и Просмотр)
+     */
     getTaskLabel(r) {
         const t = r.taskType || 'retrieval';
         let name = r.customName || r.item.name;
@@ -289,65 +418,63 @@ export const Editor = {
         return ItemsDB.formatMC(name);
     },
 
+    /**
+     * Показ всплывающей подсказки
+     */
     showTooltip(quest) {
         const tt = document.getElementById('quest-tooltip');
         document.getElementById('tt-title').innerHTML = ItemsDB.formatMC(quest.title);
         document.getElementById('tt-desc').innerHTML = ItemsDB.formatMC(quest.desc || '');
         
-        let reqHtml = '';
-        if (quest.reqs && quest.reqs.length > 0) {
-            quest.reqs.forEach(r => { 
-                const consumeTag = (r.taskType !== 'hunt' && r.taskType !== 'block_break' && r.taskType !== 'checkbox' && r.taskType !== 'xp') 
-                    ? (r.consume !== false ? '<span style="color:#ff5555; font-size:12px; margin-left:6px;">[Забрать]</span>' : '<span style="color:#aaaaaa; font-size:12px; margin-left:6px;">[Наличие]</span>')
-                    : '';
-                reqHtml += `<div class="tt-item"><img src="${ItemsDB.getImageUrl(r.item.image)}" loading="lazy">${this.getTaskLabel(r)} x${r.count}${consumeTag}</div>`; 
-            });
-        } else reqHtml = 'Нет требований';
+        let reqHtml = (quest.reqs || []).map(r => {
+            const consume = (r.taskType !== 'hunt' && r.taskType !== 'block_break' && r.taskType !== 'checkbox') 
+                ? (r.consume !== false ? ' <span style="color:#ff5555;">[Забрать]</span>' : ' <span style="color:#aaa;">[Наличие]</span>') : '';
+            return `<div class="tt-item"><img src="${ItemsDB.getImageUrl(r.item.image)}" loading="lazy">${this.getTaskLabel(r)} x${r.count}${consume}</div>`;
+        }).join('') || 'Нет требований';
         document.getElementById('tt-reqs').innerHTML = reqHtml;
 
-        let rewHtml = '';
-        if (quest.rewards && quest.rewards.length > 0) {
-            quest.rewards.forEach(r => { 
-                const choiceTag = r.isChoice ? '<span style="color:#ffff55; font-size:12px; margin-left:6px;">[На выбор]</span>' : '';
-                rewHtml += `<div class="tt-item"><img src="${ItemsDB.getImageUrl(r.item.image)}" loading="lazy">${this.getRewardLabel(r)} x${r.count}${choiceTag}</div>`; 
-            });
-        } else rewHtml = 'Нет наград';
+        let rewHtml = (quest.rewards || []).map(r => {
+            const choice = r.isChoice ? ' <span style="color:#ffff55;">[На выбор]</span>' : '';
+            return `<div class="tt-item"><img src="${ItemsDB.getImageUrl(r.item.image)}" loading="lazy">${this.getRewardLabel(r)} x${r.count}${choice}</div>`;
+        }).join('') || 'Нет наград';
         document.getElementById('tt-rewards').innerHTML = rewHtml;
 
         tt.classList.remove('hidden');
     },
 
+    /**
+     * Обновление панели общей статистики наград
+     */
     updateSummary() {
         const container = document.getElementById('rewards-summary-list');
         const summaryPanel = document.getElementById('rewards-summary');
-        
         const mod = this.getActiveMod();
-        if (!mod) { summaryPanel.classList.add('hidden'); container.innerHTML = ''; return; }
+        if (!mod) { summaryPanel.classList.add('hidden'); return; }
 
         const totals = {};
         mod.quests.forEach(q => {
             (q.rewards || []).forEach(r => {
                 const name = this.getRewardLabel(r);
-                const key = name + (r.isChoice ? '___CHOICE' : '___GUARANTEED');
-                if (!totals[key]) totals[key] = { count: 0, item: r.item, name: name, isChoice: r.isChoice };
+                const key = name + (r.isChoice ? '_CH' : '_GR');
+                if (!totals[key]) totals[key] = { count: 0, item: r.item, name, isChoice: r.isChoice };
                 totals[key].count += parseInt(r.count || 1);
             });
         });
 
         if (Object.keys(totals).length > 0) {
             summaryPanel.classList.remove('hidden');
-            let htmlStr = ''; 
-            for (const key in totals) {
-                const choiceTag = totals[key].isChoice ? '<span style="color:#ffff55; font-size:12px; margin-left:4px;">[На выбор]</span>' : '';
-                htmlStr += `<div class="summary-item"><img src="${ItemsDB.getImageUrl(totals[key].item.image)}" loading="lazy"> ${totals[key].count}x ${totals[key].name}${choiceTag}</div>`;
-            }
-            container.innerHTML = htmlStr;
-        } else {
-            summaryPanel.classList.add('hidden');
-            container.innerHTML = '';
-        }
+            container.innerHTML = Object.values(totals).map(t => `
+                <div class="summary-item">
+                    <img src="${ItemsDB.getImageUrl(t.item.image)}" loading="lazy">
+                    ${t.count}x ${t.name}${t.isChoice ? ' <small>[На выбор]</small>':''}
+                </div>
+            `).join('');
+        } else summaryPanel.classList.add('hidden');
     },
 
+    /**
+     * Редактор NBT (JSON)
+     */
     bindNbtModalEvents() {
         document.getElementById('btn-close-nbt').addEventListener('click', () => {
             document.getElementById('nbt-editor-modal').classList.add('hidden');
@@ -366,42 +493,37 @@ export const Editor = {
                 document.getElementById('nbt-editor-modal').classList.add('hidden');
                 errDiv.innerText = '';
                 this.renderQuestEditForm(); 
-            } catch(e) { errDiv.innerText = 'Ошибка JSON! ' + e.message; }
+            } catch(e) { errDiv.innerText = 'Ошибка JSON: ' + e.message; }
         });
     },
 
+    /**
+     * Сохранение состояния полей ввода перед перерисовкой списков
+     */
     saveTempState() {
-        this.tempReqs.forEach((r, idx) => {
-            const typeSel = document.getElementById(`req-type-${idx}`);
-            if(typeSel) r.taskType = typeSel.value;
-            const countInp = document.getElementById(`req-count-${idx}`);
-            if (countInp) r.count = countInp.value;
-            const targetInp = document.getElementById(`req-target-${idx}`);
-            const nameInp = document.getElementById(`req-name-${idx}`);
-            if (r.taskType === 'hunt' || r.taskType === 'fluid') {
-                if (targetInp) { r.target = targetInp.value; r.customName = targetInp.value; }
-            } else if (r.taskType !== 'xp' && r.taskType !== 'checkbox') {
+        const saveList = (list, prefix) => {
+            list.forEach((r, idx) => {
+                const countInp = document.getElementById(`${prefix}-count-${idx}`);
+                const nameInp = document.getElementById(`${prefix}-name-${idx}`);
+                if (countInp) r.count = countInp.value;
                 if (nameInp) r.customName = nameInp.value;
-            }
-            const consumeCb = document.getElementById(`req-consume-${idx}`);
-            if (consumeCb) r.consume = consumeCb.checked;
-        });
-        this.tempRewards.forEach((r, idx) => {
-            const typeSel = document.getElementById(`rew-type-${idx}`);
-            if(typeSel) r.taskType = typeSel.value;
-            const countInp = document.getElementById(`rew-count-${idx}`);
-            if (countInp) r.count = countInp.value;
-            const nameInp = document.getElementById(`rew-name-${idx}`);
-            const cmdInp = document.getElementById(`rew-command-${idx}`);
-            const tierSel = document.getElementById(`rew-tier-${idx}`);
-            const choiceCb = document.getElementById(`rew-choice-${idx}`);
-            if (r.taskType === 'command') { if (cmdInp) r.command = cmdInp.value; } 
-            else if (r.taskType !== 'xp') { if (nameInp) r.customName = nameInp.value; }
-            if (tierSel) r.damage = parseInt(tierSel.value);
-            if (choiceCb) r.isChoice = choiceCb.checked;
-        });
+                
+                if (prefix === 'req') {
+                    const cb = document.getElementById(`req-consume-${idx}`);
+                    if (cb) r.consume = cb.checked;
+                } else {
+                    const cb = document.getElementById(`rew-choice-${idx}`);
+                    if (cb) r.isChoice = cb.checked;
+                }
+            });
+        };
+        saveList(this.tempReqs, 'req');
+        saveList(this.tempRewards, 'rew');
     },
 
+    /**
+     * Копирование квеста
+     */
     copyQuest(questId) {
         const mod = this.getActiveMod();
         const q = mod.quests.find(q => q.id === questId);
@@ -415,15 +537,14 @@ export const Editor = {
         this.triggerAutoSave(); this.renderCanvas();
     },
 
+    /**
+     * События окна редактирования квеста
+     */
     bindQuestModalEvents() {
         const modal = document.getElementById('quest-edit-modal');
         document.getElementById('btn-close-view').addEventListener('click', () => document.getElementById('quest-view-modal').classList.add('hidden'));
-        document.getElementById('btn-toggle-all-consume').addEventListener('click', () => {
-            this.saveTempState(); 
-            const target = this.tempReqs.some(r => r.consume === false);
-            this.tempReqs.forEach(r => r.consume = target);
-            this.renderQuestEditForm();
-        });
+
+        // Смена иконки квеста
         document.getElementById('btn-select-quest-icon').addEventListener('click', () => {
             this.saveTempState();
             this.openItemPicker((item) => {
@@ -431,6 +552,8 @@ export const Editor = {
                 document.getElementById('quest-icon-preview').innerHTML = `<img src="${ItemsDB.getImageUrl(item.image)}" style="width:32px; height:32px; image-rendering:pixelated;">`;
             });
         });
+
+        // Добавление новых строк
         document.getElementById('btn-add-req').addEventListener('click', () => {
             this.saveTempState();
             this.openItemPicker((item) => { 
@@ -438,6 +561,7 @@ export const Editor = {
                 this.renderQuestEditForm(); 
             });
         });
+
         document.getElementById('btn-add-reward').addEventListener('click', () => {
             this.saveTempState();
             this.openItemPicker((item) => { 
@@ -445,6 +569,8 @@ export const Editor = {
                 this.renderQuestEditForm(); 
             });
         });
+
+        // Сохранение квеста
         document.getElementById('btn-save-quest').addEventListener('click', () => {
             this.saveTempState(); 
             const mod = this.getActiveMod();
@@ -457,18 +583,25 @@ export const Editor = {
             };
             if (q) Object.assign(q, data);
             else mod.quests.push({ id: 'q_' + Date.now(), x: this.newQuestX, y: this.newQuestY, parents: [], ...data });
-            this.triggerAutoSave(); modal.classList.add('hidden'); this.renderCanvas();
+            this.triggerAutoSave(); 
+            modal.classList.add('hidden'); 
+            this.renderCanvas();
         });
+
         document.getElementById('btn-delete-quest').addEventListener('click', () => {
-            if(this.editingNodeId && confirm('Удалить квест?')) {
+            if(this.editingNodeId && confirm('Удалить квест навсегда?')) {
                 const mod = this.getActiveMod();
                 mod.quests = mod.quests.filter(q => q.id !== this.editingNodeId);
                 this.triggerAutoSave(); modal.classList.add('hidden'); this.renderCanvas();
             }
         });
+
         document.getElementById('btn-close-quest').addEventListener('click', () => modal.classList.add('hidden'));
     },
 
+    /**
+     * Окно ПРОСМОТРА квеста (ЛКМ)
+     */
     openQuestViewModal(questId) {
         const mod = this.getActiveMod();
         const quest = mod.quests.find(q => q.id === questId);
@@ -495,93 +628,102 @@ export const Editor = {
         modal.classList.remove('hidden');
     },
 
+    /**
+     * Открытие окна редактирования
+     */
     openQuestModal(questId = null) {
         this.editingNodeId = questId;
         const modal = document.getElementById('quest-edit-modal');
         const q = questId ? this.getActiveMod().quests.find(q => q.id === questId) : null;
+        
         document.getElementById('quest-title').value = q ? q.title : '';
         document.getElementById('quest-desc').value = q ? q.desc : '';
         document.getElementById('quest-size').value = q ? getSafeSize(q.size) : 'x1';
         this.tempQuestIcon = q ? q.icon : null;
         this.tempReqs = q ? JSON.parse(JSON.stringify(q.reqs || [])) : [];
         this.tempRewards = q ? JSON.parse(JSON.stringify(q.rewards || [])) : [];
+        
         document.getElementById('quest-icon-preview').innerHTML = this.tempQuestIcon ? `<img src="${ItemsDB.getImageUrl(this.tempQuestIcon)}" style="width:32px; height:32px; image-rendering:pixelated;">` : '';
         this.renderQuestEditForm();
         modal.classList.remove('hidden');
     },
 
+    /**
+     * Отрисовка списков в окне редактирования (Используется HELPER)
+     */
     renderQuestEditForm() {
-        const renderList = (box, list, isRew) => {
-            box.innerHTML = list.map((r, idx) => {
-                const t = r.taskType || (isRew ? 'item' : 'retrieval');
-                const nbtStyle = r.nbtTag ? 'color:#55ffff; border-color:#55ffff;' : '';
-                const isLoot = isRew && r.item?.item_key === 'bq_standard:loot_chest';
-                return `
-                    <div class="reward-row">
-                        <div class="mc-slot item-icon-btn" data-idx="${idx}" style="cursor:pointer; flex-shrink:0;">
-                            <img src="${ItemsDB.getImageUrl(r.item.image)}" width="24" height="24">
-                        </div>
-                        <input type="number" id="${isRew?'rew':'req'}-count-${idx}" class="mc-input" style="width:60px;" value="${r.count}">
-                        <input type="text" id="${isRew?'rew':'req'}-name-${idx}" class="mc-input custom-name-input" value="${r.customName || ''}">
-                        <button class="mc-button btn-nbt" data-idx="${idx}" style="${nbtStyle}">[NBT]</button>
-                        <button class="mc-button danger" data-idx="${idx}">X</button>
+        const renderList = (container, list, prefix) => {
+            container.innerHTML = list.map((r, idx) => `
+                <div class="reward-row">
+                    <div class="mc-slot item-icon-btn" data-idx="${idx}" style="cursor:pointer; flex-shrink:0;" title="Сменить иконку">
+                        <img src="${ItemsDB.getImageUrl(r.item.image)}" width="24" height="24">
                     </div>
-                `;
-            }).join('');
-            
-            box.querySelectorAll('.item-icon-btn').forEach(btn => btn.addEventListener('click', (e) => {
+                    <input type="number" id="${prefix}-count-${idx}" class="mc-input" style="width:65px;" value="${r.count}">
+                    <input type="text" id="${prefix}-name-${idx}" class="mc-input custom-name-input" value="${r.customName || ''}">
+                    <button class="mc-button btn-nbt" data-idx="${idx}" style="${r.nbtTag?'color:#55ffff; border-color:#55ffff;':''}">[NBT]</button>
+                    ${prefix==='req' ? `<label class="mc-checkbox" style="font-size:10px;"><input type="checkbox" id="req-consume-${idx}" ${r.consume!==false?'checked':''}> Забрать</label>` : ''}
+                    ${prefix==='rew' ? `<label class="mc-checkbox" style="font-size:10px;"><input type="checkbox" id="rew-choice-${idx}" ${r.isChoice?'checked':''}> Выбор</label>` : ''}
+                    <button class="mc-button danger btn-del" data-idx="${idx}">X</button>
+                </div>
+            `).join('');
+
+            // Вешаем события на кнопки
+            container.querySelectorAll('.item-icon-btn').forEach(b => b.addEventListener('click', () => {
                 this.saveTempState();
-                this.openItemPicker((item) => { 
-                    list[btn.dataset.idx].item = item; 
-                    list[btn.dataset.idx].customName = BQ.getCustomName(item, list[btn.dataset.idx].nbtTag);
+                this.openItemPicker(item => { 
+                    list[b.dataset.idx].item = item; 
+                    list[b.dataset.idx].customName = BQ.getCustomName(item, list[b.dataset.idx].nbtTag);
                     this.renderQuestEditForm(); 
                 });
             }));
-            box.querySelectorAll('.btn-nbt').forEach(btn => btn.addEventListener('click', () => {
+            container.querySelectorAll('.btn-nbt').forEach(b => b.addEventListener('click', () => {
                 this.saveTempState();
-                this.tempNbtTarget = list[btn.dataset.idx];
+                this.tempNbtTarget = list[b.dataset.idx];
                 document.getElementById('nbt-editor-textarea').value = JSON.stringify(this.tempNbtTarget.nbtTag || {}, null, 2);
                 document.getElementById('nbt-editor-modal').classList.remove('hidden');
             }));
-            box.querySelectorAll('.danger').forEach(btn => btn.addEventListener('click', () => { list.splice(btn.dataset.idx, 1); this.renderQuestEditForm(); }));
+            container.querySelectorAll('.btn-del').forEach(b => b.addEventListener('click', () => {
+                list.splice(b.dataset.idx, 1);
+                this.renderQuestEditForm();
+            }));
         };
-        renderList(document.getElementById('reqs-list'), this.tempReqs, false);
-        renderList(document.getElementById('rewards-list'), this.tempRewards, true);
+
+        renderList(document.getElementById('reqs-list'), this.tempReqs, 'req');
+        renderList(document.getElementById('rewards-list'), this.tempRewards, 'rew');
     },
 
+    /**
+     * Окно ВЫБОРА ПРЕДМЕТА
+     */
     bindItemPickerEvents() {
         const modal = document.getElementById('item-picker-modal');
-        const resultsContainer = document.getElementById('picker-results');
-        const searchInp = document.getElementById('picker-search');
+        const results = document.getElementById('picker-results');
+        const search = document.getElementById('picker-search');
         
-        const createItemElement = (item, isLoot = false) => {
+        const createEl = (item) => {
             const div = document.createElement('div');
             div.className = 'search-result-item';
             div.innerHTML = `<img src="${ItemsDB.getImageUrl(item.image)}" width="32" height="32" loading="lazy"><span>${ItemsDB.formatMC(item.name)}</span>`;
-            div.addEventListener('click', () => { 
-                modal.classList.add('hidden'); 
-                if (this.pickerCallback) this.pickerCallback(item); 
-            });
+            div.addEventListener('click', () => { modal.classList.add('hidden'); if(this.pickerCallback) this.pickerCallback(item); });
             return div;
         };
 
-        const triggerSearch = () => {
-            const data = ItemsDB.search(searchInp.value, '');
-            resultsContainer.innerHTML = '';
+        search.addEventListener('input', () => {
+            const data = ItemsDB.search(search.value, '');
+            results.innerHTML = '';
             const frag = document.createDocumentFragment();
-            data.slice(0, 50).forEach(item => frag.appendChild(createItemElement(item)));
-            resultsContainer.appendChild(frag);
-        };
+            data.slice(0, 60).forEach(i => frag.appendChild(createEl(i)));
+            results.appendChild(frag);
+        });
 
-        searchInp.addEventListener('input', triggerSearch);
         document.getElementById('btn-picker-cancel').addEventListener('click', () => modal.classList.add('hidden'));
 
         this.openItemPicker = (cb) => {
             this.pickerCallback = cb;
-            searchInp.value = '';
-            triggerSearch();
+            search.value = '';
+            search.dispatchEvent(new Event('input'));
             
-            // Рендер лутбоксов в правую панель
+            // Рендер лутбоксов в правую панель выбора
             const lootBox = document.getElementById('picker-loot-results');
             lootBox.innerHTML = Object.entries(this.lootGroups).map(([id, name]) => `
                 <div class="search-result-item loot-item" data-id="${id}" data-name="${name}">
@@ -599,6 +741,9 @@ export const Editor = {
         };
     },
 
+    /**
+     * Управление ветками (Модами) в сайдбаре
+     */
     bindModModalEvents() {
         const modal = document.getElementById('add-mod-modal');
         document.getElementById('btn-add-mod').addEventListener('click', () => {
@@ -607,16 +752,19 @@ export const Editor = {
             document.getElementById('mod-icon-preview').innerHTML = '';
             modal.classList.remove('hidden');
         });
+
         document.getElementById('btn-close-mod').addEventListener('click', () => modal.classList.add('hidden'));
+
         document.getElementById('btn-select-mod-icon').addEventListener('click', () => {
-            this.openItemPicker((item) => {
+            this.openItemPicker(item => {
                 this.tempModIcon = item.image;
                 document.getElementById('mod-icon-preview').innerHTML = `<div class="mc-slot"><img src="${ItemsDB.getImageUrl(item.image)}" width="32" height="32"></div>`;
             });
         });
+
         document.getElementById('btn-save-mod').addEventListener('click', () => {
             const name = document.getElementById('new-mod-name').value;
-            if (!name || !this.tempModIcon) return alert('Заполните данные!');
+            if (!name || !this.tempModIcon) return alert('Заполните все данные!');
             if (this.editingModId) {
                 const m = this.data.mods.find(m => m.id === this.editingModId);
                 m.name = name; m.icon = this.tempModIcon;
@@ -628,7 +776,8 @@ export const Editor = {
     },
 
     renderSidebar() {
-        document.getElementById('mod-list').innerHTML = this.data.mods.map((mod) => `
+        const list = document.getElementById('mod-list');
+        list.innerHTML = this.data.mods.map(mod => `
             <li class="mod-item ${this.activeModId === mod.id ? 'active' : ''}" data-id="${mod.id}">
                 <div class="mod-item-content">
                     <img src="${ItemsDB.getImageUrl(mod.icon)}" width="24" height="24">
@@ -636,8 +785,10 @@ export const Editor = {
                 </div>
             </li>
         `).join('');
+
         document.querySelectorAll('.mod-item').forEach(li => li.addEventListener('click', () => {
-            this.activeModId = li.dataset.id; this.renderSidebar(); this.renderCanvas(); this.centerCanvas();
+            this.activeModId = li.dataset.id;
+            this.renderSidebar(); this.renderCanvas(); this.centerCanvas();
         }));
     },
 
