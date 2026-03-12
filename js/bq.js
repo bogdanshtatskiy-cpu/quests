@@ -96,9 +96,14 @@ export const BQ = {
 
     parseData(jsonString, editor) {
         try {
-            const rawData = JSON.parse(jsonString);
+            // ГЕНИАЛЬНЫЙ ФИКС: Замораживаем огромные числа (UUID) и дробные нули (0.0), чтобы JS их не сломал
+            let safeJson = jsonString.replace(/"(?:\\\\.|[^"\\])*"|([\[:,]\s*)(-?\d{15,}|\-?\d+\.0+)(?=\s*[,\}\]])/g, (match, prefix, num) => {
+                if (prefix) return prefix + '"__BQ_NUM__' + num + '"';
+                return match; 
+            });
+
+            const rawData = JSON.parse(safeJson);
             
-            // Сохраняем глобальные настройки сервера
             const qsKey = Object.keys(rawData).find(k => k.startsWith('questSettings'));
             if (qsKey) {
                 editor.questSettings = { key: qsKey, data: rawData[qsKey] };
@@ -132,7 +137,6 @@ export const BQ = {
                     let actualId = String(q.questID !== undefined ? q.questID : cleanQKey).split(':')[0];
                     let reqs = []; let rewards = [];
                     
-                    // БЕРЕМ ОРИГИНАЛЬНЫЕ МАССИВЫ ЗАДАЧ И НАГРАД
                     let rawTasks = rawQ["tasks:9"] || {};
                     let rawRewards = rawQ["rewards:9"] || {};
                     
@@ -201,7 +205,6 @@ export const BQ = {
                         questIconStr = iconItemObj.image || '';
                     }
 
-                    // НАДЕЖНО СОХРАНЯЕМ ОРИГИНАЛЬНЫЕ НАСТРОЙКИ КВЕСТА
                     questsMap[actualId] = {
                         id: 'bq_' + actualId, 
                         numericId: parseInt(actualId),
@@ -234,7 +237,6 @@ export const BQ = {
                         });
                     }
                     
-                    // НАДЕЖНО СОХРАНЯЕМ ОРИГИНАЛЬНЫЕ НАСТРОЙКИ ВЕТКИ
                     newMods.push({ 
                         id: 'bq_mod_' + cleanLKey, 
                         numericId: parseInt(cleanLKey), 
@@ -310,7 +312,24 @@ export const BQ = {
             mod.quests.forEach(q => {
                 const bqId = idMap[q.id];
                 const preReqs = (q.parents || []).map(p => idMap[p]).filter(p => p !== undefined);
-                const tasks = {}; let taskIdx = 0;
+                const tasks = {}; 
+                
+                // ВАЖНО: Ищем максимальные индексы, чтобы не ломать порядок
+                let maxTaskIdx = -1;
+                (q.reqs || []).forEach(r => {
+                    if (r.rawTaskProps && r.rawTaskProps["index:3"] !== undefined) {
+                        if (r.rawTaskProps["index:3"] > maxTaskIdx) maxTaskIdx = r.rawTaskProps["index:3"];
+                    }
+                });
+                let taskIdx = maxTaskIdx + 1;
+
+                let maxRewIdx = -1;
+                (q.rewards || []).forEach(r => {
+                    if (r.rawRewProps && r.rawRewProps["index:3"] !== undefined) {
+                        if (r.rawRewProps["index:3"] > maxRewIdx) maxRewIdx = r.rawRewProps["index:3"];
+                    }
+                });
+                let rewIdx = maxRewIdx + 1;
                 
                 const createItemsDict = (arr) => {
                     const dict = {};
@@ -351,15 +370,15 @@ export const BQ = {
                     else groups[r.taskType || 'retrieval'].push(r); 
                 });
 
-                // ФУНКЦИЯ ДЛЯ ГЛУБОКОГО КОПИРОВАНИЯ НАСТРОЕК ТАСКОВ (чтобы сохранить ignoreNBT и др.)
                 const getTaskProps = (arr, defType) => {
                     let props = arr[0] && arr[0].rawTaskProps ? JSON.parse(JSON.stringify(arr[0].rawTaskProps)) : null;
                     if (!props) {
                         props = { "taskID:8": defType, "autoConsume:1": 0, "consume:1": arr[0]?.consume ? 1 : 0, "groupDetect:1": 0, "ignoreNBT:1": 1, "partialMatch:1": 1 };
+                        props["index:3"] = taskIdx++;
                     } else {
                         if (arr[0] && arr[0].consume !== undefined) props["consume:1"] = arr[0].consume ? 1 : 0;
+                        if (props["index:3"] === undefined) props["index:3"] = taskIdx++;
                     }
-                    props["index:3"] = taskIdx++;
                     return props;
                 };
 
@@ -396,7 +415,7 @@ export const BQ = {
                 
                 groups.hunt.forEach(h => {
                     let p = h.rawTaskProps ? JSON.parse(JSON.stringify(h.rawTaskProps)) : { "taskID:8": "bq_standard:hunt", "damageType:8": "", "ignoreNBT:1": 1, "subtypes:1": 1 };
-                    p["index:3"] = taskIdx++;
+                    if (p["index:3"] === undefined) p["index:3"] = taskIdx++;
                     p["target:8"] = h.target || h.customName || h.item.name;
                     p["required:3"] = parseInt(h.count) || 1;
                     if (h.nbtTag) p["targetNBT:10"] = h.nbtTag;
@@ -405,19 +424,23 @@ export const BQ = {
 
                 npcDialogs.forEach(req => {
                     let p = req.rawTaskProps ? JSON.parse(JSON.stringify(req.rawTaskProps)) : { "taskID:8": "bq_npc_integration:npc_dialog" };
-                    p["index:3"] = taskIdx++;
+                    if (p["index:3"] === undefined) p["index:3"] = taskIdx++;
                     let dialogId = 0;
                     if (req.nbtTag && req.nbtTag['npcDialogID:3'] !== undefined) dialogId = req.nbtTag['npcDialogID:3'];
                     p["npcDialogID:3"] = parseInt(dialogId) || 0;
                     tasks[`${p["index:3"]}:10`] = p;
                 });
 
-                const rewards = {}; let rewIdx = 0;
+                const rewards = {};
                 
                 const getRewProps = (arr, defType) => {
                     let props = arr[0] && arr[0].rawRewProps ? JSON.parse(JSON.stringify(arr[0].rawRewProps)) : null;
-                    if (!props) props = { "rewardID:8": defType, "ignoreNBT:1": 1 };
-                    props["index:3"] = rewIdx++;
+                    if (!props) {
+                        props = { "rewardID:8": defType, "ignoreNBT:1": 1 };
+                        props["index:3"] = rewIdx++;
+                    } else {
+                        if (props["index:3"] === undefined) props["index:3"] = rewIdx++;
+                    }
                     return props;
                 }
 
@@ -439,19 +462,18 @@ export const BQ = {
                     q.rewards.forEach(r => {
                         if (r.taskType === 'command') {
                             let p = r.rawRewProps ? JSON.parse(JSON.stringify(r.rawRewProps)) : { "rewardID:8": "bq_standard:command", "hideCommand:1": 1, "viaPlayer:1": 0 };
-                            p["index:3"] = rewIdx++;
+                            if (p["index:3"] === undefined) p["index:3"] = rewIdx++;
                             p["command:8"] = r.command || "";
                             rewards[`${p["index:3"]}:10`] = p;
                         } else if (r.taskType === 'xp') {
                             let p = r.rawRewProps ? JSON.parse(JSON.stringify(r.rawRewProps)) : { "rewardID:8": "bq_standard:xp", "isLevels:1": 1 };
-                            p["index:3"] = rewIdx++;
+                            if (p["index:3"] === undefined) p["index:3"] = rewIdx++;
                             p["amount:3"] = parseInt(r.count) || 1;
                             rewards[`${p["index:3"]}:10`] = p;
                         }
                     });
                 }
 
-                // НАДЕЖНО ВОССТАНАВЛИВАЕМ НАСТРОЙКИ КВЕСТА
                 let props = q.rawProps ? JSON.parse(JSON.stringify(q.rawProps)) : { 
                     "betterquesting:10": { 
                         "autoClaim:1": 0, "globalShare:1": 0, "isMain:1": 0, "isSilent:1": 0, "lockedProgress:1": 0, 
@@ -468,18 +490,15 @@ export const BQ = {
                 
                 if (q.iconItem) {
                     const { idKey, finalId, damage } = extractItemData({ item: q.iconItem, rawId: q.iconItem.rawId, rawDamage: q.iconItem.rawDamage });
-                    
                     let count = 1;
                     if (q.iconItem.rawCount !== undefined) {
                         count = q.iconItem.rawCount;
                     } else if (props["betterquesting:10"]["icon:10"] && props["betterquesting:10"]["icon:10"]["Count:3"] !== undefined) {
                         count = props["betterquesting:10"]["icon:10"]["Count:3"]; 
                     }
-                    
                     const iconDict = { "Count:3": count, "Damage:2": damage, "OreDict:8": "" };
                     iconDict[idKey] = finalId;
                     if (q.iconItem.nbtTag) iconDict["tag:10"] = q.iconItem.nbtTag;
-                    
                     props["betterquesting:10"]["icon:10"] = iconDict;
                 } else {
                      props["betterquesting:10"]["icon:10"] = { "id:8": "minecraft:book", "Count:3": 1, "Damage:2": 0, "OreDict:8": "" };
@@ -503,7 +522,6 @@ export const BQ = {
                 lineQuests[`${bqId}:10`] = { "x:3": Math.round(q.x / 3), "y:3": Math.round(q.y / 3), "id:3": bqId, "sizeX:3": sz, "sizeY:3": sz };
             });
 
-            // НАДЕЖНО ВОССТАНАВЛИВАЕМ НАСТРОЙКИ ВЕТОК
             let lineProps = mod.rawProps ? JSON.parse(JSON.stringify(mod.rawProps)) : {
                 "betterquesting:10": {
                     "bg_image:8": "minecraft:textures/gui/presets/window.png",
@@ -528,7 +546,12 @@ export const BQ = {
             };
         });
 
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(bqData, null, 2));
+        let outStr = JSON.stringify(bqData, null, 2);
+        
+        // ФИНАЛЬНЫЙ ШТРИХ: Снимаем защиту с чисел. Они снова станут полноценными гигантскими UUID и дробными числами без кавычек!
+        outStr = outStr.replace(/"__BQ_NUM__(-?\d{15,}|\-?\d+\.0+)"/g, '$1');
+
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(outStr);
         const downloadAnchorNode = document.createElement('a');
         downloadAnchorNode.setAttribute("href", dataStr);
         downloadAnchorNode.setAttribute("download", "QuestDatabase_Export.json");
