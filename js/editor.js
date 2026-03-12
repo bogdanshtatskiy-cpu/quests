@@ -20,6 +20,7 @@ export const Editor = {
     linkingFromNodeId: null, contextNodeId: null, editingNodeId: null, hoveredQuestId: null,
     
     pickerCallback: null, tempReqs: [], tempRewards: [], tempQuestIcon: null, editingModId: null, tempModIcon: null, saveTimeout: null,
+    tempNbtTarget: null, // Ссылка на текущий редактируемый предмет для NBT
 
     init() {
         this.bindCanvasEvents(); 
@@ -27,6 +28,7 @@ export const Editor = {
         this.bindQuestModalEvents();
         this.bindItemPickerEvents(); 
         this.bindTopBarEvents();
+        this.bindNbtModalEvents(); // Подключаем события NBT редактора
         this.renderSidebar(); 
         this.renderCanvas(); 
         this.centerCanvas(); 
@@ -375,6 +377,35 @@ export const Editor = {
         }
     },
 
+    // НОВОЕ: Обработка модалки NBT
+    bindNbtModalEvents() {
+        document.getElementById('btn-close-nbt').addEventListener('click', () => {
+            document.getElementById('nbt-editor-modal').classList.add('hidden');
+            this.tempNbtTarget = null;
+        });
+
+        document.getElementById('btn-save-nbt').addEventListener('click', () => {
+            const text = document.getElementById('nbt-editor-textarea').value;
+            const errDiv = document.getElementById('nbt-editor-error');
+            
+            try {
+                const parsed = text.trim() === '' || text.trim() === '{}' ? null : JSON.parse(text);
+                
+                if (this.tempNbtTarget) {
+                    this.tempNbtTarget.nbtTag = parsed;
+                    // Автоматически обновляем название на основе NBT
+                    this.tempNbtTarget.customName = BQ.getCustomName(this.tempNbtTarget.item, parsed);
+                }
+                
+                document.getElementById('nbt-editor-modal').classList.add('hidden');
+                errDiv.innerText = '';
+                this.renderQuestEditForm(); // Перерисовываем, чтобы показать новое имя
+            } catch(e) {
+                errDiv.innerText = 'Ошибка JSON! Проверьте скобки и запятые. Подробно: ' + e.message;
+            }
+        });
+    },
+
     saveTempState() {
         this.tempReqs.forEach((r, idx) => {
             const typeSel = document.getElementById(`req-type-${idx}`);
@@ -461,7 +492,7 @@ export const Editor = {
         document.getElementById('btn-add-req').addEventListener('click', () => {
             this.saveTempState();
             this.openItemPicker((item) => { 
-                this.tempReqs.push({ item: item, count: 1, customName: item.name, consume: true, taskType: 'retrieval' }); 
+                this.tempReqs.push({ item: item, count: 1, customName: BQ.getCustomName(item, null), consume: true, taskType: 'retrieval', nbtTag: null }); 
                 this.renderQuestEditForm(); 
             });
         });
@@ -469,7 +500,7 @@ export const Editor = {
         document.getElementById('btn-add-reward').addEventListener('click', () => {
             this.saveTempState();
             this.openItemPicker((item) => { 
-                this.tempRewards.push({ item: item, count: 1, customName: item.name, isChoice: false, damage: item.damage || 0, taskType: 'item' }); 
+                this.tempRewards.push({ item: item, count: 1, customName: BQ.getCustomName(item, null), isChoice: false, damage: item.damage || 0, taskType: 'item', nbtTag: null }); 
                 this.renderQuestEditForm(); 
             });
         });
@@ -616,6 +647,9 @@ export const Editor = {
 
             const showConsume = (tType === 'hunt' || tType === 'block_break' || tType === 'checkbox' || tType === 'xp') ? 'display:none;' : '';
 
+            // Подсветка, если есть NBT
+            let nbtBtnStyle = r.nbtTag ? 'color: #55ffff; border-color: #55ffff;' : '';
+
             div.innerHTML = `
                 <div class="mc-slot item-icon-btn" title="Кликните чтобы изменить иконку" style="cursor: pointer; flex-shrink:0;">
                     <img src="${ItemsDB.getImageUrl(r.item.image)}" width="24" height="24">
@@ -634,7 +668,7 @@ export const Editor = {
                 <input type="number" id="req-count-${idx}" class="mc-input" value="${r.count}" title="Количество">
                 ${targetInputHtml}
                 
-                <button class="mc-button btn-nbt" style="padding: 4px; font-size:12px; margin-left:5px;" title="NBT Данные">[NBT]</button>
+                <button class="mc-button btn-nbt" style="padding: 4px; font-size:12px; margin-left:5px; ${nbtBtnStyle}" title="NBT Данные">[NBT]</button>
 
                 <label class="mc-checkbox" title="Забирать предмет при сдаче квеста?" style="${showConsume}">
                     <input type="checkbox" id="req-consume-${idx}" ${isChecked}> Забрать
@@ -644,7 +678,11 @@ export const Editor = {
             
             div.querySelector('.item-icon-btn').addEventListener('click', () => {
                 this.saveTempState();
-                this.openItemPicker((pickedItem) => { this.tempReqs[idx].item = pickedItem; this.renderQuestEditForm(); });
+                this.openItemPicker((pickedItem) => { 
+                    this.tempReqs[idx].item = pickedItem; 
+                    this.tempReqs[idx].customName = BQ.getCustomName(pickedItem, this.tempReqs[idx].nbtTag);
+                    this.renderQuestEditForm(); 
+                });
             });
             div.querySelector('.task-type-select').addEventListener('change', (e) => {
                 this.saveTempState(); this.tempReqs[idx].taskType = e.target.value;
@@ -652,17 +690,17 @@ export const Editor = {
                 if(e.target.value === 'checkbox') this.tempReqs[idx].item = { item_key: 'checkbox', name: 'Галочка', image: 'checkbox.png', mod: 'Система' };
                 this.renderQuestEditForm(); 
             });
+            
+            // Вызов NBT редактора
             div.querySelector('.btn-nbt').addEventListener('click', () => {
                 this.saveTempState();
-                const currentNbt = this.tempReqs[idx].nbtTag ? JSON.stringify(this.tempReqs[idx].nbtTag, null, 2) : "{}";
-                const newNbtStr = prompt("NBT данные (JSON формат). Оставьте {} чтобы удалить NBT:", currentNbt);
-                if (newNbtStr !== null) {
-                    try {
-                        const parsed = JSON.parse(newNbtStr);
-                        this.tempReqs[idx].nbtTag = Object.keys(parsed).length === 0 ? null : parsed;
-                    } catch (e) { alert("Ошибка JSON!"); }
-                }
+                this.tempNbtTarget = this.tempReqs[idx];
+                const currentNbt = this.tempReqs[idx].nbtTag ? JSON.stringify(this.tempReqs[idx].nbtTag, null, 2) : "";
+                document.getElementById('nbt-editor-textarea').value = currentNbt;
+                document.getElementById('nbt-editor-error').innerText = '';
+                document.getElementById('nbt-editor-modal').classList.remove('hidden');
             });
+
             div.querySelector('.danger').addEventListener('click', () => { this.tempReqs.splice(idx, 1); this.renderQuestEditForm(); });
             reqBox.appendChild(div);
         });
@@ -690,6 +728,9 @@ export const Editor = {
             else targetInputHtml = `<input type="text" id="rew-name-${idx}" class="mc-input custom-name-input" value="${r.customName || ''}" placeholder="Название">`;
 
             const showChoice = (rType === 'command' || rType === 'xp') ? 'display:none;' : '';
+            
+            // Подсветка, если есть NBT
+            let nbtBtnStyle = r.nbtTag ? 'color: #55ffff; border-color: #55ffff;' : '';
 
             div.innerHTML = `
                 <div class="mc-slot item-icon-btn" title="Кликните чтобы изменить иконку" style="cursor: pointer; flex-shrink:0;">
@@ -707,7 +748,7 @@ export const Editor = {
                 ${isLootBox ? tierSelectHtml : ''}
                 ${targetInputHtml}
 
-                <button class="mc-button btn-nbt" style="padding: 4px; font-size:12px; margin-left:5px; ${rType !== 'item' ? 'display:none;' : ''}" title="NBT Данные">[NBT]</button>
+                <button class="mc-button btn-nbt" style="padding: 4px; font-size:12px; margin-left:5px; ${rType !== 'item' ? 'display:none;' : ''} ${nbtBtnStyle}" title="NBT Данные">[NBT]</button>
 
                 <label class="mc-checkbox" title="Предлагать этот предмет на выбор?" style="${showChoice}">
                     <input type="checkbox" id="rew-choice-${idx}" ${isChoice}> На выбор
@@ -717,7 +758,11 @@ export const Editor = {
             
             div.querySelector('.item-icon-btn').addEventListener('click', () => {
                 this.saveTempState();
-                this.openItemPicker((pickedItem) => { this.tempRewards[idx].item = pickedItem; this.renderQuestEditForm(); });
+                this.openItemPicker((pickedItem) => { 
+                    this.tempRewards[idx].item = pickedItem; 
+                    this.tempRewards[idx].customName = BQ.getCustomName(pickedItem, this.tempRewards[idx].nbtTag);
+                    this.renderQuestEditForm(); 
+                });
             });
             div.querySelector('.task-type-select').addEventListener('change', (e) => {
                 this.saveTempState(); this.tempRewards[idx].taskType = e.target.value;
@@ -725,17 +770,15 @@ export const Editor = {
                 if(e.target.value === 'command') this.tempRewards[idx].item = { item_key: 'command', name: 'Команда', image: 'command_block.png', mod: 'Система' };
                 this.renderQuestEditForm(); 
             });
+            
             if(rType === 'item') {
                 div.querySelector('.btn-nbt').addEventListener('click', () => {
                     this.saveTempState();
-                    const currentNbt = this.tempRewards[idx].nbtTag ? JSON.stringify(this.tempRewards[idx].nbtTag, null, 2) : "{}";
-                    const newNbtStr = prompt("NBT данные (JSON формат). Оставьте {} чтобы удалить NBT:", currentNbt);
-                    if (newNbtStr !== null) {
-                        try {
-                            const parsed = JSON.parse(newNbtStr);
-                            this.tempRewards[idx].nbtTag = Object.keys(parsed).length === 0 ? null : parsed;
-                        } catch (e) { alert("Ошибка JSON!"); }
-                    }
+                    this.tempNbtTarget = this.tempRewards[idx];
+                    const currentNbt = this.tempRewards[idx].nbtTag ? JSON.stringify(this.tempRewards[idx].nbtTag, null, 2) : "";
+                    document.getElementById('nbt-editor-textarea').value = currentNbt;
+                    document.getElementById('nbt-editor-error').innerText = '';
+                    document.getElementById('nbt-editor-modal').classList.remove('hidden');
                 });
             }
             div.querySelector('.danger').addEventListener('click', () => { this.tempRewards.splice(idx, 1); this.renderQuestEditForm(); });
@@ -963,7 +1006,6 @@ export const Editor = {
                     const rect = li.getBoundingClientRect();
                     const midY = rect.top + rect.height / 2;
                     
-                    // Подсвечиваем верх или низ в зависимости от положения мыши
                     if (e.clientY < midY) {
                         li.classList.add('drag-top');
                         li.classList.remove('drag-bottom');
@@ -991,12 +1033,10 @@ export const Editor = {
                     const midY = rect.top + rect.height / 2;
                     
                     let newIndex = index;
-                    if (e.clientY > midY) newIndex++; // Если бросили на нижнюю половину, вставляем после
+                    if (e.clientY > midY) newIndex++;
 
-                    // Корректируем индекс из-за сдвига массива при удалении
                     if (draggedIndex < newIndex) newIndex--;
 
-                    // Меняем местами в данных
                     const movedItem = this.data.mods.splice(draggedIndex, 1)[0];
                     this.data.mods.splice(newIndex, 0, movedItem);
 
