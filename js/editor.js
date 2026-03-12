@@ -27,15 +27,20 @@ export const Editor = {
     initialPanY: 0,
     
     draggedQuestId: null, 
+    draggedCommentId: null, // Добавлено для комментариев
     mouseStartX: 0, 
     mouseStartY: 0, 
     nodeStartX: 0, 
     nodeStartY: 0, 
     hasMovedNode: false,
     linkingFromNodeId: null, 
+    
     contextNodeId: null, 
+    contextCommentId: null, // Для ПКМ по комментарию
     editingNodeId: null, 
+    editingCommentId: null, // Для окна редактирования коммента
     hoveredQuestId: null,
+    hoveredCommentId: null, // Для тултипа коммента
     
     pickerCallback: null, 
     tempReqs: [], 
@@ -52,6 +57,7 @@ export const Editor = {
         this.bindCanvasEvents(); 
         this.bindModModalEvents(); 
         this.bindQuestModalEvents();
+        this.bindCommentModalEvents(); // Инициализация окна комментов
         this.bindItemPickerEvents(); 
         this.bindTopBarEvents();
         this.bindNbtModalEvents(); 
@@ -61,6 +67,7 @@ export const Editor = {
         const tooltip = document.getElementById('quest-tooltip');
         if (tooltip) tooltip.classList.add('hidden');
         this.hoveredQuestId = null;
+        this.hoveredCommentId = null;
     },
 
     addMobToDatalist(mobName) {
@@ -192,7 +199,19 @@ export const Editor = {
     bindCanvasEvents() {
         const container = document.getElementById('canvas-container');
         const tooltip = document.getElementById('quest-tooltip');
-        const contextMenu = document.getElementById('node-context-menu');
+        
+        const canvasMenu = document.getElementById('canvas-context-menu');
+        const nodeMenu = document.getElementById('node-context-menu');
+        const commentMenu = document.getElementById('comment-context-menu');
+
+        // Скрытие всех меню при клике мимо
+        window.addEventListener('click', (e) => {
+            if (!e.target.closest('.context-menu')) {
+                if (canvasMenu) canvasMenu.classList.add('hidden');
+                if (nodeMenu) nodeMenu.classList.add('hidden');
+                if (commentMenu) commentMenu.classList.add('hidden');
+            }
+        });
 
         container.addEventListener('wheel', (e) => {
             e.preventDefault();
@@ -213,8 +232,11 @@ export const Editor = {
         });
 
         container.addEventListener('mousedown', (e) => {
-            contextMenu.classList.add('hidden');
-            if (!e.target.closest('.quest-node') && !e.target.closest('.ui-element') && e.button === 0) {
+            if (nodeMenu) nodeMenu.classList.add('hidden');
+            if (canvasMenu) canvasMenu.classList.add('hidden');
+            if (commentMenu) commentMenu.classList.add('hidden');
+
+            if (!e.target.closest('.quest-node') && !e.target.closest('.quest-comment') && !e.target.closest('.ui-element') && e.button === 0) {
                 this.isPanning = true; 
                 this.panStartX = e.clientX; 
                 this.panStartY = e.clientY;
@@ -226,7 +248,7 @@ export const Editor = {
         });
 
         container.addEventListener('mousemove', (e) => {
-            if (this.isPanning || this.draggedQuestId) {
+            if (this.isPanning || this.draggedQuestId || this.draggedCommentId) {
                 this.hideTooltip();
             }
             
@@ -236,31 +258,59 @@ export const Editor = {
                 this.updateTransform();
             }
             
+            // Движение квеста
             if (this.draggedQuestId) {
                 const quest = this.getActiveMod().quests.find(q => q.id === this.draggedQuestId);
                 const dx = (e.clientX - this.mouseStartX) / this.scale; 
                 const dy = (e.clientY - this.mouseStartY) / this.scale;
-                
-                if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
-                    this.hasMovedNode = true;
-                }
-                
+                if (Math.abs(dx) > 3 || Math.abs(dy) > 3) this.hasMovedNode = true;
                 quest.x = this.nodeStartX + dx; 
                 quest.y = this.nodeStartY + dy;
                 this.renderCanvas(true); 
             }
 
+            // Движение комментария
+            if (this.draggedCommentId) {
+                const comment = this.getActiveMod().comments.find(c => c.id === this.draggedCommentId);
+                const dx = (e.clientX - this.mouseStartX) / this.scale; 
+                const dy = (e.clientY - this.mouseStartY) / this.scale;
+                if (Math.abs(dx) > 3 || Math.abs(dy) > 3) this.hasMovedNode = true;
+                comment.x = this.nodeStartX + dx; 
+                comment.y = this.nodeStartY + dy;
+                this.renderCanvas(true); 
+            }
+
             const hoveredNode = e.target.closest('.quest-node');
-            if (hoveredNode && !this.isPanning && !this.draggedQuestId && contextMenu.classList.contains('hidden')) {
+            const hoveredComment = e.target.closest('.quest-comment');
+            
+            const isMenuHidden = (!nodeMenu || nodeMenu.classList.contains('hidden')) && 
+                                 (!canvasMenu || canvasMenu.classList.contains('hidden')) &&
+                                 (!commentMenu || commentMenu.classList.contains('hidden'));
+
+            // Логика Тултипов
+            if (hoveredNode && !this.isPanning && !this.draggedQuestId && !this.draggedCommentId && isMenuHidden) {
                 const questId = hoveredNode.dataset.id;
                 if (this.hoveredQuestId !== questId) {
                     this.hoveredQuestId = questId;
+                    this.hoveredCommentId = null;
                     const quest = this.getActiveMod().quests.find(q => q.id === questId);
                     if (quest) this.showTooltip(quest);
                 }
                 tooltip.style.left = (e.clientX + 15) + 'px'; 
                 tooltip.style.top = (e.clientY + 15) + 'px';
-            } else { 
+            } 
+            else if (hoveredComment && !this.isPanning && !this.draggedQuestId && !this.draggedCommentId && isMenuHidden) {
+                const cId = hoveredComment.dataset.id;
+                if (this.hoveredCommentId !== cId) {
+                    this.hoveredCommentId = cId;
+                    this.hoveredQuestId = null;
+                    const comment = this.getActiveMod().comments?.find(c => c.id === cId);
+                    if (comment) this.showCommentTooltip(comment);
+                }
+                tooltip.style.left = (e.clientX + 15) + 'px'; 
+                tooltip.style.top = (e.clientY + 15) + 'px';
+            } 
+            else { 
                 this.hideTooltip();
             }
         });
@@ -268,51 +318,84 @@ export const Editor = {
         container.addEventListener('mouseleave', () => {
             this.hideTooltip();
             this.isPanning = false;
-            if (this.draggedQuestId && this.hasMovedNode) this.triggerAutoSave();
+            if ((this.draggedQuestId || this.draggedCommentId) && this.hasMovedNode) this.triggerAutoSave();
             this.draggedQuestId = null;
+            this.draggedCommentId = null;
         });
 
         window.addEventListener('mouseup', () => {
             this.isPanning = false;
-            if (this.draggedQuestId && this.hasMovedNode) this.triggerAutoSave();
+            if ((this.draggedQuestId || this.draggedCommentId) && this.hasMovedNode) this.triggerAutoSave();
             this.draggedQuestId = null; 
+            this.draggedCommentId = null; 
             container.style.cursor = 'default';
         });
 
+        // ПКМ по пустому холсту -> Меню холста
         container.addEventListener('contextmenu', (e) => {
             e.preventDefault();
             this.hideTooltip(); 
             
             if (!Auth.user) return; 
             if (!this.activeModId) return alert('Сначала выберите или создайте ветку квестов!');
-            if (e.target.closest('.quest-node') || e.target.closest('.ui-element')) return;
+            
+            // Если клик был не по квесту и не по комменту
+            if (e.target.closest('.quest-node') || e.target.closest('.quest-comment') || e.target.closest('.ui-element')) return;
 
-            contextMenu.classList.add('hidden');
+            if (nodeMenu) nodeMenu.classList.add('hidden');
+            if (commentMenu) commentMenu.classList.add('hidden');
+
             const rect = container.getBoundingClientRect();
             this.newQuestX = (e.clientX - rect.left - this.panX) / this.scale - 26; 
             this.newQuestY = (e.clientY - rect.top - this.panY) / this.scale - 26;
-            this.openQuestModal();
+
+            canvasMenu.style.left = `${e.clientX}px`; 
+            canvasMenu.style.top = `${e.clientY}px`;
+            canvasMenu.classList.remove('hidden');
         });
 
-        document.getElementById('menu-copy').addEventListener('click', () => { 
-            contextMenu.classList.add('hidden'); 
+        // КНОПКИ МЕНЮ ХОЛСТА
+        document.getElementById('menu-add-quest')?.addEventListener('click', () => {
+            document.getElementById('canvas-context-menu').classList.add('hidden');
+            this.openQuestModal();
+        });
+        document.getElementById('menu-add-comment')?.addEventListener('click', () => {
+            document.getElementById('canvas-context-menu').classList.add('hidden');
+            this.openCommentModal();
+        });
+
+        // КНОПКИ МЕНЮ КВЕСТА
+        document.getElementById('menu-copy')?.addEventListener('click', () => { 
+            nodeMenu.classList.add('hidden'); 
             this.copyQuest(this.contextNodeId); 
         });
-        
-        document.getElementById('menu-delete').addEventListener('click', () => { 
-            contextMenu.classList.add('hidden'); 
+        document.getElementById('menu-delete')?.addEventListener('click', () => { 
+            nodeMenu.classList.add('hidden'); 
             this.deleteQuest(this.contextNodeId); 
         });
-        
-        document.getElementById('menu-edit').addEventListener('click', () => { 
-            contextMenu.classList.add('hidden'); 
+        document.getElementById('menu-edit')?.addEventListener('click', () => { 
+            nodeMenu.classList.add('hidden'); 
             this.openQuestModal(this.contextNodeId); 
         });
-        
-        document.getElementById('menu-link').addEventListener('click', () => { 
-            contextMenu.classList.add('hidden'); 
+        document.getElementById('menu-link')?.addEventListener('click', () => { 
+            nodeMenu.classList.add('hidden'); 
             this.linkingFromNodeId = this.contextNodeId; 
             this.renderCanvas(); 
+        });
+
+        // КНОПКИ МЕНЮ КОММЕНТАРИЯ
+        document.getElementById('menu-edit-comment')?.addEventListener('click', () => {
+            commentMenu.classList.add('hidden');
+            this.openCommentModal(this.contextCommentId);
+        });
+        document.getElementById('menu-delete-comment')?.addEventListener('click', () => {
+            commentMenu.classList.add('hidden');
+            if (confirm('Удалить комментарий?')) {
+                const mod = this.getActiveMod();
+                mod.comments = mod.comments.filter(c => c.id !== this.contextCommentId);
+                this.triggerAutoSave();
+                this.renderCanvas();
+            }
         });
     },
 
@@ -336,6 +419,7 @@ export const Editor = {
         const nodesFragment = document.createDocumentFragment();
         const linesFragment = document.createDocumentFragment();
 
+        // Линии связей
         mod.quests.forEach(quest => {
             if (quest.parents) {
                 quest.parents.forEach(pId => {
@@ -347,6 +431,48 @@ export const Editor = {
             }
         });
 
+        // Отрисовка комментариев
+        if (mod.comments && mod.comments.length > 0) {
+            mod.comments.forEach(c => {
+                const cNode = document.createElement('div');
+                cNode.className = 'quest-comment';
+                cNode.style.left = `${c.x}px`;
+                cNode.style.top = `${c.y}px`;
+                cNode.dataset.id = c.id;
+                cNode.innerHTML = `i`; // Иконка инфо
+
+                cNode.addEventListener('mousedown', (e) => {
+                    if (e.button === 0 && Auth.user) {
+                        e.stopPropagation();
+                        this.draggedCommentId = c.id;
+                        this.hasMovedNode = false;
+                        this.mouseStartX = e.clientX;
+                        this.mouseStartY = e.clientY;
+                        this.nodeStartX = c.x;
+                        this.nodeStartY = c.y;
+                    }
+                });
+
+                cNode.addEventListener('contextmenu', (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    this.hideTooltip();
+                    if (!Auth.user) return;
+                    this.contextCommentId = c.id;
+                    
+                    document.getElementById('canvas-context-menu').classList.add('hidden');
+                    document.getElementById('node-context-menu').classList.add('hidden');
+                    
+                    const menu = document.getElementById('comment-context-menu');
+                    menu.style.left = `${e.clientX}px`;
+                    menu.style.top = `${e.clientY}px`;
+                    menu.classList.remove('hidden');
+                });
+
+                nodesFragment.appendChild(cNode);
+            });
+        }
+
+        // Отрисовка квестов
         mod.quests.forEach(quest => {
             const node = document.createElement('div');
             const nodeSize = getSafeSize(quest.size);
@@ -435,6 +561,10 @@ export const Editor = {
                 
                 if (!Auth.user) return; 
                 this.contextNodeId = quest.id;
+                
+                document.getElementById('canvas-context-menu').classList.add('hidden');
+                document.getElementById('comment-context-menu').classList.add('hidden');
+                
                 const menu = document.getElementById('node-context-menu');
                 menu.style.left = `${e.clientX}px`; 
                 menu.style.top = `${e.clientY}px`;
@@ -468,7 +598,6 @@ export const Editor = {
 
     getTaskLabel(r) {
         const t = r.taskType || 'retrieval';
-        // ИСПРАВЛЕНИЕ: Выводим customName, если он есть (в нём лежит перевод жидкостей)
         let name = r.customName || (r.item ? r.item.name : 'Предмет');
         
         if (t === 'hunt') return `Убить: ${ItemsDB.formatMC(name)}`;
@@ -494,11 +623,28 @@ export const Editor = {
         return ItemsDB.formatMC(name);
     },
 
+    // Тултип для комментария
+    showCommentTooltip(comment) {
+        const tt = document.getElementById('quest-tooltip');
+        document.getElementById('tt-title').innerHTML = "<span style='color:#ffaa00;'>Комментарий</span>";
+        document.getElementById('tt-desc').innerHTML = ItemsDB.formatMC(comment.text || '');
+        
+        document.getElementById('tt-parents-container').style.display = 'none';
+        document.getElementById('tt-reqs-container').style.display = 'none';
+        document.getElementById('tt-rewards-container').style.display = 'none';
+        
+        tt.classList.remove('hidden');
+    },
+
     showTooltip(quest) {
         const tt = document.getElementById('quest-tooltip');
         document.getElementById('tt-title').innerHTML = ItemsDB.formatMC(quest.title);
         document.getElementById('tt-desc').innerHTML = ItemsDB.formatMC(quest.desc || '');
         
+        // Включаем обратно скрытые блоки, если тултип переключился с комментария
+        document.getElementById('tt-reqs-container').style.display = 'block';
+        document.getElementById('tt-rewards-container').style.display = 'block';
+
         const parentsContainer = document.getElementById('tt-parents-container');
         if (quest.parents && quest.parents.length > 0) {
             let pNames = [];
@@ -616,6 +762,53 @@ export const Editor = {
         });
     },
 
+    // Окно Комментария (Новое)
+    bindCommentModalEvents() {
+        const modal = document.getElementById('comment-edit-modal');
+        
+        document.getElementById('btn-close-comment').addEventListener('click', () => {
+            modal.classList.add('hidden');
+        });
+
+        document.getElementById('btn-save-comment').addEventListener('click', () => {
+            const text = document.getElementById('comment-text').value;
+            const mod = this.getActiveMod();
+            
+            if (!mod.comments) mod.comments = [];
+            
+            if (this.editingCommentId) {
+                const c = mod.comments.find(item => item.id === this.editingCommentId);
+                if (c) c.text = text;
+            } else {
+                mod.comments.push({
+                    id: 'c_' + Date.now(),
+                    x: this.newQuestX + 13, // небольшой сдвиг, чтобы отцентровать круг на мышке
+                    y: this.newQuestY + 13,
+                    text: text
+                });
+            }
+            
+            this.triggerAutoSave();
+            modal.classList.add('hidden');
+            this.renderCanvas();
+        });
+    },
+
+    openCommentModal(commentId = null) {
+        this.editingCommentId = commentId;
+        const modal = document.getElementById('comment-edit-modal');
+        
+        if (commentId) {
+            const c = this.getActiveMod().comments.find(item => item.id === commentId);
+            document.getElementById('comment-text').value = c ? (c.text || '') : '';
+        } else {
+            document.getElementById('comment-text').value = '';
+        }
+        
+        modal.classList.remove('hidden');
+        setTimeout(() => document.getElementById('comment-text').focus(), 50);
+    },
+
     saveTempState() {
         this.tempReqs.forEach((r, idx) => {
             const typeSel = document.getElementById(`req-type-${idx}`);
@@ -630,7 +823,6 @@ export const Editor = {
             if (r.taskType === 'hunt' || r.taskType === 'fluid') {
                 if (targetInp) { 
                     r.target = targetInp.value; 
-                    // ИСПРАВЛЕНИЕ: Если жидкость - переводим её, иначе сохраняем как есть
                     if (r.taskType === 'fluid') {
                         r.customName = BQ.FLUIDS[r.target] || r.target;
                     } else {
@@ -1018,7 +1210,6 @@ export const Editor = {
             const isChecked = r.consume !== false ? 'checked' : '';
             
             let targetInputHtml = '';
-            // ИСПРАВЛЕНИЕ: Выводим системный ID в поле ввода (target)
             if (tType === 'hunt') targetInputHtml = `<input type="text" id="req-target-${idx}" list="mob-list" class="mc-input custom-name-input" value="${r.target || r.customName || ''}" placeholder="Моб (напр. Creeper)">`;
             else if (tType === 'fluid') targetInputHtml = `<input type="text" id="req-target-${idx}" class="mc-input custom-name-input" value="${r.target || ''}" placeholder="Жидкость (напр. water)">`;
             else if (tType === 'checkbox') targetInputHtml = `<input type="text" id="req-name-${idx}" class="mc-input custom-name-input" value="Нажать галочку" disabled>`;
