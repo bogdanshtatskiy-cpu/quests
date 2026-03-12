@@ -122,45 +122,53 @@ export const BQ = {
                     let actualId = String(q.questID !== undefined ? q.questID : qKey).split(':')[0];
                     let reqs = []; let rewards = [];
                     
+                    let originalTasks = rawData["questDatabase:9"][qKey] ? rawData["questDatabase:9"][qKey]["tasks:9"] : null;
+                    
                     if (q.tasks) {
-                        Object.values(q.tasks).forEach(task => {
+                        Object.values(q.tasks).forEach((task, idx) => {
+                            let rawTask = originalTasks ? originalTasks[Object.keys(originalTasks)[idx]] : null;
+                            
                             if (task.requiredItems && (task.taskID === 'bq_standard:retrieval' || task.taskID === 'bq_standard:crafting')) {
                                 Object.values(task.requiredItems).forEach(item => {
                                     const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage);
-                                    reqs.push({ item: foundItem, rawId: item.id, rawDamage: item.Damage, count: item.Count !== undefined ? item.Count : 1, customName: this.getCustomName(foundItem, item.tag), consume: task.consume || false, taskType: task.taskID.split(':')[1], nbtTag: item.tag });
+                                    reqs.push({ item: foundItem, rawId: item.id, rawDamage: item.Damage, count: item.Count !== undefined ? item.Count : 1, customName: this.getCustomName(foundItem, item.tag), consume: task.consume || false, taskType: task.taskID.split(':')[1], nbtTag: item.tag, rawTaskProps: rawTask });
                                 });
                             } else if (task.blocks && task.taskID === 'bq_standard:block_break') {
                                 Object.values(task.blocks).forEach(block => {
                                     const foundItem = ItemsDB.findItemByBQ(block.blockID || block.id, block.meta || block.Damage);
-                                    reqs.push({ item: foundItem, rawId: block.blockID || block.id, rawDamage: block.meta !== undefined ? block.meta : block.Damage, count: block.amount !== undefined ? block.amount : (block.Count !== undefined ? block.Count : 1), customName: this.getCustomName(foundItem, block.nbt), consume: false, taskType: 'block_break', nbtTag: block.nbt });
+                                    reqs.push({ item: foundItem, rawId: block.blockID || block.id, rawDamage: block.meta !== undefined ? block.meta : block.Damage, count: block.amount !== undefined ? block.amount : (block.Count !== undefined ? block.Count : 1), customName: this.getCustomName(foundItem, block.nbt), consume: false, taskType: 'block_break', nbtTag: block.nbt, rawTaskProps: rawTask });
                                 });
                             } else if (task.taskID === 'bq_standard:hunt') {
-                                 reqs.push({ item: { item_key: `mob_${task.target}`, name: task.target, image: 'skull.png', mod: 'Мобы' }, count: task.required || 1, target: task.target, customName: task.target, consume: false, taskType: 'hunt', nbtTag: task.targetNBT });
+                                 reqs.push({ item: { item_key: `mob_${task.target}`, name: task.target, image: 'skull.png', mod: 'Мобы' }, count: task.required || 1, target: task.target, customName: task.target, consume: false, taskType: 'hunt', nbtTag: task.targetNBT, rawTaskProps: rawTask });
                             } else if (task.taskID === 'bq_standard:fluid') {
                                 Object.values(task.requiredFluids || {}).forEach(f => {
-                                    reqs.push({ item: { item_key: `f_${f.FluidName}`, name: this.FLUIDS[f.FluidName] || f.FluidName, image: 'fluid_bucket.png', mod: 'Жидкость' }, rawFluid: f.FluidName || "water", count: f.Amount || 1000, target: f.FluidName, customName: this.FLUIDS[f.FluidName] || f.FluidName, consume: task.consume || false, taskType: 'fluid' });
+                                    reqs.push({ item: { item_key: `f_${f.FluidName}`, name: this.FLUIDS[f.FluidName] || f.FluidName, image: 'fluid_bucket.png', mod: 'Жидкость' }, rawFluid: f.FluidName || "water", count: f.Amount || 1000, target: f.FluidName, customName: this.FLUIDS[f.FluidName] || f.FluidName, consume: task.consume || false, taskType: 'fluid', rawTaskProps: rawTask });
                                 });
                             } else if (task.taskID === 'bq_standard:checkbox') {
-                                reqs.push({ item: { item_key: 'checkbox', name: 'Галочка', image: 'checkbox.png', mod: 'Задачи' }, count: 1, customName: 'Нажать галочку', consume: false, taskType: 'checkbox' });
+                                reqs.push({ item: { item_key: 'checkbox', name: 'Галочка', image: 'checkbox.png', mod: 'Задачи' }, count: 1, customName: 'Нажать галочку', consume: false, taskType: 'checkbox', rawTaskProps: rawTask });
                             } else if (task.taskID === 'bq_standard:xp') {
-                                reqs.push({ item: { item_key: 'xp', name: 'Опыт', image: 'experience_bottle.png', mod: 'Система' }, count: task.amount !== undefined ? task.amount : 1, customName: 'Уровни опыта', consume: task.consume || false, taskType: 'xp' });
+                                reqs.push({ item: { item_key: 'xp', name: 'Опыт', image: 'experience_bottle.png', mod: 'Система' }, count: task.amount !== undefined ? task.amount : 1, customName: 'Уровни опыта', consume: task.consume || false, taskType: 'xp', rawTaskProps: rawTask });
                             } else if (task.taskID === 'bq_npc_integration:npc_dialog') {
-                                reqs.push({ item: { item_key: 'npc_dialog', name: 'Диалог NPC', image: 'oak_sign.png', mod: 'Задачи' }, count: 1, customName: `Диалог NPC (ID: ${task.npcDialogID})`, consume: false, taskType: 'retrieval', nbtTag: { "npcDialogID:3": task.npcDialogID || 0 } });
+                                reqs.push({ item: { item_key: 'npc_dialog', name: 'Диалог NPC', image: 'oak_sign.png', mod: 'Задачи' }, count: 1, customName: `Диалог NPC (ID: ${task.npcDialogID})`, consume: false, taskType: 'retrieval', nbtTag: { "npcDialogID:3": task.npcDialogID || 0 }, rawTaskProps: rawTask });
                             }
                         });
                     }
                     if (q.rewards) {
-                        Object.values(q.rewards).forEach(rew => {
+                        let originalRewards = rawData["questDatabase:9"][qKey] ? rawData["questDatabase:9"][qKey]["rewards:9"] : null;
+                        
+                        Object.values(q.rewards).forEach((rew, idx) => {
+                            let rawRew = originalRewards ? originalRewards[Object.keys(originalRewards)[idx]] : null;
+                            
                             if ((rew.rewardID === 'bq_standard:item' && rew.rewards) || (rew.rewardID === 'bq_standard:choice' && rew.choices)) {
                                 const list = rew.rewards || rew.choices;
                                 Object.values(list).forEach(item => {
                                     const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage);
-                                    rewards.push({ item: foundItem, rawId: item.id, rawDamage: item.Damage, count: item.Count !== undefined ? item.Count : 1, customName: this.getCustomName(foundItem, item.tag), isChoice: rew.rewardID === 'bq_standard:choice', taskType: 'item', damage: item.Damage, nbtTag: item.tag });
+                                    rewards.push({ item: foundItem, rawId: item.id, rawDamage: item.Damage, count: item.Count !== undefined ? item.Count : 1, customName: this.getCustomName(foundItem, item.tag), isChoice: rew.rewardID === 'bq_standard:choice', taskType: 'item', damage: item.Damage, nbtTag: item.tag, rawRewProps: rawRew });
                                 });
                             } else if (rew.rewardID === 'bq_standard:command') {
-                                rewards.push({ item: { item_key: 'command', name: 'Команда', image: 'command_block.png', mod: 'Система' }, count: 1, customName: 'Команда', isChoice: false, taskType: 'command', command: rew.command });
+                                rewards.push({ item: { item_key: 'command', name: 'Команда', image: 'command_block.png', mod: 'Система' }, count: 1, customName: 'Команда', isChoice: false, taskType: 'command', command: rew.command, rawRewProps: rawRew });
                             } else if (rew.rewardID === 'bq_standard:xp') {
-                                rewards.push({ item: { item_key: 'xp', name: 'Опыт', image: 'experience_bottle.png', mod: 'Система' }, count: rew.amount !== undefined ? rew.amount : 1, customName: 'Уровни опыта', isChoice: false, taskType: 'xp' });
+                                rewards.push({ item: { item_key: 'xp', name: 'Опыт', image: 'experience_bottle.png', mod: 'Система' }, count: rew.amount !== undefined ? rew.amount : 1, customName: 'Уровни опыта', isChoice: false, taskType: 'xp', rawRewProps: rawRew });
                             }
                         });
                     }
@@ -174,15 +182,15 @@ export const BQ = {
                     let iconItemObj = null;
                     if (q.properties?.betterquesting?.icon) {
                         iconItemObj = ItemsDB.findItemByBQ(q.properties.betterquesting.icon.id, q.properties.betterquesting.icon.Damage);
-                        // Сохраняем сырые данные для иконки
                         iconItemObj.rawId = q.properties.betterquesting.icon.id;
                         iconItemObj.rawDamage = q.properties.betterquesting.icon.Damage;
+                        iconItemObj.rawCount = q.properties.betterquesting.icon.Count; // Сохраняем оригинальный Count (даже если он 64)
                         questIconStr = iconItemObj.image || '';
                     }
 
                     questsMap[actualId] = {
                         id: 'bq_' + actualId, 
-                        numericId: parseInt(actualId), // ВАЖНО: Запоминаем оригинальный ID
+                        numericId: parseInt(actualId),
                         title: q.properties?.betterquesting?.name || 'Безымянный квест',
                         desc: q.properties?.betterquesting?.desc || '', 
                         icon: questIconStr, 
@@ -198,9 +206,7 @@ export const BQ = {
             const newMods = [];
             if (data.questLines) {
                 Object.keys(data.questLines).forEach(key => {
-                    const ql = data.questLines[key]; 
-                    const lineQuests = []; 
-                    const addedIds = new Set();
+                    const ql = data.questLines[key]; const lineQuests = []; const addedIds = new Set();
                     if (ql.quests) {
                         Object.values(ql.quests).forEach(pos => {
                             let qIdStr = String(pos.id !== undefined ? pos.id : (pos.questID !== undefined ? pos.questID : "")).split(':')[0]; 
@@ -211,10 +217,10 @@ export const BQ = {
                     }
                     newMods.push({ 
                         id: 'bq_mod_' + key, 
-                        numericId: parseInt(key), // ВАЖНО: Запоминаем оригинальный ID ветки
+                        numericId: parseInt(key), 
                         name: ql.properties?.betterquesting?.name || 'Ветка ' + key, 
                         icon: '', 
-                        rawProps: ql.properties, 
+                        rawProps: rawData["questLines:9"][key] ? rawData["questLines:9"][key]["properties:10"] : null, 
                         quests: lineQuests 
                     });
                 });
@@ -234,7 +240,6 @@ export const BQ = {
             bqData["questSettings:9"] = editor.questSettings;
         }
 
-        // ВАЖНО: Поиск максимального ID для новых квестов
         let maxQuestId = -1;
         let maxLineId = -1;
 
@@ -245,13 +250,12 @@ export const BQ = {
             });
         });
 
-        // Назначаем ID
         const idMap = {}; 
         mods.forEach(mod => {
-            if (mod.numericId === undefined) mod.numericId = ++maxLineId; // Новая ветка
+            if (mod.numericId === undefined) mod.numericId = ++maxLineId; 
             mod.quests.forEach(q => {
                 if (q.numericId === undefined) {
-                    q.numericId = ++maxQuestId; // Новый квест
+                    q.numericId = ++maxQuestId; 
                 }
                 idMap[q.id] = q.numericId;
             });
@@ -327,18 +331,54 @@ export const BQ = {
                     else groups[r.taskType || 'retrieval'].push(r); 
                 });
 
-                if (groups.retrieval.length) tasks[`${taskIdx}:10`] = { "taskID:8": "bq_standard:retrieval", "autoConsume:1": 0, "consume:1": groups.retrieval[0].consume ? 1 : 0, "groupDetect:1": 0, "ignoreNBT:1": 1, "index:3": taskIdx++, "partialMatch:1": 1, "requiredItems:9": createItemsDict(groups.retrieval) };
-                if (groups.crafting.length) tasks[`${taskIdx}:10`] = { "taskID:8": "bq_standard:crafting", "allowAnvil:1": 0, "allowSmelt:1": 0, "allowCraft:1": 1, "autoConsume:1": 0, "groupDetect:1": 0, "ignoreNBT:1": 1, "index:3": taskIdx++, "partialMatch:1": 1, "requiredItems:9": createItemsDict(groups.crafting) };
-                if (groups.block_break.length) tasks[`${taskIdx}:10`] = { "taskID:8": "bq_standard:block_break", "ignoreNBT:1": 1, "index:3": taskIdx++, "blocks:9": createBlocksDict(groups.block_break) };
-                if (groups.fluid.length) tasks[`${taskIdx}:10`] = { "taskID:8": "bq_standard:fluid", "autoConsume:1": 0, "consume:1": groups.fluid[0].consume ? 1 : 0, "groupDetect:1": 0, "ignoreNBT:1": 1, "index:3": taskIdx++, "requiredFluids:9": createFluidsDict(groups.fluid) };
-                if (groups.checkbox.length) tasks[`${taskIdx}:10`] = { "taskID:8": "bq_standard:checkbox", "index:3": taskIdx++ };
-                if (groups.xp.length) tasks[`${taskIdx}:10`] = { "taskID:8": "bq_standard:xp", "amount:3": parseInt(groups.xp[0].count) || 1, "isLevels:1": 1, "consume:1": groups.xp[0].consume ? 1 : 0, "index:3": taskIdx++ };
+                // Используем оригинальные настройки тасков, если они есть
+                const getTaskProps = (arr, defType) => {
+                    let props = arr[0]?.rawTaskProps ? JSON.parse(JSON.stringify(arr[0].rawTaskProps)) : null;
+                    if (!props) {
+                        props = { "taskID:8": defType, "autoConsume:1": 0, "consume:1": arr[0]?.consume ? 1 : 0, "groupDetect:1": 0, "ignoreNBT:1": 1, "partialMatch:1": 1 };
+                    }
+                    props["index:3"] = taskIdx++;
+                    return props;
+                };
+
+                if (groups.retrieval.length) {
+                    let p = getTaskProps(groups.retrieval, "bq_standard:retrieval");
+                    p["requiredItems:9"] = createItemsDict(groups.retrieval);
+                    tasks[`${taskIdx - 1}:10`] = p;
+                }
+                if (groups.crafting.length) {
+                    let p = getTaskProps(groups.crafting, "bq_standard:crafting");
+                    p["requiredItems:9"] = createItemsDict(groups.crafting);
+                    tasks[`${taskIdx - 1}:10`] = p;
+                }
+                if (groups.block_break.length) {
+                    let p = getTaskProps(groups.block_break, "bq_standard:block_break");
+                    p["blocks:9"] = createBlocksDict(groups.block_break);
+                    tasks[`${taskIdx - 1}:10`] = p;
+                }
+                if (groups.fluid.length) {
+                    let p = getTaskProps(groups.fluid, "bq_standard:fluid");
+                    p["requiredFluids:9"] = createFluidsDict(groups.fluid);
+                    tasks[`${taskIdx - 1}:10`] = p;
+                }
+                if (groups.checkbox.length) {
+                    let p = getTaskProps(groups.checkbox, "bq_standard:checkbox");
+                    tasks[`${taskIdx - 1}:10`] = p;
+                }
+                if (groups.xp.length) {
+                    let p = getTaskProps(groups.xp, "bq_standard:xp");
+                    p["amount:3"] = parseInt(groups.xp[0].count) || 1;
+                    p["isLevels:1"] = 1;
+                    tasks[`${taskIdx - 1}:10`] = p;
+                }
                 
                 groups.hunt.forEach(h => {
-                    let target = h.target || h.customName || h.item.name;
-                    const huntDict = { "taskID:8": "bq_standard:hunt", "damageType:8": "", "ignoreNBT:1": 1, "index:3": taskIdx++, "target:8": target, "required:3": parseInt(h.count) || 1, "subtypes:1": 1 };
-                    if (h.nbtTag) huntDict["targetNBT:10"] = h.nbtTag;
-                    tasks[`${taskIdx - 1}:10`] = huntDict;
+                    let p = h.rawTaskProps ? JSON.parse(JSON.stringify(h.rawTaskProps)) : { "taskID:8": "bq_standard:hunt", "damageType:8": "", "ignoreNBT:1": 1, "subtypes:1": 1 };
+                    p["index:3"] = taskIdx++;
+                    p["target:8"] = h.target || h.customName || h.item.name;
+                    p["required:3"] = parseInt(h.count) || 1;
+                    if (h.nbtTag) p["targetNBT:10"] = h.nbtTag;
+                    tasks[`${taskIdx - 1}:10`] = p;
                 });
 
                 npcDialogs.forEach(req => {
@@ -348,28 +388,50 @@ export const BQ = {
                 });
 
                 const rewards = {}; let rewIdx = 0;
+                
+                const getRewProps = (arr, defType) => {
+                    let props = arr[0]?.rawRewProps ? JSON.parse(JSON.stringify(arr[0].rawRewProps)) : null;
+                    if (!props) props = { "rewardID:8": defType, "ignoreNBT:1": 1 };
+                    props["index:3"] = rewIdx++;
+                    return props;
+                }
+
                 if (q.rewards) {
                     const standardRews = q.rewards.filter(r => (!r.taskType || r.taskType === 'item') && !r.isChoice);
                     const choiceRews = q.rewards.filter(r => (!r.taskType || r.taskType === 'item') && r.isChoice);
 
-                    if (standardRews.length > 0) rewards[`${rewIdx}:10`] = { "rewardID:8": "bq_standard:item", "ignoreNBT:1": 1, "index:3": rewIdx++, "rewards:9": createItemsDict(standardRews) };
-                    if (choiceRews.length > 0) rewards[`${rewIdx}:10`] = { "rewardID:8": "bq_standard:choice", "ignoreNBT:1": 1, "index:3": rewIdx++, "choices:9": createItemsDict(choiceRews) };
+                    if (standardRews.length > 0) {
+                        let p = getRewProps(standardRews, "bq_standard:item");
+                        p["rewards:9"] = createItemsDict(standardRews);
+                        rewards[`${rewIdx - 1}:10`] = p;
+                    }
+                    if (choiceRews.length > 0) {
+                        let p = getRewProps(choiceRews, "bq_standard:choice");
+                        p["choices:9"] = createItemsDict(choiceRews);
+                        rewards[`${rewIdx - 1}:10`] = p;
+                    }
 
                     q.rewards.forEach(r => {
                         if (r.taskType === 'command') {
-                            rewards[`${rewIdx}:10`] = { "rewardID:8": "bq_standard:command", "command:8": r.command || "", "hideCommand:1": 1, "viaPlayer:1": 0, "index:3": rewIdx++ };
+                            let p = r.rawRewProps ? JSON.parse(JSON.stringify(r.rawRewProps)) : { "rewardID:8": "bq_standard:command", "hideCommand:1": 1, "viaPlayer:1": 0 };
+                            p["index:3"] = rewIdx++;
+                            p["command:8"] = r.command || "";
+                            rewards[`${rewIdx - 1}:10`] = p;
                         } else if (r.taskType === 'xp') {
-                            rewards[`${rewIdx}:10`] = { "rewardID:8": "bq_standard:xp", "amount:3": parseInt(r.count) || 1, "isLevels:1": 1, "index:3": rewIdx++ };
+                            let p = r.rawRewProps ? JSON.parse(JSON.stringify(r.rawRewProps)) : { "rewardID:8": "bq_standard:xp", "isLevels:1": 1 };
+                            p["index:3"] = rewIdx++;
+                            p["amount:3"] = parseInt(r.count) || 1;
+                            rewards[`${rewIdx - 1}:10`] = p;
                         }
                     });
                 }
 
                 let props = q.rawProps ? JSON.parse(JSON.stringify(q.rawProps)) : { 
                     "betterquesting:10": { 
-                        "autoClaim:1": 0, "isMain:1": 0, "isSilent:1": 0, "lockedProgress:1": 0, 
+                        "autoClaim:1": 0, "globalShare:1": 0, "isMain:1": 0, "isSilent:1": 0, "lockedProgress:1": 0, 
                         "partySingleReward:1": 0, "questLogic:8": "AND", "repeatTime:3": -1, 
                         "repeat_relative:1": 1, "simultaneous:1": 0, "snd_complete:8": "minecraft:entity.player.levelup", 
-                        "snd_update:8": "minecraft:entity.player.levelup", "taskLogic:8": "AND", "visibility:8": "ALWAYS" 
+                        "snd_update:8": "minecraft:entity.player.levelup", "taskLogic:8": "AND", "visibility:8": "NORMAL" 
                     } 
                 };
 
@@ -380,7 +442,9 @@ export const BQ = {
                 
                 if (q.iconItem) {
                     const { idKey, finalId, damage } = extractItemData({ item: q.iconItem, rawId: q.iconItem.rawId, rawDamage: q.iconItem.rawDamage });
-                    const iconDict = { "Count:3": 1, "Damage:2": damage, "OreDict:8": "" };
+                    // Используем сохраненный Count, если он был
+                    let count = q.iconItem.rawCount !== undefined ? q.iconItem.rawCount : 1;
+                    const iconDict = { "Count:3": count, "Damage:2": damage, "OreDict:8": "" };
                     iconDict[idKey] = finalId;
                     props["betterquesting:10"]["icon:10"] = iconDict;
                 } else {
