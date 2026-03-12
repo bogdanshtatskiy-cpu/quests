@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { firebaseConfig } from './firebase-config.js';
 import { Auth } from './auth.js';
 
@@ -7,17 +7,45 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 export const DB = {
+    currentWorkspace: 'Основной', // Это значение будет меняться из main.js
+
+    _getWorkspaceDocName() {
+        // Чтобы не ломать старую базу, "Основной" сохраняем по старому пути
+        if (this.currentWorkspace === 'Основной') return "main";
+        return `workspace_${this.currentWorkspace}`;
+    },
+
     async saveQuestsSilent(modsData) {
         if (!Auth.user) return;
-        try { await setDoc(doc(db, "quests", "main"), { mods: modsData }); } catch (e) {}
+        try { 
+            const docName = this._getWorkspaceDocName();
+            await setDoc(doc(db, "quests", docName), { mods: modsData }); 
+        } catch (e) {
+            console.error("Ошибка автосохранения:", e);
+        }
     },
 
     async loadQuests() {
         try {
-            const docSnap = await getDoc(doc(db, "quests", "main"));
+            const docName = this._getWorkspaceDocName();
+            const docSnap = await getDoc(doc(db, "quests", docName));
             if (docSnap.exists()) return docSnap.data().mods;
             return [];
-        } catch (e) { return []; }
+        } catch (e) { 
+            console.error("Ошибка загрузки квестов:", e);
+            return []; 
+        }
+    },
+
+    async deleteWorkspaceQuests(workspaceName) {
+        if (!Auth.user) return;
+        if (workspaceName === 'Основной') return; // Защита от дурака
+        try {
+            await deleteDoc(doc(db, "quests", `workspace_${workspaceName}`));
+            this.logAction(`Удалил профиль и квесты: ${workspaceName}`);
+        } catch (e) {
+            console.error("Ошибка удаления профиля:", e);
+        }
     },
 
     async getUsers() {
@@ -47,18 +75,22 @@ export const DB = {
         if (!Auth.user) return;
         try {
             await addDoc(collection(db, "logs"), {
-                username: Auth.user.username, action: actionDesc, timestamp: new Date().toISOString() 
+                username: Auth.user.username, 
+                action: actionDesc, 
+                timestamp: new Date().toISOString() 
             });
         } catch (e) {}
     },
 
     async getLogs() {
         if (!Auth.user) return [];
-        const q = query(collection(db, "logs"), orderBy("timestamp", "desc"), limit(50));
-        const querySnapshot = await getDocs(q);
-        const logs = [];
-        querySnapshot.forEach((doc) => logs.push(doc.data()));
-        return logs;
+        try {
+            const q = query(collection(db, "logs"), orderBy("timestamp", "desc"), limit(50));
+            const querySnapshot = await getDocs(q);
+            const logs = [];
+            querySnapshot.forEach((doc) => logs.push(doc.data()));
+            return logs;
+        } catch(e) { return []; }
     },
 
     async saveCustomItem(itemName, base64Image) {
@@ -71,7 +103,6 @@ export const DB = {
                 mod: "Custom (Свои)",
                 item_id: 99999
             };
-
             await addDoc(collection(db, "custom_items"), newItem);
             this.logAction(`Добавил свою иконку: ${itemName}`);
             return newItem;
