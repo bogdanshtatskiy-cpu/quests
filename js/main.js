@@ -52,26 +52,32 @@ document.addEventListener('DOMContentLoaded', () => {
     // Показываем фоновый статус
     indicator.classList.remove('hidden');
     indicator.style.color = "#ffaa00";
-    indicator.innerText = "⏳ Загрузка базы предметов...";
+    indicator.innerText = "⏳ Загрузка базы данных...";
 
-    // 4. ЗАГРУЗКА И ПОДПИСКА (Параллельно)
+    // 4. ЗАГРУЗКА БАЗЫ ПРЕДМЕТОВ (С защитой от ошибок)
     const itemsPromise = ItemsDB.load().then(async () => {
-        const customItems = await DB.loadCustomItems();
-        ItemsDB.addCustomItems(customItems);
-    });
+        try {
+            const customItems = await DB.loadCustomItems();
+            ItemsDB.addCustomItems(customItems);
+        } catch (e) {
+            console.error("Ошибка при загрузке кастомных предметов:", e);
+        }
+    }).catch(e => console.error("Ошибка при инициализации ItemsDB:", e));
 
     let isFirstLoad = true;
 
+    // Функция обработки данных из Firebase
     const handleQuestsUpdate = async (savedQuests) => {
         if (Editor.isImportMode) return;
 
-        // Игнорируем эхо-ответы от сервера, если данные не изменились
         const newDataStr = JSON.stringify(savedQuests || []);
         const currentDataStr = JSON.stringify(Editor.data.mods || []);
-        if (newDataStr === currentDataStr) return;
+        
+        // ИСПРАВЛЕНИЕ: Отменяем только если это НЕ первая загрузка и данные идентичны
+        if (!isFirstLoad && newDataStr === currentDataStr) return;
 
         // Откладываем обновление, если пользователь что-то перетаскивает
-        if (Editor.isPanning || Editor.draggedQuestId || Editor.draggedCommentId || Editor.linkingFromNodeId) {
+        if (!isFirstLoad && (Editor.isPanning || Editor.draggedQuestId || Editor.draggedCommentId || Editor.linkingFromNodeId)) {
             if (!Editor.pendingUpdate) {
                 Editor.pendingUpdate = true;
                 const checkInterval = setInterval(() => {
@@ -89,13 +95,14 @@ document.addEventListener('DOMContentLoaded', () => {
         await itemsPromise;
 
         if (savedQuests && savedQuests.length > 0) {
-            // Восстановление старых форматов
             savedQuests.forEach(mod => {
-                mod.quests.forEach(q => {
-                    if (q.req && !q.reqs) q.reqs = [q.req];
-                    if (!q.reqs) q.reqs = [];
-                    if (!q.rewards) q.rewards = [];
-                });
+                if (mod.quests) {
+                    mod.quests.forEach(q => {
+                        if (q.req && !q.reqs) q.reqs = [q.req];
+                        if (!q.reqs) q.reqs = [];
+                        if (!q.rewards) q.rewards = [];
+                    });
+                }
             });
             Editor.data.mods = savedQuests;
             if (!Editor.activeModId || !savedQuests.find(m => m.id === Editor.activeModId)) {
@@ -106,23 +113,28 @@ document.addEventListener('DOMContentLoaded', () => {
             Editor.activeModId = null;
         }
         
-        // Если история пуста, добавляем изначальное состояние
+        // Синхронизация истории
         if (Editor.history.length === 0) {
-            Editor.history.push(JSON.parse(JSON.stringify(Editor.data.mods)));
+            Editor.history.push(JSON.stringify(Editor.data.mods));
             Editor.historyIndex = 0;
-        } else {
-            // Синхронизация истории с внешними изменениями
-            Editor.history[Editor.historyIndex] = JSON.parse(JSON.stringify(Editor.data.mods));
+        } else if (!isFirstLoad) {
+            Editor.history[Editor.historyIndex] = JSON.stringify(Editor.data.mods);
         }
         
-        // Сохраняем стейт просмотра до рендера
-        Editor.saveViewState();
+        // ИСПРАВЛЕНИЕ: Вручную сохраняем стейт просмотра (замена отсутствующей функции)
+        if (!isFirstLoad && Editor.activeModId) {
+            Editor.viewStates[Editor.activeModId] = {
+                panX: Editor.panX,
+                panY: Editor.panY,
+                scale: Editor.scale
+            };
+        }
 
         Editor.renderSidebar();
         Editor.renderCanvas(true);
 
         if (isFirstLoad) {
-            Editor.centerCanvas(true);
+            Editor.centerCanvas();
             isFirstLoad = false;
         } else if (Editor.activeModId && Editor.viewStates[Editor.activeModId]) {
             const state = Editor.viewStates[Editor.activeModId];
@@ -136,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         indicator.classList.remove('hidden');
         indicator.style.color = "#55ff55";
-        indicator.innerText = "✔ Синхронизировано!";
+        indicator.innerText = "✔ Готово!";
         setTimeout(() => {
             indicator.classList.add('hidden');
         }, 1500);
@@ -160,7 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
         Editor.viewStates = {};
         Editor.history = [];
 
-        // Переподписываемся на новый воркспейс
+        // Переподписываемся на новый профиль
         DB.subscribeToQuests(handleQuestsUpdate);
     });
 
@@ -342,6 +354,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (version) {
                         const modsData = await DB.getVersionData(vId);
                         if (modsData) {
+                            // Приостанавливаем подписку, чтобы откатиться "мягко"
                             Editor.data.mods = modsData;
                             await DB.saveQuestsSilent(Editor.data.mods);
                             DB.logAction(`Откат базы к коммиту: ${version.comment}`);
