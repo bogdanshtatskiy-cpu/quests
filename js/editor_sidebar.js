@@ -5,6 +5,11 @@ import { Auth } from './auth.js';
 export const EditorSidebar = {
     init(editor) {
         this.bindModModalEvents(editor);
+        
+        // Кнопка сворачивания сайдбара
+        document.getElementById('btn-toggle-sidebar')?.addEventListener('click', () => {
+            document.getElementById('sidebar').classList.toggle('collapsed');
+        });
     },
 
     bindModModalEvents(editor) {
