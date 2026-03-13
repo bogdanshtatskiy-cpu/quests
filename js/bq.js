@@ -47,7 +47,7 @@ export const BQ = {
         const display = this.getRawValue(tag, 'display');
         if (display) {
             const customName = this.getRawValue(display, 'Name');
-            if (customName) name = customName.trim().replace(/ğ/g, ''); 
+            if (customName) name = customName.trim().replace(/ğ/g, ''); // Цвета (§) сохраняются!
         }
 
         const enchs = this.getRawValue(tag, 'ench') || this.getRawValue(tag, 'StoredEnchantments');
@@ -96,8 +96,8 @@ export const BQ = {
 
     parseData(jsonString, editor) {
         try {
-            // ГЕНИАЛЬНЫЙ ФИКС: Замораживаем огромные числа (UUID) и дробные нули (0.0), чтобы JS их не сломал
-            let safeJson = jsonString.replace(/([:\[]\s*)([-]?\d+\.\d+|-?\d{15,})(?=\s*[,}\]])/g, '$1"__BQ_NUM__$2"');
+            // ГЕНИАЛЬНЫЙ ФИКС: Замораживаем огромные числа (UUID мобов) и дробные нули (0.0 здоровья), чтобы браузер их не сломал
+            let safeJson = jsonString.replace(/([:\[,]\s*)([-]?\d+\.\d+|[-]?\d{15,})(?=\s*[,}\]])/g, '$1"__BQ_NUM__$2"');
 
             const rawData = JSON.parse(safeJson);
             
@@ -331,8 +331,20 @@ export const BQ = {
                         const { idKey, finalId, damage } = extractItemData(req);
                         const dictObj = { "Count:3": parseInt(req.count) || 1, "Damage:2": damage, "OreDict:8": "" };
                         dictObj[idKey] = finalId;
-                        if (req.nbtTag) dictObj["tag:10"] = req.nbtTag;
+                        
+                        let nbt = req.nbtTag ? JSON.parse(JSON.stringify(req.nbtTag)) : null;
+                        
+                        // ИНЖЕКТОР ИМЕН: Если ты переименовал предмет (например "Деньги") в редакторе, это сохранится в NBT!
+                        if (req.customName && req.item && req.customName !== req.item.name && req.customName !== "Нажать галочку" && req.customName !== "Уровни опыта" && req.customName !== "Команда") {
+                            let formattedName = req.customName.replace(/&/g, '§'); // Авто-замена & на § для цвета
+                            if (!nbt) nbt = {};
+                            if (!nbt["display:10"]) nbt["display:10"] = {};
+                            nbt["display:10"]["Name:8"] = formattedName;
+                        }
+                        
+                        if (nbt) dictObj["tag:10"] = nbt;
                         else if (finalId === 'bq_standard:loot_chest') dictObj["tag:10"] = { "hideLootInfo:1": 1 };
+                        
                         dict[`${idx}:10`] = dictObj;
                     });
                     return dict;
@@ -375,37 +387,35 @@ export const BQ = {
                     return props;
                 };
 
-                let tDictIdx = 0;
-
                 if (groups.retrieval.length) {
                     let p = getTaskProps(groups.retrieval, "bq_standard:retrieval");
                     p["requiredItems:9"] = createItemsDict(groups.retrieval);
-                    tasks[`${tDictIdx++}:10`] = p;
+                    tasks[`${p["index:3"]}:10`] = p;
                 }
                 if (groups.crafting.length) {
                     let p = getTaskProps(groups.crafting, "bq_standard:crafting");
                     p["requiredItems:9"] = createItemsDict(groups.crafting);
-                    tasks[`${tDictIdx++}:10`] = p;
+                    tasks[`${p["index:3"]}:10`] = p;
                 }
                 if (groups.block_break.length) {
                     let p = getTaskProps(groups.block_break, "bq_standard:block_break");
                     p["blocks:9"] = createBlocksDict(groups.block_break);
-                    tasks[`${tDictIdx++}:10`] = p;
+                    tasks[`${p["index:3"]}:10`] = p;
                 }
                 if (groups.fluid.length) {
                     let p = getTaskProps(groups.fluid, "bq_standard:fluid");
                     p["requiredFluids:9"] = createFluidsDict(groups.fluid);
-                    tasks[`${tDictIdx++}:10`] = p;
+                    tasks[`${p["index:3"]}:10`] = p;
                 }
                 if (groups.checkbox.length) {
                     let p = getTaskProps(groups.checkbox, "bq_standard:checkbox");
-                    tasks[`${tDictIdx++}:10`] = p;
+                    tasks[`${p["index:3"]}:10`] = p;
                 }
                 if (groups.xp.length) {
                     let p = getTaskProps(groups.xp, "bq_standard:xp");
                     p["amount:3"] = parseInt(groups.xp[0].count) || 1;
                     p["isLevels:1"] = 1;
-                    tasks[`${tDictIdx++}:10`] = p;
+                    tasks[`${p["index:3"]}:10`] = p;
                 }
                 
                 groups.hunt.forEach(h => {
@@ -414,7 +424,7 @@ export const BQ = {
                     p["target:8"] = h.target || h.customName || h.item.name;
                     p["required:3"] = parseInt(h.count) || 1;
                     if (h.nbtTag) p["targetNBT:10"] = h.nbtTag;
-                    tasks[`${tDictIdx++}:10`] = p;
+                    tasks[`${p["index:3"]}:10`] = p;
                 });
 
                 npcDialogs.forEach(req => {
@@ -423,11 +433,10 @@ export const BQ = {
                     let dialogId = 0;
                     if (req.nbtTag && req.nbtTag['npcDialogID:3'] !== undefined) dialogId = req.nbtTag['npcDialogID:3'];
                     p["npcDialogID:3"] = parseInt(dialogId) || 0;
-                    tasks[`${tDictIdx++}:10`] = p;
+                    tasks[`${p["index:3"]}:10`] = p;
                 });
 
                 const rewards = {}; 
-                let rDictIdx = 0;
                 
                 const getRewProps = (arr, defType) => {
                     let props = arr[0] && arr[0].rawRewProps ? JSON.parse(JSON.stringify(arr[0].rawRewProps)) : null;
@@ -447,12 +456,12 @@ export const BQ = {
                     if (standardRews.length > 0) {
                         let p = getRewProps(standardRews, "bq_standard:item");
                         p["rewards:9"] = createItemsDict(standardRews);
-                        rewards[`${rDictIdx++}:10`] = p;
+                        rewards[`${p["index:3"]}:10`] = p;
                     }
                     if (choiceRews.length > 0) {
                         let p = getRewProps(choiceRews, "bq_standard:choice");
                         p["choices:9"] = createItemsDict(choiceRews);
-                        rewards[`${rDictIdx++}:10`] = p;
+                        rewards[`${p["index:3"]}:10`] = p;
                     }
 
                     q.rewards.forEach(r => {
@@ -460,12 +469,12 @@ export const BQ = {
                             let p = r.rawRewProps ? JSON.parse(JSON.stringify(r.rawRewProps)) : { "rewardID:8": "bq_standard:command", "hideCommand:1": 1, "viaPlayer:1": 0 };
                             if (p["index:3"] === undefined) p["index:3"] = rewIdx++;
                             p["command:8"] = r.command || "";
-                            rewards[`${rDictIdx++}:10`] = p;
+                            rewards[`${p["index:3"]}:10`] = p;
                         } else if (r.taskType === 'xp') {
                             let p = r.rawRewProps ? JSON.parse(JSON.stringify(r.rawRewProps)) : { "rewardID:8": "bq_standard:xp", "isLevels:1": 1 };
                             if (p["index:3"] === undefined) p["index:3"] = rewIdx++;
                             p["amount:3"] = parseInt(r.count) || 1;
-                            rewards[`${rDictIdx++}:10`] = p;
+                            rewards[`${p["index:3"]}:10`] = p;
                         }
                     });
                 }
@@ -518,9 +527,10 @@ export const BQ = {
                 lineQuests[`${bqId}:10`] = { "x:3": Math.round(q.x / 3), "y:3": Math.round(q.y / 3), "id:3": bqId, "sizeX:3": sz, "sizeY:3": sz };
             });
 
+            // ИСПРАВЛЕНИЕ: Новые ветки создаются с пустым фоном, как в оригинале
             let lineProps = mod.rawProps ? JSON.parse(JSON.stringify(mod.rawProps)) : {
                 "betterquesting:10": {
-                    "bg_image:8": "minecraft:textures/gui/presets/window.png",
+                    "bg_image:8": "", 
                     "bg_size:3": 256,
                     "bms_complete:8": "minecraft:entity.player.levelup",
                     "bms_update:8": "minecraft:entity.player.levelup",
@@ -544,8 +554,8 @@ export const BQ = {
 
         let outStr = JSON.stringify(bqData, null, 2);
         
-        // ФИНАЛЬНЫЙ ШТРИХ: Снимаем защиту. Огромные числа и Float 0.0 возвращаются в игру живыми.
-        outStr = outStr.replace(/"__BQ_NUM__([-]?\d+\.\d+|-?\d{15,})"/g, '$1');
+        // ФИНАЛЬНЫЙ ШТРИХ: Размораживаем числа. Гигантские UUID и дробные "0.0" возвращаются в игру без кавычек!
+        outStr = outStr.replace(/"__BQ_NUM__([-]?\d+\.\d+|[-]?\d{15,})"/g, '$1');
 
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(outStr);
         const downloadAnchorNode = document.createElement('a');
