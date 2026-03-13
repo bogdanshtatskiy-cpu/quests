@@ -47,7 +47,7 @@ export const BQ = {
         const display = this.getRawValue(tag, 'display');
         if (display) {
             const customName = this.getRawValue(display, 'Name');
-            if (customName) name = customName.trim().replace(/ğ/g, ''); // Цвета (§) сохраняются!
+            if (customName) name = customName.trim().replace(/ğ/g, ''); // Цвета (§) сохраняются
         }
 
         const enchs = this.getRawValue(tag, 'ench') || this.getRawValue(tag, 'StoredEnchantments');
@@ -96,7 +96,7 @@ export const BQ = {
 
     parseData(jsonString, editor) {
         try {
-            // ГЕНИАЛЬНЫЙ ФИКС: Замораживаем огромные числа (UUID мобов) и дробные нули (0.0 здоровья), чтобы браузер их не сломал
+            // КРИОКАМЕРА: Замораживаем огромные числа (UUID) и нули с точкой (0.0)
             let safeJson = jsonString.replace(/([:\[,]\s*)([-]?\d+\.\d+|[-]?\d{15,})(?=\s*[,}\]])/g, '$1"__BQ_NUM__$2"');
 
             const rawData = JSON.parse(safeJson);
@@ -142,46 +142,113 @@ export const BQ = {
                             let rawTKey = Object.keys(rawTasks).find(k => k.startsWith(tKey + ':') || k === tKey);
                             let rawTaskProps = rawTKey ? rawTasks[rawTKey] : null;
                             
-                            if (task.requiredItems && (task.taskID === 'bq_standard:retrieval' || task.taskID === 'bq_standard:crafting')) {
-                                Object.values(task.requiredItems).forEach(item => {
-                                    const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage);
-                                    reqs.push({ item: foundItem, rawId: item.id, rawDamage: item.Damage, count: item.Count !== undefined ? item.Count : 1, customName: this.getCustomName(foundItem, item.tag), consume: task.consume || false, taskType: task.taskID.split(':')[1], nbtTag: item.tag, rawTaskProps: rawTaskProps });
+                            const tType = task["taskID:8"].replace('bq_standard:', '').replace('bq_npc_integration:', '');
+                            let req = { taskType: tType, rawTaskProps: rawTaskProps, nbtTag: task["targetNBT:10"] || null };
+                            
+                            if (tType === 'retrieval' || tType === 'crafting') {
+                                Object.values(task["requiredItems:9"] || {}).forEach(item => {
+                                    const foundItem = ItemsDB.findItemByBQ(item["id:8"], item["Damage:2"]);
+                                    reqs.push({ ...req, item: foundItem, rawId: item["id:8"], rawDamage: item["Damage:2"], count: item["Count:3"] || 1, customName: this.getCustomName(foundItem, item["tag:10"]), consume: task["consume:1"] || 0, nbtTag: item["tag:10"] });
                                 });
-                            } else if (task.blocks && task.taskID === 'bq_standard:block_break') {
-                                Object.values(task.blocks).forEach(block => {
-                                    const foundItem = ItemsDB.findItemByBQ(block.blockID || block.id, block.meta || block.Damage);
-                                    reqs.push({ item: foundItem, rawId: block.blockID || block.id, rawDamage: block.meta !== undefined ? block.meta : block.Damage, count: block.amount !== undefined ? block.amount : (block.Count !== undefined ? block.Count : 1), customName: this.getCustomName(foundItem, block.nbt), consume: false, taskType: 'block_break', nbtTag: block.nbt, rawTaskProps: rawTaskProps });
+                            } else if (tType === 'block_break') {
+                                Object.values(task["blocks:9"] || {}).forEach(block => {
+                                    const foundItem = ItemsDB.findItemByBQ(block["blockID:8"], block["meta:3"]);
+                                    reqs.push({ ...req, item: foundItem, rawId: block["blockID:8"], rawDamage: block["meta:3"], count: block["amount:3"] || block["Count:3"] || 1, customName: this.getCustomName(foundItem, block["nbt:10"]), consume: false, nbtTag: block["nbt:10"] });
                                 });
-                            } else if (task.taskID === 'bq_standard:hunt') {
-                                 reqs.push({ item: { item_key: `mob_${task.target}`, name: task.target, image: 'skull.png', mod: 'Мобы' }, count: task.required || 1, target: task.target, customName: task.target, consume: false, taskType: 'hunt', nbtTag: task.targetNBT, rawTaskProps: rawTaskProps });
-                            } else if (task.taskID === 'bq_standard:fluid') {
-                                Object.values(task.requiredFluids || {}).forEach(f => {
-                                    reqs.push({ item: { item_key: `f_${f.FluidName}`, name: this.FLUIDS[f.FluidName] || f.FluidName, image: 'fluid_bucket.png', mod: 'Жидкость' }, rawFluid: f.FluidName || "water", count: f.Amount || 1000, target: f.FluidName, customName: this.FLUIDS[f.FluidName] || f.FluidName, consume: task.consume || false, taskType: 'fluid', rawTaskProps: rawTaskProps });
+                            } else if (tType === 'hunt') {
+                                req.target = task["target:8"] || 'Zombie';
+                                req.count = task["required:3"] || 1;
+                                reqs.push(req);
+                            } else if (tType === 'fluid') {
+                                Object.values(task["requiredFluids:9"] || {}).forEach(f => {
+                                    reqs.push({ ...req, target: f["FluidName:8"], count: f["Amount:3"] || 1000, consume: task["consume:1"] || 0 });
                                 });
-                            } else if (task.taskID === 'bq_standard:checkbox') {
-                                reqs.push({ item: { item_key: 'checkbox', name: 'Галочка', image: 'checkbox.png', mod: 'Задачи' }, count: 1, customName: 'Нажать галочку', consume: false, taskType: 'checkbox', rawTaskProps: rawTaskProps });
-                            } else if (task.taskID === 'bq_standard:xp') {
-                                reqs.push({ item: { item_key: 'xp', name: 'Опыт', image: 'experience_bottle.png', mod: 'Система' }, count: task.amount !== undefined ? task.amount : 1, customName: 'Уровни опыта', consume: task.consume || false, taskType: 'xp', rawTaskProps: rawTaskProps });
-                            } else if (task.taskID === 'bq_npc_integration:npc_dialog') {
-                                reqs.push({ item: { item_key: 'npc_dialog', name: 'Диалог NPC', image: 'oak_sign.png', mod: 'Задачи' }, count: 1, customName: `Диалог NPC (ID: ${task.npcDialogID})`, consume: false, taskType: 'retrieval', nbtTag: { "npcDialogID:3": task.npcDialogID || 0 }, rawTaskProps: rawTaskProps });
+                            } else if (tType === 'checkbox') {
+                                reqs.push(req);
+                            } else if (tType === 'xp') {
+                                req.count = task["amount:3"] || 1;
+                                reqs.push(req);
+                            } else if (tType === 'npc_dialog') {
+                                req.dialogId = task["npcDialogID:3"] || 0;
+                                req.desc = task["description:8"] || '';
+                                reqs.push(req);
+                            } else if (tType === 'npc_faction') {
+                                req.factionId = task["factionID:3"] || 0;
+                                req.operation = task["operation:8"] || 'MORE_OR_EQUAL';
+                                req.targetValue = task["target:3"] || 1;
+                                reqs.push(req);
+                            } else if (tType === 'npc_quest') {
+                                req.questId = task["npcQuestID:3"] || 0;
+                                reqs.push(req);
+                            } else if (tType === 'interact_entity') {
+                                req.target = task["targetID:8"] || 'Villager';
+                                req.onHit = task["onHit:1"] || 0;
+                                req.onInteract = task["onInteract:1"] || 0;
+                                reqs.push(req);
+                            } else if (tType === 'interact_item') {
+                                req.onHit = task["onHit:1"] || 0;
+                                req.onInteract = task["onInteract:1"] || 0;
+                                let i = task["item:10"] || {};
+                                if (i["id:8"]) {
+                                    const foundItem = ItemsDB.findItemByBQ(i["id:8"], i["Damage:2"]);
+                                    req.item = foundItem; req.rawId = i["id:8"]; req.rawDamage = i["Damage:2"]; req.nbtTag = i["tag:10"];
+                                }
+                                reqs.push(req);
+                            } else if (tType === 'location') {
+                                req.name = task["name:8"] || '';
+                                req.posX = task["posX:3"] || 0;
+                                req.posY = task["posY:3"] || 0;
+                                req.posZ = task["posZ:3"] || 0;
+                                req.dimension = task["dimension:3"] || 0;
+                                req.range = task["range:3"] || -1;
+                                reqs.push(req);
+                            } else if (tType === 'meeting') {
+                                req.target = task["target:8"] || 'Villager';
+                                req.count = task["amount:3"] || 1;
+                                req.range = task["range:3"] || 4;
+                                reqs.push(req);
+                            } else if (tType === 'scoreboard') {
+                                req.scoreName = task["scoreName:8"] || '';
+                                req.scoreDisp = task["scoreDisp:8"] || '';
+                                req.operation = task["operation:8"] || 'MORE_OR_EQUAL';
+                                req.targetValue = task["target:3"] || 1;
+                                reqs.push(req);
                             }
                         });
                     }
+
                     if (q.rewards) {
                         Object.entries(q.rewards).forEach(([rKey, rew]) => {
                             let rawRKey = Object.keys(rawRewards).find(k => k.startsWith(rKey + ':') || k === rKey);
                             let rawRewProps = rawRKey ? rawRewards[rawRKey] : null;
                             
-                            if ((rew.rewardID === 'bq_standard:item' && rew.rewards) || (rew.rewardID === 'bq_standard:choice' && rew.choices)) {
-                                const list = rew.rewards || rew.choices;
-                                Object.values(list).forEach(item => {
+                            const rType = rew["rewardID:8"].replace('bq_standard:', '').replace('bq_npc_integration:', '');
+                            let reward = { taskType: rType, rawRewProps: rawRewProps };
+
+                            if (rType === 'item' || rType === 'choice') {
+                                Object.values(rew["rewards:9"] || rew["choices:9"] || {}).forEach(item => {
                                     const foundItem = ItemsDB.findItemByBQ(item.id, item.Damage);
-                                    rewards.push({ item: foundItem, rawId: item.id, rawDamage: item.Damage, count: item.Count !== undefined ? item.Count : 1, customName: this.getCustomName(foundItem, item.tag), isChoice: rew.rewardID === 'bq_standard:choice', taskType: 'item', damage: item.Damage, nbtTag: item.tag, rawRewProps: rawRewProps });
+                                    rewards.push({ ...reward, item: foundItem, rawId: item.id, rawDamage: item.Damage, count: item.Count !== undefined ? item.Count : 1, customName: this.getCustomName(foundItem, item.tag), isChoice: rType === 'choice', damage: item.Damage, nbtTag: item.tag });
                                 });
-                            } else if (rew.rewardID === 'bq_standard:command') {
-                                rewards.push({ item: { item_key: 'command', name: 'Команда', image: 'command_block.png', mod: 'Система' }, count: 1, customName: 'Команда', isChoice: false, taskType: 'command', command: rew.command, rawRewProps: rawRewProps });
-                            } else if (rew.rewardID === 'bq_standard:xp') {
-                                rewards.push({ item: { item_key: 'xp', name: 'Опыт', image: 'experience_bottle.png', mod: 'Система' }, count: rew.amount !== undefined ? rew.amount : 1, customName: 'Уровни опыта', isChoice: false, taskType: 'xp', rawRewProps: rawRewProps });
+                            } else if (rType === 'command') {
+                                reward.command = rew["command:8"] || '';
+                                rewards.push(reward);
+                            } else if (rType === 'xp') {
+                                reward.count = rew["amount:3"] || 1;
+                                rewards.push(reward);
+                            } else if (rType === 'npc_faction') {
+                                reward.factionId = rew["factionID:3"] || 0;
+                                reward.targetValue = rew["value:3"] || 1;
+                                rewards.push(reward);
+                            } else if (rType === 'npc_mail') {
+                                reward.sender = rew["Sender:8"] || '';
+                                reward.subject = rew["Subject:8"] || '';
+                                reward.message = (rew["Message:10"] && rew["Message:10"]["pages:9"] && rew["Message:10"]["pages:9"]["0:8"]) ? rew["Message:10"]["pages:9"]["0:8"] : '';
+                                rewards.push(reward);
+                            } else if (rType === 'scoreboard') {
+                                reward.scoreName = rew["score:8"] || '';
+                                reward.targetValue = rew["value:3"] || 1;
+                                rewards.push(reward);
                             }
                         });
                     }
@@ -334,9 +401,9 @@ export const BQ = {
                         
                         let nbt = req.nbtTag ? JSON.parse(JSON.stringify(req.nbtTag)) : null;
                         
-                        // ИНЖЕКТОР ИМЕН: Если ты переименовал предмет (например "Деньги") в редакторе, это сохранится в NBT!
+                        // ИНЖЕКТОР ИМЕН: Конвертация & в §
                         if (req.customName && req.item && req.customName !== req.item.name && req.customName !== "Нажать галочку" && req.customName !== "Уровни опыта" && req.customName !== "Команда") {
-                            let formattedName = req.customName.replace(/&/g, '§'); // Авто-замена & на § для цвета
+                            let formattedName = req.customName.replace(/&/g, '§'); 
                             if (!nbt) nbt = {};
                             if (!nbt["display:10"]) nbt["display:10"] = {};
                             nbt["display:10"]["Name:8"] = formattedName;
@@ -368,11 +435,13 @@ export const BQ = {
                     return dict;
                 };
 
-                const groups = { retrieval: [], crafting: [], block_break: [], hunt: [], fluid: [], checkbox: [], xp: [] };
-                const npcDialogs = [];
-                (q.reqs || []).forEach(r => { 
-                    if (r.item && r.item.item_key === 'npc_dialog') npcDialogs.push(r);
-                    else groups[r.taskType || 'retrieval'].push(r); 
+                const taskGroups = { retrieval: [], crafting: [], block_break: [], fluid: [] };
+                const ungroupedTasks = [];
+
+                (q.reqs || []).forEach(r => {
+                    let type = r.taskType || 'retrieval';
+                    if (taskGroups[type]) taskGroups[type].push(r);
+                    else ungroupedTasks.push(r);
                 });
 
                 const getTaskProps = (arr, defType) => {
@@ -387,57 +456,106 @@ export const BQ = {
                     return props;
                 };
 
-                if (groups.retrieval.length) {
-                    let p = getTaskProps(groups.retrieval, "bq_standard:retrieval");
-                    p["requiredItems:9"] = createItemsDict(groups.retrieval);
+                if (taskGroups.retrieval.length) {
+                    let p = getTaskProps(taskGroups.retrieval, "bq_standard:retrieval");
+                    p["requiredItems:9"] = createItemsDict(taskGroups.retrieval);
                     tasks[`${p["index:3"]}:10`] = p;
                 }
-                if (groups.crafting.length) {
-                    let p = getTaskProps(groups.crafting, "bq_standard:crafting");
-                    p["requiredItems:9"] = createItemsDict(groups.crafting);
+                if (taskGroups.crafting.length) {
+                    let p = getTaskProps(taskGroups.crafting, "bq_standard:crafting");
+                    p["requiredItems:9"] = createItemsDict(taskGroups.crafting);
                     tasks[`${p["index:3"]}:10`] = p;
                 }
-                if (groups.block_break.length) {
-                    let p = getTaskProps(groups.block_break, "bq_standard:block_break");
-                    p["blocks:9"] = createBlocksDict(groups.block_break);
+                if (taskGroups.block_break.length) {
+                    let p = getTaskProps(taskGroups.block_break, "bq_standard:block_break");
+                    p["blocks:9"] = createBlocksDict(taskGroups.block_break);
                     tasks[`${p["index:3"]}:10`] = p;
                 }
-                if (groups.fluid.length) {
-                    let p = getTaskProps(groups.fluid, "bq_standard:fluid");
-                    p["requiredFluids:9"] = createFluidsDict(groups.fluid);
+                if (taskGroups.fluid.length) {
+                    let p = getTaskProps(taskGroups.fluid, "bq_standard:fluid");
+                    p["requiredFluids:9"] = createFluidsDict(taskGroups.fluid);
                     tasks[`${p["index:3"]}:10`] = p;
                 }
-                if (groups.checkbox.length) {
-                    let p = getTaskProps(groups.checkbox, "bq_standard:checkbox");
-                    tasks[`${p["index:3"]}:10`] = p;
-                }
-                if (groups.xp.length) {
-                    let p = getTaskProps(groups.xp, "bq_standard:xp");
-                    p["amount:3"] = parseInt(groups.xp[0].count) || 1;
-                    p["isLevels:1"] = 1;
-                    tasks[`${p["index:3"]}:10`] = p;
-                }
-                
-                groups.hunt.forEach(h => {
-                    let p = h.rawTaskProps ? JSON.parse(JSON.stringify(h.rawTaskProps)) : { "taskID:8": "bq_standard:hunt", "damageType:8": "", "ignoreNBT:1": 1, "subtypes:1": 1 };
+
+                ungroupedTasks.forEach(t => {
+                    let p = t.rawTaskProps ? JSON.parse(JSON.stringify(t.rawTaskProps)) : {};
                     if (p["index:3"] === undefined) p["index:3"] = taskIdx++;
-                    p["target:8"] = h.target || h.customName || h.item.name;
-                    p["required:3"] = parseInt(h.count) || 1;
-                    if (h.nbtTag) p["targetNBT:10"] = h.nbtTag;
+                    let tType = t.taskType;
+                    
+                    if (tType === 'hunt') {
+                        p["taskID:8"] = "bq_standard:hunt";
+                        p["target:8"] = t.target || "Zombie";
+                        p["required:3"] = parseInt(t.count) || 1;
+                        if (t.nbtTag) p["targetNBT:10"] = t.nbtTag;
+                    } else if (tType === 'checkbox') {
+                        p["taskID:8"] = "bq_standard:checkbox";
+                    } else if (tType === 'xp') {
+                        p["taskID:8"] = "bq_standard:xp";
+                        p["amount:3"] = parseInt(t.count) || 1;
+                        p["isLevels:1"] = 1;
+                    } else if (tType === 'npc_dialog') {
+                        p["taskID:8"] = "bq_npc_integration:npc_dialog";
+                        p["npcDialogID:3"] = parseInt(t.dialogId) || 0;
+                        p["description:8"] = t.desc || "";
+                    } else if (tType === 'npc_faction') {
+                        p["taskID:8"] = "bq_npc_integration:npc_faction";
+                        p["factionID:3"] = parseInt(t.factionId) || 0;
+                        p["operation:8"] = t.operation || "MORE_OR_EQUAL";
+                        p["target:3"] = parseInt(t.targetValue) || 1;
+                    } else if (tType === 'npc_quest') {
+                        p["taskID:8"] = "bq_npc_integration:npc_quest";
+                        p["npcQuestID:3"] = parseInt(t.questId) || 0;
+                    } else if (tType === 'interact_entity') {
+                        p["taskID:8"] = "bq_standard:interact_entity";
+                        p["targetID:8"] = t.target || "Villager";
+                        p["onHit:1"] = t.onHit ? 1 : 0;
+                        p["onInteract:1"] = t.onInteract ? 1 : 0;
+                    } else if (tType === 'interact_item') {
+                        p["taskID:8"] = "bq_standard:interact_item";
+                        p["onHit:1"] = t.onHit ? 1 : 0;
+                        p["onInteract:1"] = t.onInteract ? 1 : 0;
+                        if (t.item) {
+                            const { idKey, finalId, damage } = extractItemData(t);
+                            p["item:10"] = { "Count:3": 1, "Damage:2": damage, "OreDict:8": "" };
+                            p["item:10"][idKey] = finalId;
+                            if (t.nbtTag) p["item:10"]["tag:10"] = t.nbtTag;
+                        } else {
+                            p["item:10"] = {};
+                        }
+                    } else if (tType === 'location') {
+                        p["taskID:8"] = "bq_standard:location";
+                        p["name:8"] = t.name || "";
+                        p["posX:3"] = parseInt(t.posX) || 0;
+                        p["posY:3"] = parseInt(t.posY) || 0;
+                        p["posZ:3"] = parseInt(t.posZ) || 0;
+                        p["dimension:3"] = parseInt(t.dimension) || 0;
+                        p["range:3"] = parseInt(t.range) || -1;
+                    } else if (tType === 'meeting') {
+                        p["taskID:8"] = "bq_standard:meeting";
+                        p["target:8"] = t.target || "Villager";
+                        p["amount:3"] = parseInt(t.count) || 1;
+                        p["range:3"] = parseInt(t.range) || 4;
+                    } else if (tType === 'scoreboard') {
+                        p["taskID:8"] = "bq_standard:scoreboard";
+                        p["scoreName:8"] = t.scoreName || "";
+                        p["scoreDisp:8"] = t.scoreDisp || "";
+                        p["operation:8"] = t.operation || "MORE_OR_EQUAL";
+                        p["target:3"] = parseInt(t.targetValue) || 1;
+                        p["type:8"] = "dummy";
+                    }
                     tasks[`${p["index:3"]}:10`] = p;
                 });
 
-                npcDialogs.forEach(req => {
-                    let p = req.rawTaskProps ? JSON.parse(JSON.stringify(req.rawTaskProps)) : { "taskID:8": "bq_npc_integration:npc_dialog" };
-                    if (p["index:3"] === undefined) p["index:3"] = taskIdx++;
-                    let dialogId = 0;
-                    if (req.nbtTag && req.nbtTag['npcDialogID:3'] !== undefined) dialogId = req.nbtTag['npcDialogID:3'];
-                    p["npcDialogID:3"] = parseInt(dialogId) || 0;
-                    tasks[`${p["index:3"]}:10`] = p;
+                const rewards = {};
+                const rewardGroups = { item: [], choice: [] };
+                const ungroupedRewards = [];
+
+                (q.rewards || []).forEach(r => {
+                    let type = r.taskType || 'item';
+                    if (rewardGroups[type]) rewardGroups[type].push(r);
+                    else ungroupedRewards.push(r);
                 });
 
-                const rewards = {}; 
-                
                 const getRewProps = (arr, defType) => {
                     let props = arr[0] && arr[0].rawRewProps ? JSON.parse(JSON.stringify(arr[0].rawRewProps)) : null;
                     if (!props) {
@@ -449,35 +567,46 @@ export const BQ = {
                     return props;
                 }
 
-                if (q.rewards) {
-                    const standardRews = q.rewards.filter(r => (!r.taskType || r.taskType === 'item') && !r.isChoice);
-                    const choiceRews = q.rewards.filter(r => (!r.taskType || r.taskType === 'item') && r.isChoice);
-
-                    if (standardRews.length > 0) {
-                        let p = getRewProps(standardRews, "bq_standard:item");
-                        p["rewards:9"] = createItemsDict(standardRews);
-                        rewards[`${p["index:3"]}:10`] = p;
-                    }
-                    if (choiceRews.length > 0) {
-                        let p = getRewProps(choiceRews, "bq_standard:choice");
-                        p["choices:9"] = createItemsDict(choiceRews);
-                        rewards[`${p["index:3"]}:10`] = p;
-                    }
-
-                    q.rewards.forEach(r => {
-                        if (r.taskType === 'command') {
-                            let p = r.rawRewProps ? JSON.parse(JSON.stringify(r.rawRewProps)) : { "rewardID:8": "bq_standard:command", "hideCommand:1": 1, "viaPlayer:1": 0 };
-                            if (p["index:3"] === undefined) p["index:3"] = rewIdx++;
-                            p["command:8"] = r.command || "";
-                            rewards[`${p["index:3"]}:10`] = p;
-                        } else if (r.taskType === 'xp') {
-                            let p = r.rawRewProps ? JSON.parse(JSON.stringify(r.rawRewProps)) : { "rewardID:8": "bq_standard:xp", "isLevels:1": 1 };
-                            if (p["index:3"] === undefined) p["index:3"] = rewIdx++;
-                            p["amount:3"] = parseInt(r.count) || 1;
-                            rewards[`${p["index:3"]}:10`] = p;
-                        }
-                    });
+                if (rewardGroups.item.length) {
+                    let p = getRewProps(rewardGroups.item, "bq_standard:item");
+                    p["rewards:9"] = createItemsDict(rewardGroups.item);
+                    rewards[`${p["index:3"]}:10`] = p;
                 }
+                if (rewardGroups.choice.length) {
+                    let p = getRewProps(rewardGroups.choice, "bq_standard:choice");
+                    p["choices:9"] = createItemsDict(rewardGroups.choice);
+                    rewards[`${p["index:3"]}:10`] = p;
+                }
+
+                ungroupedRewards.forEach(r => {
+                    let p = r.rawRewProps ? JSON.parse(JSON.stringify(r.rawRewProps)) : {};
+                    if (p["index:3"] === undefined) p["index:3"] = rewIdx++;
+                    let rType = r.taskType;
+
+                    if (rType === 'command') {
+                        p["rewardID:8"] = "bq_standard:command";
+                        p["command:8"] = r.command || "";
+                    } else if (rType === 'xp') {
+                        p["rewardID:8"] = "bq_standard:xp";
+                        p["amount:3"] = parseInt(r.count) || 1;
+                        p["isLevels:1"] = 1;
+                    } else if (rType === 'npc_faction') {
+                        p["rewardID:8"] = "bq_npc_integration:npc_faction";
+                        p["factionID:3"] = parseInt(r.factionId) || 0;
+                        p["value:3"] = parseInt(r.targetValue) || 1;
+                    } else if (rType === 'npc_mail') {
+                        p["rewardID:8"] = "bq_npc_integration:npc_mail";
+                        p["Sender:8"] = r.sender || "Anonymous";
+                        p["Subject:8"] = r.subject || "Reward";
+                        p["Message:10"] = { "pages:9": { "0:8": r.message || "" } };
+                    } else if (rType === 'scoreboard') {
+                        p["rewardID:8"] = "bq_standard:scoreboard";
+                        p["score:8"] = r.scoreName || "";
+                        p["value:3"] = parseInt(r.targetValue) || 1;
+                        p["type:8"] = "dummy";
+                    }
+                    rewards[`${p["index:3"]}:10`] = p;
+                });
 
                 let props = q.rawProps ? JSON.parse(JSON.stringify(q.rawProps)) : { 
                     "betterquesting:10": { 
@@ -527,7 +656,7 @@ export const BQ = {
                 lineQuests[`${bqId}:10`] = { "x:3": Math.round(q.x / 3), "y:3": Math.round(q.y / 3), "id:3": bqId, "sizeX:3": sz, "sizeY:3": sz };
             });
 
-            // ИСПРАВЛЕНИЕ: Новые ветки создаются с пустым фоном, как в оригинале
+            // ИСПРАВЛЕНИЕ: Новые ветки создаются с пустым фоном ""
             let lineProps = mod.rawProps ? JSON.parse(JSON.stringify(mod.rawProps)) : {
                 "betterquesting:10": {
                     "bg_image:8": "", 
@@ -554,7 +683,7 @@ export const BQ = {
 
         let outStr = JSON.stringify(bqData, null, 2);
         
-        // ФИНАЛЬНЫЙ ШТРИХ: Размораживаем числа. Гигантские UUID и дробные "0.0" возвращаются в игру без кавычек!
+        // ФИНАЛЬНЫЙ ШТРИХ: Снимаем защиту. Огромные числа и Float (0.0) возвращаются в игру живыми и без кавычек!
         outStr = outStr.replace(/"__BQ_NUM__([-]?\d+\.\d+|[-]?\d{15,})"/g, '$1');
 
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(outStr);
