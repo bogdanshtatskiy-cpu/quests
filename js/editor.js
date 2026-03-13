@@ -30,7 +30,7 @@ export const Editor = {
     initialPanY: 0,
     
     draggedQuestId: null, 
-    draggedCommentId: null, // Добавлено для комментариев
+    draggedCommentId: null, 
     mouseStartX: 0, 
     mouseStartY: 0, 
     nodeStartX: 0, 
@@ -39,11 +39,11 @@ export const Editor = {
     linkingFromNodeId: null, 
     
     contextNodeId: null, 
-    contextCommentId: null, // Для ПКМ по комментарию
+    contextCommentId: null, 
     editingNodeId: null, 
-    editingCommentId: null, // Для окна редактирования коммента
+    editingCommentId: null, 
     hoveredQuestId: null,
-    hoveredCommentId: null, // Для тултипа коммента
+    hoveredCommentId: null, 
     
     pickerCallback: null, 
     tempReqs: [], 
@@ -56,64 +56,15 @@ export const Editor = {
     saveTimeout: null,
     tempNbtTarget: null,
 
-    saveViewState() {
-        if (this.activeModId) {
-            this.viewStates[this.activeModId] = { scale: this.scale, panX: this.panX, panY: this.panY };
-        }
-    },
-
     init() {
         this.bindCanvasEvents(); 
         this.bindModModalEvents(); 
         this.bindQuestModalEvents();
-        this.bindCommentModalEvents(); // Инициализация окна комментов
+        this.bindCommentModalEvents(); 
         this.bindItemPickerEvents(); 
         this.bindTopBarEvents();
         this.bindNbtModalEvents(); 
-        this.bindHistoryButtons();
-        this.bindTemplatesEvents();
-    },
-
-    bindHistoryButtons() {
-        document.getElementById('btn-undo').addEventListener('click', () => {
-            this.undo();
-        });
-        document.getElementById('btn-redo').addEventListener('click', () => {
-            this.redo();
-        });
-    },
-
-    pushHistory() {
-        if (!Auth.user || this.isImportMode) return;
-        if (this.historyIndex < this.history.length - 1) {
-            this.history = this.history.slice(0, this.historyIndex + 1);
-        }
-        this.history.push(JSON.parse(JSON.stringify(this.data.mods)));
-        if (this.history.length > 30) {
-            this.history.shift();
-            this.historyIndex--;
-        }
-        this.historyIndex++;
-    },
-
-    undo() {
-        if (this.historyIndex > 0) {
-            this.historyIndex--;
-            this.data.mods = JSON.parse(JSON.stringify(this.history[this.historyIndex]));
-            DB.saveQuestsSilent(this.data.mods);
-            this.renderSidebar();
-            this.renderCanvas();
-        }
-    },
-
-    redo() {
-        if (this.historyIndex < this.history.length - 1) {
-            this.historyIndex++;
-            this.data.mods = JSON.parse(JSON.stringify(this.history[this.historyIndex]));
-            DB.saveQuestsSilent(this.data.mods);
-            this.renderSidebar();
-            this.renderCanvas();
-        }
+        this.bindHistoryEvents();
     },
 
     hideTooltip() {
@@ -121,6 +72,44 @@ export const Editor = {
         if (tooltip) tooltip.classList.add('hidden');
         this.hoveredQuestId = null;
         this.hoveredCommentId = null;
+    },
+
+    saveHistoryState() {
+        if (this.historyIndex < this.history.length - 1) {
+            this.history = this.history.slice(0, this.historyIndex + 1);
+        }
+        const state = JSON.stringify(this.data.mods);
+        if (this.history.length === 0 || this.history[this.history.length - 1] !== state) {
+            this.history.push(state);
+            this.historyIndex++;
+            if (this.history.length > 50) {
+                this.history.shift();
+                this.historyIndex--;
+            }
+        }
+    },
+
+    bindHistoryEvents() {
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'z') {
+                if (this.historyIndex > 0) {
+                    this.historyIndex--;
+                    this.data.mods = JSON.parse(this.history[this.historyIndex]);
+                    this.triggerAutoSave(true);
+                    this.renderSidebar();
+                    this.renderCanvas();
+                }
+            }
+            if (e.ctrlKey && e.key === 'y') {
+                if (this.historyIndex < this.history.length - 1) {
+                    this.historyIndex++;
+                    this.data.mods = JSON.parse(this.history[this.historyIndex]);
+                    this.triggerAutoSave(true);
+                    this.renderSidebar();
+                    this.renderCanvas();
+                }
+            }
+        });
     },
 
     addMobToDatalist(mobName) {
@@ -142,25 +131,10 @@ export const Editor = {
         const btnToggleSummary = document.getElementById('btn-toggle-summary-size');
         const summaryPanel = document.getElementById('rewards-summary');
         
-        // Restore state from localStorage or default to minimized
-        const isMinimized = localStorage.getItem('rewards_summary_minimized') !== 'false';
-        if (isMinimized) {
-            summaryPanel.classList.add('minimized');
-            btnToggleSummary.innerText = '▲';
-        } else {
-            summaryPanel.classList.remove('minimized');
-            btnToggleSummary.innerText = '▼';
-        }
-
         btnToggleSummary.addEventListener('click', () => {
             summaryPanel.classList.toggle('minimized');
-            if (summaryPanel.classList.contains('minimized')) {
-                btnToggleSummary.innerText = '▲';
-                localStorage.setItem('rewards_summary_minimized', 'true');
-            } else {
-                btnToggleSummary.innerText = '▼';
-                localStorage.setItem('rewards_summary_minimized', 'false');
-            }
+            if (summaryPanel.classList.contains('minimized')) btnToggleSummary.innerText = '▲';
+            else btnToggleSummary.innerText = '▼';
         });
 
         const fileInput = document.getElementById('bq-file-input');
@@ -210,12 +184,10 @@ export const Editor = {
         });
     },
 
-    triggerAutoSave() {
+    triggerAutoSave(skipHistory = false) {
         if (!Auth.user || this.isImportMode) return; 
+        if (!skipHistory) this.saveHistoryState();
         
-        // Добавляем текущее состояние в историю перед сохранением
-        this.pushHistory();
-
         const indicator = document.getElementById('save-indicator');
         indicator.classList.remove('hidden'); 
         indicator.innerText = "Сохранение..."; 
@@ -227,19 +199,10 @@ export const Editor = {
             indicator.innerText = "Сохранено ✔"; 
             indicator.style.color = "#55ff55";
             setTimeout(() => { indicator.classList.add('hidden'); }, 2000);
-        }, 300); // Быстрое сохранение (300мс) для лучшей синхронизации
+        }, 1500);
     },
 
-    centerCanvas(force = false) {
-        if (!force && this.activeModId && this.viewStates[this.activeModId]) {
-            const state = this.viewStates[this.activeModId];
-            this.scale = state.scale;
-            this.panX = state.panX;
-            this.panY = state.panY;
-            this.updateTransform();
-            return;
-        }
-
+    centerCanvas() {
         const mod = this.getActiveMod();
         const container = document.getElementById('canvas-container');
         
@@ -274,6 +237,12 @@ export const Editor = {
         this.panX = (container.clientWidth / 2) - centerX * this.scale; 
         this.panY = (container.clientHeight / 2) - centerY * this.scale;
         
+        if (this.viewStates[mod.id]) {
+            this.panX = this.viewStates[mod.id].panX;
+            this.panY = this.viewStates[mod.id].panY;
+            this.scale = this.viewStates[mod.id].scale;
+        }
+
         this.updateTransform();
     },
 
@@ -285,7 +254,6 @@ export const Editor = {
         const nodeMenu = document.getElementById('node-context-menu');
         const commentMenu = document.getElementById('comment-context-menu');
 
-        // Скрытие всех меню при клике мимо
         window.addEventListener('click', (e) => {
             if (!e.target.closest('.context-menu')) {
                 if (canvasMenu) canvasMenu.classList.add('hidden');
@@ -309,6 +277,10 @@ export const Editor = {
             this.panX = mouseX - canvasX * this.scale; 
             this.panY = mouseY - canvasY * this.scale;
             
+            if (this.activeModId) {
+                this.viewStates[this.activeModId] = { panX: this.panX, panY: this.panY, scale: this.scale };
+            }
+
             this.updateTransform();
         });
 
@@ -336,10 +308,10 @@ export const Editor = {
             if (this.isPanning) {
                 this.panX = this.initialPanX + (e.clientX - this.panStartX);
                 this.panY = this.initialPanY + (e.clientY - this.panStartY);
+                if (this.activeModId) this.viewStates[this.activeModId] = { panX: this.panX, panY: this.panY, scale: this.scale };
                 this.updateTransform();
             }
             
-            // Движение квеста
             if (this.draggedQuestId) {
                 const quest = this.getActiveMod().quests.find(q => q.id === this.draggedQuestId);
                 const dx = (e.clientX - this.mouseStartX) / this.scale; 
@@ -350,7 +322,6 @@ export const Editor = {
                 this.renderCanvas(true); 
             }
 
-            // Движение комментария
             if (this.draggedCommentId) {
                 const comment = this.getActiveMod().comments.find(c => c.id === this.draggedCommentId);
                 const dx = (e.clientX - this.mouseStartX) / this.scale; 
@@ -368,7 +339,6 @@ export const Editor = {
                                  (!canvasMenu || canvasMenu.classList.contains('hidden')) &&
                                  (!commentMenu || commentMenu.classList.contains('hidden'));
 
-            // Логика Тултипов
             if (hoveredNode && !this.isPanning && !this.draggedQuestId && !this.draggedCommentId && isMenuHidden) {
                 const questId = hoveredNode.dataset.id;
                 if (this.hoveredQuestId !== questId) {
@@ -412,7 +382,6 @@ export const Editor = {
             container.style.cursor = 'default';
         });
 
-        // ПКМ по пустому холсту -> Меню холста
         container.addEventListener('contextmenu', (e) => {
             e.preventDefault();
             this.hideTooltip(); 
@@ -420,7 +389,6 @@ export const Editor = {
             if (!Auth.user) return; 
             if (!this.activeModId) return alert('Сначала выберите или создайте ветку квестов!');
             
-            // Если клик был не по квесту и не по комменту
             if (e.target.closest('.quest-node') || e.target.closest('.quest-comment') || e.target.closest('.ui-element')) return;
 
             if (nodeMenu) nodeMenu.classList.add('hidden');
@@ -435,28 +403,18 @@ export const Editor = {
             canvasMenu.classList.remove('hidden');
         });
 
-        // КНОПКИ МЕНЮ ХОЛСТА
         document.getElementById('menu-add-quest')?.addEventListener('click', () => {
             document.getElementById('canvas-context-menu').classList.add('hidden');
             this.openQuestModal();
-        });
-        document.getElementById('menu-add-template')?.addEventListener('click', async () => {
-            document.getElementById('canvas-context-menu').classList.add('hidden');
-            this.openTemplatesModal();
         });
         document.getElementById('menu-add-comment')?.addEventListener('click', () => {
             document.getElementById('canvas-context-menu').classList.add('hidden');
             this.openCommentModal();
         });
 
-        // КНОПКИ МЕНЮ КВЕСТА
         document.getElementById('menu-copy')?.addEventListener('click', () => { 
             nodeMenu.classList.add('hidden'); 
             this.copyQuest(this.contextNodeId); 
-        });
-        document.getElementById('menu-save-template')?.addEventListener('click', () => { 
-            nodeMenu.classList.add('hidden'); 
-            this.saveQuestAsTemplate(this.contextNodeId); 
         });
         document.getElementById('menu-delete')?.addEventListener('click', () => { 
             nodeMenu.classList.add('hidden'); 
@@ -472,7 +430,6 @@ export const Editor = {
             this.renderCanvas(); 
         });
 
-        // КНОПКИ МЕНЮ КОММЕНТАРИЯ
         document.getElementById('menu-edit-comment')?.addEventListener('click', () => {
             commentMenu.classList.add('hidden');
             this.openCommentModal(this.contextCommentId);
@@ -486,76 +443,6 @@ export const Editor = {
                 this.renderCanvas();
             }
         });
-    },
-
-    bindTemplatesEvents() {
-        document.getElementById('btn-close-templates').addEventListener('click', () => {
-            document.getElementById('templates-modal').classList.add('hidden');
-        });
-    },
-
-    saveQuestAsTemplate(questId) {
-        const mod = this.getActiveMod();
-        const quest = mod.quests.find(q => q.id === questId);
-        if (!quest) return;
-
-        const name = prompt("Введите название для шаблона:", quest.title);
-        if (name && name.trim()) {
-            const templateData = JSON.parse(JSON.stringify(quest));
-            // Удаляем специфичные данные
-            delete templateData.id;
-            delete templateData.x;
-            delete templateData.y;
-            delete templateData.parents;
-            
-            DB.saveTemplate(name.trim(), templateData);
-            alert("Шаблон успешно сохранен!");
-        }
-    },
-
-    async openTemplatesModal() {
-        const modal = document.getElementById('templates-modal');
-        const list = document.getElementById('templates-list');
-        list.innerHTML = '<div style="padding:10px; color:#aaa;">Загрузка...</div>';
-        modal.classList.remove('hidden');
-
-        const templates = await DB.getTemplates();
-        list.innerHTML = '';
-        
-        if (templates.length === 0) {
-            list.innerHTML = '<div style="padding:10px; color:#aaa;">Нет сохраненных шаблонов</div>';
-            return;
-        }
-
-        templates.forEach(t => {
-            const div = document.createElement('div');
-            div.className = 'search-result-item';
-            
-            let iconPath = ItemsDB.getImageUrl('book.png');
-            if (t.quest.icon) iconPath = ItemsDB.getImageUrl(t.quest.icon);
-            else if (t.quest.reqs && t.quest.reqs[0] && t.quest.reqs[0].item) iconPath = ItemsDB.getImageUrl(t.quest.reqs[0].item.image);
-
-            div.innerHTML = `<img src="${iconPath}" width="32" height="32" style="image-rendering:pixelated;"><span>${ItemsDB.formatMC(t.name)}</span>`;
-            
-            div.addEventListener('click', () => {
-                modal.classList.add('hidden');
-                this.insertQuestFromTemplate(t.quest);
-            });
-            list.appendChild(div);
-        });
-    },
-
-    insertQuestFromTemplate(templateData) {
-        const mod = this.getActiveMod();
-        const newQuest = JSON.parse(JSON.stringify(templateData));
-        newQuest.id = 'q_' + Date.now();
-        newQuest.x = this.newQuestX;
-        newQuest.y = this.newQuestY;
-        newQuest.parents = [];
-        
-        mod.quests.push(newQuest);
-        this.triggerAutoSave();
-        this.renderCanvas();
     },
 
     updateTransform() { 
@@ -578,7 +465,6 @@ export const Editor = {
         const nodesFragment = document.createDocumentFragment();
         const linesFragment = document.createDocumentFragment();
 
-        // Линии связей
         mod.quests.forEach(quest => {
             if (quest.parents) {
                 quest.parents.forEach(pId => {
@@ -590,7 +476,6 @@ export const Editor = {
             }
         });
 
-        // Отрисовка комментариев
         if (mod.comments && mod.comments.length > 0) {
             mod.comments.forEach(c => {
                 const cNode = document.createElement('div');
@@ -598,7 +483,7 @@ export const Editor = {
                 cNode.style.left = `${c.x}px`;
                 cNode.style.top = `${c.y}px`;
                 cNode.dataset.id = c.id;
-                cNode.innerHTML = `i`; // Иконка инфо
+                cNode.innerHTML = `i`;
 
                 cNode.addEventListener('mousedown', (e) => {
                     if (e.button === 0 && Auth.user) {
@@ -631,7 +516,6 @@ export const Editor = {
             });
         }
 
-        // Отрисовка квестов
         mod.quests.forEach(quest => {
             const node = document.createElement('div');
             const nodeSize = getSafeSize(quest.size);
@@ -782,44 +666,6 @@ export const Editor = {
         return ItemsDB.formatMC(name);
     },
 
-    formatNBTForTooltip(nbt) {
-        if (!nbt || Object.keys(nbt).length === 0) return '';
-        let html = '<div class="nbt-tooltip-data" style="margin-left: 28px; font-size: 11px; color: #aaa; margin-bottom: 4px; border-left: 2px solid #555; padding-left: 5px;">';
-        
-        // Поиск чар
-        const enchants = nbt['StoredEnchantments:9'] || nbt['ench:9'];
-        if (enchants) {
-            html += '<div style="color: #55ffff;">✨ Чары:</div>';
-            for (let key in enchants) {
-                const e = enchants[key];
-                if (e && e['id:2'] !== undefined) {
-                    html += `<div>- ID: ${e['id:2']} (Ур. ${e['lvl:2'] || e['lvl:4']})</div>`;
-                }
-            }
-        }
-        
-        // Поиск Display Name / Lore
-        const display = nbt['display:10'];
-        if (display) {
-            if (display['Name:8']) html += `<div style="color: #ffaa00;">📛 ${display['Name:8']}</div>`;
-            const lore = display['Lore:9'];
-            if (lore) {
-                for (let key in lore) {
-                    html += `<div style="color: #aa00aa; font-style: italic;">"${lore[key].replace(/§[0-9a-fk-or]/gi, '')}"</div>`;
-                }
-            }
-        }
-        
-        if (!enchants && !display) {
-            const keys = Object.keys(nbt).map(k => k.split(':')[0]).join(', ');
-            html += `<div>📦 Теги: <span style="color:#55ff55;">${keys}</span></div>`;
-        }
-
-        html += '</div>';
-        return html;
-    },
-
-    // Тултип для комментария
     showCommentTooltip(comment) {
         const tt = document.getElementById('quest-tooltip');
         document.getElementById('tt-title').innerHTML = "<span style='color:#ffaa00;'>Комментарий</span>";
@@ -837,7 +683,6 @@ export const Editor = {
         document.getElementById('tt-title').innerHTML = ItemsDB.formatMC(quest.title);
         document.getElementById('tt-desc').innerHTML = ItemsDB.formatMC(quest.desc || '');
         
-        // Включаем обратно скрытые блоки, если тултип переключился с комментария
         document.getElementById('tt-reqs-container').style.display = 'block';
         document.getElementById('tt-rewards-container').style.display = 'block';
 
@@ -870,7 +715,6 @@ export const Editor = {
                     : '';
                 const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
                 reqHtml += `<div class="tt-item"><img src="${imgPath}">${this.getTaskLabel(r)} x${r.count}${consumeTag}</div>`;
-                reqHtml += this.formatNBTForTooltip(r.nbtTag);
             });
         } else {
             reqHtml = 'Нет требований';
@@ -883,7 +727,6 @@ export const Editor = {
                 const choiceTag = r.isChoice ? ' <span style="color:#ffff55; font-size:12px; margin-left:6px;">[На выбор]</span>' : '';
                 const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
                 rewHtml += `<div class="tt-item"><img src="${imgPath}">${this.getRewardLabel(r)} x${r.count}${choiceTag}</div>`;
-                rewHtml += this.formatNBTForTooltip(r.nbtTag);
             });
         } else {
             rewHtml = 'Нет наград';
@@ -960,7 +803,6 @@ export const Editor = {
         });
     },
 
-    // Окно Комментария (Новое)
     bindCommentModalEvents() {
         const modal = document.getElementById('comment-edit-modal');
         
@@ -980,7 +822,7 @@ export const Editor = {
             } else {
                 mod.comments.push({
                     id: 'c_' + Date.now(),
-                    x: this.newQuestX + 13, // небольшой сдвиг, чтобы отцентровать круг на мышке
+                    x: this.newQuestX + 13, 
                     y: this.newQuestY + 13,
                     text: text
                 });
@@ -1322,15 +1164,12 @@ export const Editor = {
                     ? (r.consume !== false ? '<span style="color:#ff5555;">[Забирается]</span>' : '<span style="color:#aaaaaa;">[Только наличие]</span>') : '';
                 const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
                 reqsBox.innerHTML += `
-                    <div class="view-item-row" style="display:block;">
-                        <div style="display:flex; gap:10px; align-items:center;">
-                            <div class="mc-slot"><img src="${imgPath}"></div>
-                            <div class="item-info" style="display:flex; flex-direction:column; justify-content:center;">
-                                <span class="item-name">${r.count}x ${this.getTaskLabel(r)}</span>
-                                <span class="item-meta">${consumeText}</span>
-                            </div>
+                    <div class="view-item-row">
+                        <div class="mc-slot"><img src="${imgPath}"></div>
+                        <div class="item-info">
+                            <span class="item-name">${r.count}x ${this.getTaskLabel(r)}</span>
+                            <span class="item-meta">${consumeText}</span>
                         </div>
-                        ${this.formatNBTForTooltip(r.nbtTag)}
                     </div>`;
             });
         } else { reqsBox.innerHTML = '<div style="padding: 15px; color: #aaa; font-size: 16px;">Нет требований</div>'; }
@@ -1342,15 +1181,12 @@ export const Editor = {
                 const choiceText = r.isChoice ? '<span style="color:#ffff55;">[На выбор]</span>' : '<span style="color:#55ff55;">[Гарантировано]</span>';
                 const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
                 rewsBox.innerHTML += `
-                    <div class="view-item-row" style="display:block;">
-                        <div style="display:flex; gap:10px; align-items:center;">
-                            <div class="mc-slot"><img src="${imgPath}"></div>
-                            <div class="item-info" style="display:flex; flex-direction:column; justify-content:center;">
-                                <span class="item-name">${r.count}x ${this.getRewardLabel(r)}</span>
-                                <span class="item-meta">${choiceText}</span>
-                            </div>
+                    <div class="view-item-row">
+                        <div class="mc-slot"><img src="${imgPath}"></div>
+                        <div class="item-info">
+                            <span class="item-name">${r.count}x ${this.getRewardLabel(r)}</span>
+                            <span class="item-meta">${choiceText}</span>
                         </div>
-                        ${this.formatNBTForTooltip(r.nbtTag)}
                     </div>`;
             });
         } else { rewsBox.innerHTML = '<div style="padding: 15px; color: #aaa; font-size: 16px;">Нет наград</div>'; }
@@ -1690,6 +1526,8 @@ export const Editor = {
             if (!file) return alert("Выберите картинку!");
             if (!name) return alert("Введите название предмета!");
 
+            alert("Внимание: Свои картинки отображаются только в веб-редакторе! Сама игра Minecraft не умеет скачивать картинки из интернета. В самой игре эта иконка будет стандартной.");
+
             const btn = document.getElementById('btn-upload-custom-item');
             btn.innerText = "Грузим...";
             btn.disabled = true;
@@ -1827,13 +1665,10 @@ export const Editor = {
             `;
             
             li.querySelector('.mod-item-content').addEventListener('click', () => {
-                if (this.activeModId !== mod.id) {
-                    this.saveViewState();
-                    this.activeModId = mod.id;
-                    this.renderSidebar(); 
-                    this.renderCanvas(); 
-                    this.centerCanvas(); 
-                }
+                this.activeModId = mod.id;
+                this.renderSidebar(); 
+                this.renderCanvas(); 
+                this.centerCanvas(); 
             });
 
             if (Auth.user) {
