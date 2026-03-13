@@ -19,243 +19,193 @@ body { background-color: #202020; color: #404040; overflow: hidden; user-select:
     background-color: #c6c6c6; border: 2px solid;
     border-top-color: #ffffff; border-left-color: #ffffff;
     border-bottom-color: #555555; border-right-color: #555555;
-    color: #202020; padding: 8px 12px; cursor: pointer; font-size: 16px; outline: none;
+    padding: 6px 12px; font-family: 'MCFont', sans-serif; font-size: 16px; cursor: pointer; color: #000;
 }
-.mc-button:hover { background-color: #a0a0a0; }
 .mc-button:active {
     border-top-color: #555555; border-left-color: #555555;
     border-bottom-color: #ffffff; border-right-color: #ffffff;
-    padding: 9px 11px 7px 13px;
+    background-color: #a0a0a0;
 }
-.mc-button.danger { color: #8b0000; }
-.mc-button.btn-cancel { color: #404040; background-color: #a0a0a0; }
+.mc-button.danger { color: #aa0000; }
+.mc-button.btn-cancel { color: #555; }
+.mc-button:disabled { color: #888; border-color: #999; cursor: not-allowed; }
 
-.mc-input {
-    background-color: #000000; color: #ffffff; border: 2px solid;
-    border-top-color: #555555; border-left-color: #555555;
-    border-bottom-color: #ffffff; border-right-color: #ffffff;
-    padding: 8px; font-size: 16px; width: 100%; outline: none;
+.mc-input, .mc-select {
+    background-color: #000000; border: 2px solid #a0a0a0; color: #ffffff;
+    padding: 6px; font-family: 'MCFont', sans-serif; font-size: 16px; width: 100%; margin-bottom: 10px;
 }
-textarea.mc-input { resize: none; height: 120px; } 
+.mc-input:focus { outline: 2px solid #ffffff; }
 
 .mc-slot {
-    background-color: #8b8b8b; border: 2px solid;
-    border-top-color: #373737; border-left-color: #373737;
+    width: 36px; height: 36px; background-color: #8b8b8b;
+    border: 2px solid; border-top-color: #373737; border-left-color: #373737;
     border-bottom-color: #ffffff; border-right-color: #ffffff;
-    display: inline-flex; justify-content: center; align-items: center;
+    display: flex; justify-content: center; align-items: center; position: relative;
 }
+.mc-slot img { max-width: 32px; max-height: 32px; image-rendering: pixelated; }
 
-/* Макет (Обновленная верхняя панель) */
-#top-bar { 
-    position: absolute; top: 0; left: 0; width: 100%; height: 45px; z-index: 100; 
-    display: flex; align-items: center; padding: 0 10px; border-bottom-width: 3px; 
+.mc-checkbox { display: flex; align-items: center; gap: 5px; font-size: 14px; cursor: pointer; color: #fff; }
+
+/* Лоадер */
+#global-loader {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background-color: #000000; z-index: 10000;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
 }
-#top-bar .mc-button { padding: 4px 8px; font-size: 14px; }
-.vertical-divider { width: 2px; height: 24px; background-color: #777; margin: 0 8px; border-right: 1px solid #fff; }
-.controls-hint { position: absolute; bottom: 10px; left: 10px; z-index: 1000; color: #404040; text-shadow: 1px 1px 0 #fff; font-size: 14px; background: rgba(255,255,255,0.7); padding: 4px 8px; border-radius: 4px; pointer-events: none; }
+.spinner {
+    width: 50px; height: 50px; border: 5px solid #555; border-top: 5px solid #ffaa00;
+    border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px;
+}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+#loader-text { color: #ffaa00; font-size: 24px; text-shadow: 2px 2px 0px #333; }
 
-#app-container { display: flex; height: 100vh; width: 100vw; padding-top: 45px; transition: padding-top 0.2s; }
-body.import-mode #app-container { padding-top: 90px; }
-body.import-mode #rewards-summary { top: 100px; }
+/* Верхняя панель */
+#top-bar {
+    position: absolute; top: 0; left: 0; width: 100%; height: 45px;
+    display: flex; align-items: center; padding: 0 10px; z-index: 100;
+    border-bottom-width: 3px; border-top: none; border-left: none; border-right: none;
+}
+.vertical-divider { width: 2px; height: 24px; background-color: #555; margin: 0 10px; border-right: 1px solid #fff; }
+.controls-hint { margin-left: auto; color: #555; font-size: 14px; font-style: italic; }
 
-#sidebar { width: 300px; display: flex; flex-direction: column; z-index: 10; border-width: 0 3px 0 0; }
-.sidebar-header { padding: 10px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #555; }
-#mod-list { list-style: none; overflow-y: auto; flex: 1; padding: 5px; }
-.mod-item { padding: 8px; margin-bottom: 5px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: #a0a0a0; border: 2px solid #555; }
-.mod-item:hover { background: #c6c6c6; border-color: #fff; }
-.mod-item.active { background: #e0e0e0; border-color: #00aa00; }
-.mod-item-content { display: flex; align-items: center; flex: 1; overflow: hidden; }
-.mod-item-content span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mod-item-content img { image-rendering: pixelated; margin-right: 10px; flex-shrink: 0; }
-.mod-item-actions { display: none; gap: 5px; }
-.mod-item:hover .mod-item-actions { display: flex; }
-.mod-btn { background: transparent; border: none; cursor: pointer; font-size: 16px; }
-.mod-btn:hover { transform: scale(1.2); }
-
-/* Drag & Drop для веток квестов */
-.mod-item.drag-top { box-shadow: inset 0 4px 0 #55ffff; }
-.mod-item.drag-bottom { box-shadow: inset 0 -4px 0 #55ffff; }
-
-/* Холст */
-#canvas-container { flex: 1; position: relative; background-color: #202020; overflow: hidden; }
-#quest-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform-origin: 0 0; }
-#connections-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
-.quest-line { stroke: #00aaaa; stroke-width: 4; fill: none; }
-#nodes-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-
-/* Окно статистики */
+/* Статистика наград */
 #rewards-summary {
-    position: absolute; top: 55px; right: 10px; 
-    min-width: 250px; width: max-content; max-width: 60vw;
-    background-color: rgba(16, 16, 20, 0.95); border: 2px solid #373737;
-    z-index: 100; padding: 10px; color: #fff; display: flex; flex-direction: column; transition: top 0.2s;
+    position: absolute; top: 55px; right: 10px; width: 250px;
+    background: rgba(0,0,0,0.8); border: 2px solid #555; color: #fff;
+    z-index: 90; display: flex; flex-direction: column; max-height: 80vh;
 }
-#rewards-summary .summary-header {
-    display: flex; justify-content: space-between; align-items: center;
-    border-bottom: 1px solid #333; padding-bottom: 5px; margin-bottom: 5px; gap: 20px;
-}
-#rewards-summary .mc-title { margin: 0; font-size: 14px; text-shadow: 1px 1px 0 #000; color: #55ffff; white-space: nowrap; }
-#rewards-summary-list { overflow-y: auto; overflow-x: hidden; max-height: 40vh; }
-.summary-item { display: flex; align-items: center; margin-bottom: 5px; font-size: 14px; white-space: nowrap; }
-.summary-item img { width: 20px; height: 20px; image-rendering: pixelated; margin-right: 8px; flex-shrink: 0; }
-#btn-toggle-summary-size { padding: 2px 8px; font-size: 12px; }
+.summary-header { display: flex; justify-content: space-between; align-items: center; background: #333; padding: 5px; border-bottom: 2px solid #555; }
+.summary-header .mc-title { margin: 0; font-size: 16px; color: #ffaa00; text-shadow: 1px 1px 0 #000; }
+.summary-header .mc-button { padding: 2px 6px; font-size: 12px; }
+#rewards-summary-list { padding: 5px; overflow-y: auto; flex: 1; }
 #rewards-summary.minimized #rewards-summary-list { display: none; }
-#rewards-summary.minimized { padding: 5px 10px; width: auto; }
+.summary-item { display: flex; align-items: center; gap: 5px; font-size: 14px; padding: 3px 0; border-bottom: 1px solid #333; }
+.summary-item img { width: 16px; height: 16px; image-rendering: pixelated; }
 
-/* УЗЕЛ КВЕСТА */
-.quest-node { position: absolute; background-color: #8b8b8b; border: 3px solid; border-top-color: #373737; border-left-color: #373737; border-bottom-color: #ffffff; border-right-color: #ffffff; display: flex; justify-content: center; align-items: center; cursor: pointer; pointer-events: auto; padding: 3px; }
-.quest-node.selected { border-color: #55ffff; box-shadow: 0 0 10px #55ffff; }
+/* Основной лейаут */
+#app-container { display: flex; height: 100vh; padding-top: 45px; }
 
-.quest-node.size-x1 { width: 52px; height: 52px; }
-.quest-node.size-x2 { width: 104px; height: 104px; border-width: 4px;}
-.quest-node.size-x3 { width: 156px; height: 156px; border-width: 5px;}
-.quest-node.size-x4 { width: 208px; height: 208px; border-width: 6px;}
+/* Боковая панель */
+#sidebar {
+    width: 250px; background-color: #1e1e1e; border-right-width: 3px;
+    border-top: none; border-left: none; border-bottom: none;
+    display: flex; flex-direction: column; z-index: 10;
+}
+.sidebar-header {
+    background-color: #333; padding: 10px; border-bottom: 2px solid #555;
+    display: flex; justify-content: space-between; align-items: center; color: #fff;
+}
+#mod-list { flex: 1; overflow-y: auto; list-style: none; padding: 5px; }
+.mod-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px; margin-bottom: 5px; background-color: #2a2a2a; border: 1px solid #444;
+    color: #ccc; cursor: pointer; transition: 0.1s;
+}
+.mod-item:hover { background-color: #3a3a3a; border-color: #666; }
+.mod-item.active { background-color: #114411; border-color: #22ff22; color: #fff; }
+.mod-item-content { display: flex; align-items: center; gap: 10px; flex: 1; overflow: hidden; }
+.mod-item-content img { width: 24px; height: 24px; image-rendering: pixelated; }
+.mod-item-content span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14px; }
+.mod-btn { background: none; border: none; cursor: pointer; font-size: 12px; opacity: 0.5; padding: 2px; }
+.mod-btn:hover { opacity: 1; }
 
-.quest-node img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; pointer-events: none; }
+.drag-top { border-top: 2px solid #55ffff !important; }
+.drag-bottom { border-bottom: 2px solid #55ffff !important; }
 
-.quest-node .node-title { position: absolute; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 3px 6px; border-radius: 3px; white-space: nowrap; font-size: 14px; pointer-events: none; display: none; z-index: 5; }
-.quest-node.size-x1 .node-title { top: 54px; }
-.quest-node.size-x2 .node-title { top: 106px; }
-.quest-node.size-x3 .node-title { top: 158px; font-size: 16px;}
-.quest-node.size-x4 .node-title { top: 210px; font-size: 18px;}
-body.show-titles .quest-node .node-title { display: block; }
+/* Холст квестов */
+#canvas-container { flex: 1; position: relative; background-color: #202020; overflow: hidden; }
+#quest-canvas { position: absolute; top: 0; left: 0; width: 0; height: 0; transform-origin: 0 0; }
+#connections-layer { position: absolute; top: 0; left: 0; width: 10000px; height: 10000px; pointer-events: none; overflow: visible; }
+.quest-line { stroke: #555555; stroke-width: 4; }
+
+#nodes-layer { position: absolute; top: 0; left: 0; }
+.quest-node {
+    position: absolute; background-color: #3c3c3c; border: 2px solid #555555; border-radius: 4px;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    cursor: pointer; box-shadow: inset -2px -2px 0px rgba(0,0,0,0.5), inset 2px 2px 0px rgba(255,255,255,0.2);
+}
+.quest-node:hover { border-color: #aaaaaa; }
+.quest-node.selected { border-color: #ffaa00; box-shadow: 0 0 10px #ffaa00; }
+.quest-node img { max-width: 80%; max-height: 80%; image-rendering: pixelated; pointer-events: none; }
+.node-title {
+    position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.7); color: #fff; padding: 2px 6px; border-radius: 3px;
+    font-size: 12px; white-space: nowrap; pointer-events: none; display: none; text-shadow: 1px 1px 0 #000;
+}
+.show-titles .node-title { display: block; }
+.quest-node.size-x1 { width: 26px; height: 26px; }
+.quest-node.size-x2 { width: 52px; height: 52px; }
+.quest-node.size-x3 { width: 78px; height: 78px; }
+.quest-node.size-x4 { width: 104px; height: 104px; }
+
+/* КОММЕНТАРИИ НА ХОЛСТЕ */
+.quest-comment {
+    position: absolute; width: 32px; height: 32px; background-color: rgba(0, 0, 0, 0.7);
+    border: 2px solid #ffaa00; border-radius: 50%; display: flex; justify-content: center; align-items: center;
+    color: #ffaa00; font-weight: bold; font-family: Arial, sans-serif; font-size: 18px; font-style: italic;
+    cursor: pointer; pointer-events: auto; box-shadow: 0 0 5px rgba(255, 170, 0, 0.5); z-index: 5;
+}
+.quest-comment:hover { background-color: rgba(255, 170, 0, 0.3); transform: scale(1.1); box-shadow: 0 0 10px rgba(255, 170, 0, 0.8); }
+
+/* Контекстные меню */
+.context-menu { position: fixed; z-index: 1000; padding: 5px; min-width: 150px; box-shadow: 2px 2px 10px rgba(0,0,0,0.5); }
+.menu-item { padding: 8px 10px; cursor: pointer; color: #fff; font-size: 14px; border-bottom: 1px solid #555; }
+.menu-item:last-child { border-bottom: none; }
+.menu-item:hover { background-color: #555; color: #ffaa00; }
+.menu-item.delete { color: #ff5555; }
+.menu-item.delete:hover { background-color: #aa0000; color: #fff; }
 
 /* Тултип */
-#quest-tooltip { 
-    position: fixed; z-index: 9999; background-color: rgba(16, 16, 20, 0.95); 
-    border: 2px solid #373737; border-radius: 4px; color: #fff; padding: 12px; 
-    min-width: 250px; pointer-events: none; 
-}
-#quest-tooltip * { pointer-events: none; }
-#quest-tooltip h3 { margin-bottom: 5px; color: #fff; text-shadow: 1px 1px 0 #000; white-space: nowrap; }
-#quest-tooltip #tt-desc { color: #aaaaaa; margin-bottom: 10px; font-size: 14px; white-space: pre-wrap; max-width: 400px; }
-.tt-section { margin-top: 8px; }
-.tt-label { color: #55ffff; font-size: 14px; text-shadow: 1px 1px 0 #000; }
-.tt-item { display: flex; align-items: center; margin-top: 4px; font-size: 14px; white-space: nowrap; }
-.tt-item img { width: 16px; height: 16px; image-rendering: pixelated; margin-right: 6px; flex-shrink: 0; }
-
-/* Контекстное меню */
-.context-menu { position: absolute; z-index: 1000; padding: 0; min-width: 200px; box-shadow: 4px 4px 0px rgba(0,0,0,0.5); }
-.menu-item { padding: 10px 15px; cursor: pointer; font-size: 16px; color: #404040; text-shadow: 1px 1px 0 #fff; border-bottom: 2px solid #a0a0a0; background-color: #c6c6c6; }
-.menu-item:hover { background-color: #a0a0a0; color: #000; }
-.menu-item.delete { color: #aa0000; border-bottom: none; }
-.menu-item.delete:hover { background-color: #ffaaaa; }
+#quest-tooltip { position: fixed; z-index: 999; padding: 10px; max-width: 300px; background: rgba(0,0,0,0.85); color: #fff; pointer-events: none; border-color: #551155; }
+#tt-title { color: #55FFFF; font-size: 16px; margin-bottom: 5px; text-shadow: 1px 1px 0 #000; }
+#tt-desc { font-size: 12px; color: #aaa; margin-bottom: 10px; line-height: 1.2; }
+.tt-section { margin-bottom: 8px; }
+.tt-label { display: block; color: #ffaa00; font-size: 12px; margin-bottom: 3px; text-shadow: 1px 1px 0 #000; }
+.tt-item { display: flex; align-items: center; gap: 5px; font-size: 12px; margin-bottom: 2px; }
+.tt-item img { width: 16px; height: 16px; image-rendering: pixelated; }
 
 /* Модальные окна */
-.modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.8); display: flex; justify-content: center; align-items: center; z-index: 2000; }
-.modal-content { width: 450px; padding: 20px; max-height: 95vh; overflow-y: auto; }
+.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 2000; }
+.modal-content { width: 400px; padding: 20px; box-shadow: 5px 5px 15px rgba(0,0,0,0.5); }
+.modal-content.large { width: 800px; max-width: 90vw; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 
-/* Широкие модалки */
-.modal-content.large { width: 1500px; max-width: 98vw; }
+.form-group { margin-bottom: 15px; }
+.form-group label { display: block; margin-bottom: 5px; color: #fff; font-size: 14px; text-shadow: 1px 1px 0 #000; }
+.form-row { display: flex; gap: 15px; }
 
-.form-row { display: flex; gap: 20px; }
-.form-group { margin-bottom: 15px; flex: 1; }
-.form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
-.form-group-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; min-height: 32px; }
-.form-group-header label { margin-bottom: 0; }
-.modal-actions { display: flex; justify-content: space-between; margin-top: 20px; border-top: 2px solid #555; padding-top: 15px; }
+.item-list-container { background: #000; border: 2px solid #555; padding: 5px; min-height: 100px; max-height: 200px; overflow-y: auto; }
+.item-list-container.big-list { max-height: 300px; }
 
-/* Списки внутри редактора квеста */
-.item-list-container { overflow-y: auto; background-color: #1e1e1e; border: 2px solid #555; padding: 5px; }
-.item-list-container.big-list { max-height: 350px; min-height: 150px; }
-.mt-5 { margin-top: 10px; width: 100%; }
+/* Строка награды/условия */
+.reward-row { display: flex; gap: 5px; align-items: center; margin-bottom: 5px; background: #1e1e1e; padding: 5px; border: 1px solid #333; }
+.reward-row .mc-input { margin-bottom: 0; padding: 4px; font-size: 14px; }
+.reward-row .mc-button { padding: 4px 8px; font-size: 12px; }
+.form-group-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+.mt-5 { margin-top: 5px; }
 
-.reward-row { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; background: #333; padding: 5px; border: 1px solid #555; }
-.reward-row input[type="number"] { width: 100px; text-align: center; padding: 6px; flex-shrink: 0; }
-.reward-row .task-type-select { width: 120px; padding: 6px; background-color: #000; color: #fff; border: 1px solid #555; flex-shrink: 0; }
-.reward-row .custom-name-input { flex: 1; text-align: left; }
-.reward-row .mc-checkbox { font-size: 13px; margin: 0 5px; display: flex; align-items: center; gap: 4px; color: #fff; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
-.reward-row .mc-checkbox input { margin: 0; cursor: pointer; }
+/* Просмотр квеста */
+.view-item-row { display: flex; align-items: center; gap: 10px; padding: 5px; border-bottom: 1px solid #333; }
+.view-item-row .item-info { display: flex; flex-direction: column; }
+.view-item-row .item-name { color: #fff; font-size: 16px; }
+.view-item-row .item-meta { color: #aaa; font-size: 12px; }
 
-/* Поиск и выбор предметов */
-.picker-controls { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
-.picker-controls input[type="text"] { flex: 2; margin: 0; }
-.picker-controls select { flex: 1; margin: 0; }
-.search-results-list { overflow-y: auto; background-color: #1e1e1e; border: 2px solid #555; padding: 5px; }
-.search-result-item { display: flex; align-items: center; padding: 6px; cursor: pointer; border-bottom: 1px solid #333; color: #fff; font-size: 15px; }
-.search-result-item:hover { background-color: #37373d; }
-.search-result-item img { image-rendering: pixelated; margin-right: 10px; flex-shrink: 0; }
-.fav-star { color: #555; font-size: 20px; margin-right: 10px; cursor: pointer; transition: color 0.2s; flex-shrink: 0; }
-.fav-star.active { color: #ffaa00; text-shadow: 0 0 5px #ffaa00; }
+/* Избранное и поиск */
+.search-result-item { display: flex; align-items: center; gap: 10px; padding: 5px; cursor: pointer; color: #fff; border-bottom: 1px solid #333; }
+.search-result-item:hover { background: #333; }
+.fav-star { color: #555; cursor: pointer; font-size: 18px; user-select: none; }
+.fav-star:hover { color: #aaa; }
+.fav-star.active { color: #ffaa00; }
 
-.admin-table { width: 100%; border-collapse: collapse; color: #e0e0e0; font-size: 14px; }
-.admin-table th { background-color: #373737; padding: 8px; text-align: left; border-bottom: 2px solid #555; position: sticky; top: 0; z-index: 2; }
-.admin-table td { padding: 8px; border-bottom: 1px solid #333; }
-.admin-table tr:hover { background-color: #444; }
+/* Таблица админки */
+.admin-table { width: 100%; border-collapse: collapse; color: #fff; font-size: 14px; }
+.admin-table th, .admin-table td { border: 1px solid #555; padding: 5px; text-align: left; }
+.admin-table th { background-color: #333; color: #ffaa00; }
+.admin-table tr:nth-child(even) { background-color: #1a1a1a; }
 
-/* Режим Просмотра квеста */
-.view-item-row { display: flex; align-items: center; gap: 15px; padding: 10px; border-bottom: 2px solid #333; background-color: transparent; }
-.view-item-row:last-child { border-bottom: none; }
-.view-item-row .mc-slot { width: 40px; height: 40px; flex-shrink: 0; }
-.view-item-row .mc-slot img { width: 24px; height: 24px; }
-.view-item-row .item-info { display: flex; flex-direction: column; gap: 4px; }
-.view-item-row .item-name { font-size: 18px; color: #fff; text-shadow: 1px 1px 0 #000; }
-.view-item-row .item-meta { font-size: 14px; text-shadow: 1px 1px 0 #000; }
-
-/* Экран загрузки */
-#global-loader {
-    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-    background-color: #202020; z-index: 999999;
-    display: flex; flex-direction: column; justify-content: center; align-items: center;
-    color: #55ffff; font-size: 24px; text-shadow: 2px 2px 0 #000;
-    transition: opacity 0.5s ease;
-}
-#global-loader.hidden { opacity: 0; pointer-events: none; }
-.spinner {
-    width: 60px; height: 60px; margin-bottom: 20px;
-    border: 6px solid #555; border-top-color: #55ffff; border-radius: 50%;
-    animation: spin 1s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* СТИЛИ ДЛЯ ЛУТБОКСОВ */
-.loot-group-item { padding: 8px; cursor: pointer; border-bottom: 1px solid #444; color: #fff; display: flex; justify-content: space-between; align-items: center; }
-.loot-group-item:hover { background-color: #333; }
-.loot-group-item.active { background-color: #444; border-left: 3px solid #55ffff; }
-.loot-reward-card { background: #2a2a2a; border: 1px solid #555; padding: 10px; margin-bottom: 10px; }
-.loot-reward-header { display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center; }
-.loot-items-list { display: flex; flex-direction: column; gap: 5px; }
-.loot-item-row { display: flex; align-items: center; gap: 10px; background: #1a1a1a; padding: 5px; border: 1px solid #333; }
-
-/* ИНДИКАТОР СОХРАНЕНИЯ (Уведомление снизу справа) */
+/* ИНДИКАТОР СОХРАНЕНИЯ */
 #save-indicator {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 9999;
-    background-color: rgba(0, 0, 0, 0.8);
-    border: 2px solid #555;
-    border-left-color: #777;
-    border-top-color: #777;
-    padding: 10px 20px;
-    font-size: 16px;
-    font-weight: bold;
-    box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
-    pointer-events: none;
-}
-/* СТИЛИ ДЛЯ КОММЕНТАРИЕВ НА ХОЛСТЕ */
-.quest-comment {
-    position: absolute;
-    width: 32px;
-    height: 32px;
-    background-color: rgba(0, 0, 0, 0.7);
-    border: 2px solid #ffaa00;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    color: #ffaa00;
-    font-weight: bold;
-    font-family: Arial, sans-serif;
-    font-size: 18px;
-    font-style: italic;
-    cursor: pointer;
-    pointer-events: auto;
-    box-shadow: 0 0 5px rgba(255, 170, 0, 0.5);
-    z-index: 5;
-}
-.quest-comment:hover {
-    background-color: rgba(255, 170, 0, 0.3);
-    transform: scale(1.1);
-    box-shadow: 0 0 10px rgba(255, 170, 0, 0.8);
+    position: fixed; bottom: 20px; right: 20px; z-index: 9999; background-color: rgba(0, 0, 0, 0.8);
+    border: 2px solid #555; border-left-color: #777; border-top-color: #777; padding: 10px 20px;
+    font-size: 16px; font-weight: bold; box-shadow: 2px 2px 5px rgba(0,0,0,0.5); pointer-events: none;
 }
