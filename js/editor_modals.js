@@ -334,7 +334,16 @@ export const EditorModals = {
         
         document.getElementById('view-quest-icon').innerHTML = `<img src="${ItemsDB.getImageUrl(iconFile)}" style="width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated;">`;
         document.getElementById('view-quest-title').innerHTML = ItemsDB.formatMC(quest.title);
-        document.getElementById('view-quest-desc').innerHTML = ItemsDB.formatMC(quest.desc || 'Нет описания.');
+        
+        // Скрытие пустого описания
+        const descEl = document.getElementById('view-quest-desc');
+        const descContainer = document.getElementById('view-desc-container');
+        if (quest.desc && quest.desc.trim().length > 0) {
+            descEl.innerHTML = ItemsDB.formatMC(quest.desc);
+            descContainer.style.display = 'block';
+        } else {
+            descContainer.style.display = 'none';
+        }
 
         const pContainer = document.getElementById('view-parents-container');
         const pList = document.getElementById('view-parents-list');
@@ -345,7 +354,7 @@ export const EditorModals = {
                 editor.data.mods.forEach(m => { const f = m.quests.find(q => q.id === pId); if (f) { pQuest = f; pMod = m; } });
                 const t = pQuest ? pQuest.title : `Скрытый квест: ${pId}`;
                 const m = pMod ? pMod.name : '?';
-                return `<div style="color:#fff; font-size:16px; margin-bottom:6px;">🔗 ${ItemsDB.formatMC(t)} <span style="color:#aaa; font-size:14px;">[${ItemsDB.formatMC(m)}]</span></div>`;
+                return `<div class="view-item-row" style="padding: 8px;"><div class="item-info"><span class="item-name">🔗 ${ItemsDB.formatMC(t)} <small style="color:#aaa;">[${ItemsDB.formatMC(m)}]</small></span></div></div>`;
             }).join('');
         } else { pContainer.classList.add('hidden'); }
 
@@ -353,13 +362,13 @@ export const EditorModals = {
             const consumeText = (r.taskType !== 'hunt' && r.taskType !== 'block_break' && r.taskType !== 'checkbox' && r.taskType !== 'xp') ? (r.consume !== false ? '<span style="color:#ff5555; white-space: nowrap;">[Забирается]</span>' : '<span style="color:#aaaaaa; white-space: nowrap;">[Только наличие]</span>') : '';
             const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
             return `<div class="view-item-row"><div class="mc-slot"><img src="${imgPath}"></div><div class="item-info"><span class="item-name">${r.count}x ${editor.getTaskLabel(r)}</span><span class="item-meta">${consumeText}</span></div></div>`;
-        }).join('') : '<div style="padding: 15px; color: #aaa; font-size: 16px;">Нет требований</div>';
+        }).join('') : '<div style="padding: 10px; color: #888; font-style: italic;">Нет требований</div>';
 
         document.getElementById('view-rewards-list').innerHTML = (quest.rewards && quest.rewards.length > 0) ? quest.rewards.map(r => {
             const choiceText = r.isChoice ? '<span style="color:#ffff55; white-space: nowrap;">[На выбор]</span>' : '<span style="color:#55ff55; white-space: nowrap;">[Гарантировано]</span>';
             const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
             return `<div class="view-item-row"><div class="mc-slot"><img src="${imgPath}"></div><div class="item-info"><span class="item-name">${r.count}x ${editor.getRewardLabel(r)}</span><span class="item-meta">${choiceText}</span></div></div>`;
-        }).join('') : '<div style="padding: 15px; color: #aaa; font-size: 16px;">Нет наград</div>';
+        }).join('') : '<div style="padding: 10px; color: #888; font-style: italic;">Нет наград</div>';
 
         modal.classList.remove('hidden');
     },
