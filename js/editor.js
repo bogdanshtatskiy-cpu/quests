@@ -18,6 +18,7 @@ export const Editor = {
     isImportMode: false, 
     lootGroups: {}, 
     questSettings: null,
+    viewStates: {},
     
     scale: 1, 
     panX: 0, 
@@ -54,6 +55,12 @@ export const Editor = {
     tempModIcon: null, 
     saveTimeout: null,
     tempNbtTarget: null,
+
+    saveViewState() {
+        if (this.activeModId) {
+            this.viewStates[this.activeModId] = { scale: this.scale, panX: this.panX, panY: this.panY };
+        }
+    },
 
     init() {
         this.bindCanvasEvents(); 
@@ -213,7 +220,16 @@ export const Editor = {
         }, 1500);
     },
 
-    centerCanvas() {
+    centerCanvas(force = false) {
+        if (!force && this.activeModId && this.viewStates[this.activeModId]) {
+            const state = this.viewStates[this.activeModId];
+            this.scale = state.scale;
+            this.panX = state.panX;
+            this.panY = state.panY;
+            this.updateTransform();
+            return;
+        }
+
         const mod = this.getActiveMod();
         const container = document.getElementById('canvas-container');
         
@@ -1801,10 +1817,13 @@ export const Editor = {
             `;
             
             li.querySelector('.mod-item-content').addEventListener('click', () => {
-                this.activeModId = mod.id;
-                this.renderSidebar(); 
-                this.renderCanvas(); 
-                this.centerCanvas(); 
+                if (this.activeModId !== mod.id) {
+                    this.saveViewState();
+                    this.activeModId = mod.id;
+                    this.renderSidebar(); 
+                    this.renderCanvas(); 
+                    this.centerCanvas(); 
+                }
             });
 
             if (Auth.user) {

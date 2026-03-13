@@ -90,9 +90,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 Editor.history[Editor.historyIndex] = JSON.parse(JSON.stringify(Editor.data.mods));
             }
             
+            // Сохраняем стейт просмотра до рендера
+            Editor.saveViewState();
+
             Editor.renderSidebar();
-            Editor.renderCanvas();
-            Editor.centerCanvas();
+            Editor.renderCanvas(true);
+
+            if (Editor.activeModId && Editor.viewStates[Editor.activeModId]) {
+                const state = Editor.viewStates[Editor.activeModId];
+                Editor.scale = state.scale;
+                Editor.panX = state.panX;
+                Editor.panY = state.panY;
+                Editor.updateTransform();
+            } else {
+                Editor.centerCanvas();
+            }
             
             indicator.style.color = "#55ff55";
             indicator.innerText = "✔ Синхронизировано!";
@@ -118,44 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
         indicator.innerText = `⏳ Загрузка профиля: ${AppState.activeWorkspace}...`;
 
         // Переподписываемся на новый воркспейс
-        DB.subscribeToQuests((savedQuests) => {
-            if (Editor.isImportMode) return;
-            if (savedQuests && savedQuests.length > 0) {
-                savedQuests.forEach(mod => {
-                    mod.quests.forEach(q => {
-                        if (q.req && !q.reqs) q.reqs = [q.req];
-                        if (!q.reqs) q.reqs = [];
-                        if (!q.rewards) q.rewards = [];
-                    });
-                });
-                Editor.data.mods = savedQuests;
-                if (!Editor.activeModId || !savedQuests.find(m => m.id === Editor.activeModId)) {
-                    Editor.activeModId = savedQuests[0].id; 
-                }
-            } else {
-                Editor.data.mods = [];
-                Editor.activeModId = null;
-            }
-            
-            // Если история пуста, добавляем изначальное состояние
-            if (Editor.history.length === 0) {
-                Editor.history.push(JSON.parse(JSON.stringify(Editor.data.mods)));
-                Editor.historyIndex = 0;
-            } else {
-                // Синхронизация истории с внешними изменениями
-                Editor.history[Editor.historyIndex] = JSON.parse(JSON.stringify(Editor.data.mods));
-            }
-            
-            Editor.renderSidebar();
-            Editor.renderCanvas();
-            Editor.centerCanvas();
-
-            indicator.style.color = "#55ff55";
-            indicator.innerText = "✔ Профиль загружен!";
-            setTimeout(() => {
-                indicator.classList.add('hidden');
-            }, 2000);
-        });
+        DB.subscribeToQuests(handleQuestsUpdate);
     });
 
     document.getElementById('btn-add-workspace').addEventListener('click', () => {

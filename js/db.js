@@ -35,7 +35,8 @@ export const DB = {
         if (!Auth.user) return;
         try { 
             const docName = this._getWorkspaceDocName();
-            await setDoc(doc(db, "quests", docName), { mods: modsData }); 
+            const safeData = JSON.parse(JSON.stringify(modsData));
+            await setDoc(doc(db, "quests", docName), { mods: safeData }); 
         } catch (e) {
             console.error("Ошибка автосохранения:", e);
         }
@@ -142,25 +143,29 @@ export const DB = {
     async saveVersion(comment, modsData) {
         if (!Auth.user) return;
         try {
+            // Очистка от возможных undefined и функций перед отправкой в Firestore
+            const safeData = JSON.parse(JSON.stringify(modsData));
             await addDoc(collection(db, "quests_versions"), {
                 workspace: this.currentWorkspace,
                 comment: comment,
                 author: Auth.user.username,
                 timestamp: new Date().toISOString(),
-                mods: modsData
+                mods: safeData
             });
             this.logAction(`Создал коммит: ${comment}`);
         } catch (e) {
             console.error("Ошибка создания коммита:", e);
+            alert("Ошибка создания коммита: " + e.message);
         }
     },
 
     async saveTemplate(name, questData) {
         if (!Auth.user) return;
         try {
+            const safeData = JSON.parse(JSON.stringify(questData));
             await addDoc(collection(db, "quest_templates"), {
                 name: name,
-                quest: questData,
+                quest: safeData,
                 timestamp: new Date().toISOString()
             });
             this.logAction(`Создал шаблон: ${name}`);
