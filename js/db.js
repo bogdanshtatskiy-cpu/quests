@@ -143,15 +143,29 @@ export const DB = {
     async saveVersion(comment, modsData) {
         if (!Auth.user) return;
         try {
-            // Очистка от возможных undefined и функций перед отправкой в Firestore
             const safeData = JSON.parse(JSON.stringify(modsData));
-            await addDoc(collection(db, "quests_versions"), {
-                workspace: this.currentWorkspace,
+            const versionId = "v_" + Date.now();
+            
+            // Сохраняем данные версии в рабочую коллекцию quests
+            await setDoc(doc(db, "quests", versionId), { mods: safeData });
+            
+            // Обновляем реестр версий
+            const regDoc = "versions_reg_" + (this.currentWorkspace === 'Основной' ? 'main' : this.currentWorkspace);
+            const regRef = doc(db, "quests", regDoc);
+            const regSnap = await getDoc(regRef);
+            let versions = [];
+            if (regSnap.exists()) versions = regSnap.data().list || [];
+            
+            versions.unshift({
+                id: versionId,
                 comment: comment,
                 author: Auth.user.username,
-                timestamp: new Date().toISOString(),
-                mods: safeData
+                timestamp: new Date().toISOString()
             });
+            
+            if(versions.length > 50) versions = versions.slice(0, 50);
+            await setDoc(regRef, { list: versions });
+            
             this.logAction(`Создал коммит: ${comment}`);
         } catch (e) {
             console.error("Ошибка создания коммита:", e);
@@ -163,41 +177,49 @@ export const DB = {
         if (!Auth.user) return;
         try {
             const safeData = JSON.parse(JSON.stringify(questData));
-            await addDoc(collection(db, "quest_templates"), {
+            const regRef = doc(db, "quests", "templates_registry");
+            const regSnap = await getDoc(regRef);
+            let templates = [];
+            if (regSnap.exists()) templates = regSnap.data().list || [];
+            
+            templates.unshift({
+                id: "t_" + Date.now(),
                 name: name,
                 quest: safeData,
                 timestamp: new Date().toISOString()
             });
+            
+            await setDoc(regRef, { list: templates });
             this.logAction(`Создал шаблон: ${name}`);
         } catch(e) { console.error(e); }
     },
 
     async getTemplates() {
         try {
-            const q = query(collection(db, "quest_templates"), orderBy("timestamp", "desc"));
-            const snap = await getDocs(q);
-            const templates = [];
-            snap.forEach(doc => templates.push({ id: doc.id, ...doc.data() }));
-            return templates;
+            const regSnap = await getDoc(doc(db, "quests", "templates_registry"));
+            if (regSnap.exists()) return regSnap.data().list || [];
+            return [];
         } catch(e) { return []; }
     },
 
     async getVersions() {
         if (!Auth.user) return [];
         try {
-            const q = query(collection(db, "quests_versions"), orderBy("timestamp", "desc"), limit(100));
-            const querySnapshot = await getDocs(q);
-            const versions = [];
-            querySnapshot.forEach((doc) => {
-                const data = doc.data();
-                if (data.workspace === this.currentWorkspace) {
-                    versions.push({ id: doc.id, ...data });
-                }
-            });
-            return versions;
+            const regDoc = "versions_reg_" + (this.currentWorkspace === 'Основной' ? 'main' : this.currentWorkspace);
+            const regSnap = await getDoc(doc(db, "quests", regDoc));
+            if (regSnap.exists()) return regSnap.data().list || [];
+            return [];
         } catch(e) { 
             console.error(e);
             return []; 
         }
+    },
+
+    async getVersionData(versionId) {
+        try {
+            const docSnap = await getDoc(doc(db, "quests", versionId));
+            if (docSnap.exists()) return docSnap.data().mods;
+            return null;
+        } catch(e) { return null; }
     }
 };

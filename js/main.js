@@ -339,12 +339,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (confirm('Вы уверены? Это полностью перезапишет текущую базу этим коммитом!')) {
                     const vId = e.target.getAttribute('data-id');
                     const version = versions.find(v => v.id === vId);
-                    if (version && version.mods) {
-                        Editor.data.mods = version.mods;
-                        await DB.saveQuestsSilent(Editor.data.mods);
-                        DB.logAction(`Откат базы к коммиту: ${version.comment}`);
-                        document.getElementById('versions-modal').classList.add('hidden');
-                        alert("База успешно восстановлена!");
+                    if (version) {
+                        const modsData = await DB.getVersionData(vId);
+                        if (modsData) {
+                            Editor.data.mods = modsData;
+                            await DB.saveQuestsSilent(Editor.data.mods);
+                            DB.logAction(`Откат базы к коммиту: ${version.comment}`);
+                            document.getElementById('versions-modal').classList.add('hidden');
+                            alert("База успешно восстановлена!");
+                        } else {
+                            alert("Не удалось загрузить данные коммита. Возможно, они были удалены.");
+                        }
                     }
                 }
             });
