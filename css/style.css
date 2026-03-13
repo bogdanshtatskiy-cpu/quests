@@ -174,16 +174,42 @@ body { background-color: #202020; color: #404040; overflow: hidden; user-select:
 #quest-tooltip { 
     position: fixed; 
     z-index: 2000; 
-    padding: 12px; 
+    padding: 14px; 
     min-width: 250px;
-    max-width: 500px; /* Увеличили максимальную ширину с 320px до 500px */
-    width: max-content; /* Окно автоматически расширяется под длину текста */
-    background: rgba(0,0,0,0.9); 
+    max-width: 450px; 
+    width: max-content; 
+    background: rgba(0,0,0,0.95); 
     color: #fff; 
     pointer-events: none; 
     border-color: #551155; 
     border-width: 3px; 
-    box-shadow: 4px 4px 10px rgba(0,0,0,0.8); 
+    box-shadow: 4px 4px 12px rgba(0,0,0,0.8); 
+}
+#tt-title { color: #55FFFF; font-size: 18px; margin-bottom: 8px; text-shadow: 1px 1px 0 #000; line-height: 1.2; overflow-wrap: break-word; word-break: normal; }
+#tt-desc { font-size: 13px; color: #ccc; margin-bottom: 12px; line-height: 1.4; overflow-wrap: break-word; word-break: normal; white-space: pre-wrap; }
+.tt-section { margin-bottom: 10px; }
+.tt-label { display: block; color: #ffaa00; font-size: 13px; margin-bottom: 6px; text-shadow: 1px 1px 0 #000; }
+
+.tt-item { 
+    display: flex; 
+    align-items: flex-start; /* Иконка прижата к верхней строке */
+    gap: 8px; 
+    font-size: 14px; 
+    margin-bottom: 8px; 
+}
+.tt-item img { 
+    width: 20px; 
+    height: 20px; 
+    flex-shrink: 0; /* Запрет на сжатие иконки */
+    image-rendering: pixelated; 
+    object-fit: contain; 
+    margin-top: -1px; 
+}
+.tt-item-text {
+    flex: 1;
+    line-height: 1.3;
+    overflow-wrap: break-word; /* Мягкий перенос длинных слов */
+    word-break: normal; /* Разрешаем переносить ТОЛЬКО по пробелам */
 }
 #tt-title { color: #55FFFF; font-size: 18px; margin-bottom: 8px; text-shadow: 1px 1px 0 #000; }
 #tt-desc { font-size: 13px; color: #ccc; margin-bottom: 12px; line-height: 1.3; word-wrap: break-word; white-space: pre-wrap; }
