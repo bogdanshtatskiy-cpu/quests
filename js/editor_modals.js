@@ -95,6 +95,7 @@ export const EditorModals = {
             r.scoreName = getValue(`req-scoreName-${idx}`, r.scoreName);
             r.scoreDisp = getValue(`req-scoreDisp-${idx}`, r.scoreDisp);
             
+            // Защита и правильное сохранение названий и перевода жидкостей
             if (r.taskType === 'fluid' && r.target) {
                 r.customName = BQ.FLUIDS[r.target] || r.target;
             } else if (r.taskType === 'hunt') {
@@ -147,7 +148,7 @@ export const EditorModals = {
         editor.renderCanvas();
     },
 
-    // Умное добавление зависимостей (Ветка -> Квест)
+    // ДВУХУРОВНЕВЫЙ ВЫБОР ЗАВИСИМОСТЕЙ (УМНЫЙ СПИСОК)
     populateParentsSelect(editor) {
         const modSelect = document.getElementById('parent-mod-select');
         const questSelect = document.getElementById('parent-quest-select');
@@ -160,6 +161,7 @@ export const EditorModals = {
             modSelect.appendChild(opt);
         });
 
+        // При выборе ветки подгружаем только её квесты
         modSelect.onchange = () => {
             questSelect.innerHTML = '<option value="">-- Выберите Квест --</option>';
             if (!modSelect.value) {
@@ -196,7 +198,8 @@ export const EditorModals = {
             div.querySelector('.btn-del-parent').addEventListener('click', () => { 
                 editor.tempParents.splice(idx, 1); 
                 this.renderParentsList(editor); 
-                this.populateParentsSelect(editor); 
+                // Перерисовываем список, чтобы удаленный квест вернулся обратно в селект
+                document.getElementById('parent-mod-select').dispatchEvent(new Event('change'));
             });
             container.appendChild(div);
         });
@@ -218,29 +221,28 @@ export const EditorModals = {
             this.saveTempState(editor);
             editor.openItemPicker((item) => {
                 editor.tempQuestIcon = item.image; editor.tempQuestIconItem = item; 
-                document.getElementById('quest-icon-preview').innerHTML = `<img src="${ItemsDB.getImageUrl(item.image)}" style="width: 32px; height: 32px; image-rendering: pixelated;">`;
+                document.getElementById('quest-icon-preview').innerHTML = `<img src="${ItemsDB.getImageUrl(item.image)}" style="width: 32px; height: 32px; image-rendering: pixelated; object-fit: contain;">`;
             });
         });
 
-        // Умное добавление задачи (сразу нужного типа)
+        // Умное добавление задачи (создает шаблон сразу нужного типа)
         document.getElementById('btn-add-req-type').addEventListener('click', () => {
             this.saveTempState(editor);
             const type = document.getElementById('new-req-type-select').value;
             
-            // Если нужен предмет, открываем пикер
             if (type === 'retrieval' || type === 'crafting' || type === 'block_break' || type === 'interact_item') {
                 editor.openItemPicker((item) => { 
                     editor.tempReqs.push({ taskType: type, item: item, rawId: item.string_id || item.item_key, rawDamage: item.damage !== undefined ? item.damage : 0, count: 1, customName: BQ.getCustomName(item, null), consume: true, nbtTag: null }); 
                     this.renderQuestEditForm(editor); 
                 });
             } else {
-                // Иначе добавляем дефолтную заглушку для этого типа
                 let newItem = { item_key: 'minecraft:stone', name: 'Система', image: 'stone.png' };
                 if (type === 'xp') newItem = { item_key: 'xp', name: 'Опыт', image: 'experience_bottle.png' };
                 if (type === 'checkbox') newItem = { item_key: 'checkbox', name: 'Галочка', image: 'checkbox.png' };
                 if (type === 'fluid') newItem = { item_key: 'fluid', name: 'Жидкость', image: 'fluid_bucket.png' };
                 if (type === 'hunt' || type === 'meeting' || type === 'interact_entity') newItem = { item_key: 'mob', name: 'Моб', image: 'skull.png' };
                 if (type === 'npc_dialog' || type === 'npc_faction' || type === 'npc_quest') newItem = { item_key: 'npc', name: 'NPC', image: 'oak_sign.png' };
+                if (type === 'scoreboard') newItem = { item_key: 'scoreboard', name: 'Счетчик', image: 'oak_sign.png' };
                 
                 editor.tempReqs.push({
                     taskType: type, item: newItem, rawId: newItem.item_key, rawDamage: 0, count: 1, 
@@ -267,6 +269,7 @@ export const EditorModals = {
                 if (type === 'xp') newItem = { item_key: 'xp', name: 'Опыт', image: 'experience_bottle.png' };
                 if (type === 'command') newItem = { item_key: 'command', name: 'Команда', image: 'command_block.png' };
                 if (type === 'npc_faction' || type === 'npc_mail') newItem = { item_key: 'npc', name: 'NPC', image: 'oak_sign.png' };
+                if (type === 'scoreboard') newItem = { item_key: 'scoreboard', name: 'Счетчик', image: 'oak_sign.png' };
                 
                 editor.tempRewards.push({
                     taskType: type, item: newItem, rawId: newItem.item_key, rawDamage: 0, count: 1, 
@@ -282,7 +285,8 @@ export const EditorModals = {
             if (val && !editor.tempParents.includes(val)) { 
                 editor.tempParents.push(val); 
                 this.renderParentsList(editor); 
-                this.populateParentsSelect(editor); 
+                // Убираем добавленный элемент из списка выбора
+                document.getElementById('parent-mod-select').dispatchEvent(new Event('change'));
             }
         });
 
@@ -387,11 +391,12 @@ export const EditorModals = {
             editor.tempQuestIcon = null; editor.tempQuestIconItem = null; editor.tempReqs = []; editor.tempRewards = []; editor.tempParents = [];
         }
         
-        document.getElementById('quest-icon-preview').innerHTML = editor.tempQuestIcon ? `<img src="${ItemsDB.getImageUrl(editor.tempQuestIcon)}" style="width: 32px; height: 32px; image-rendering: pixelated;">` : '';
+        document.getElementById('quest-icon-preview').innerHTML = editor.tempQuestIcon ? `<img src="${ItemsDB.getImageUrl(editor.tempQuestIcon)}" style="width: 32px; height: 32px; image-rendering: pixelated; object-fit: contain;">` : '';
         this.renderQuestEditForm(editor); 
         this.renderParentsList(editor); 
         
-        // Сброс списков выбора
+        document.getElementById('parent-mod-select').value = '';
+        document.getElementById('parent-quest-select').innerHTML = '<option value="">-- Сначала выберите ветку --</option>';
         document.getElementById('parent-quest-select').disabled = true;
         this.populateParentsSelect(editor);
         
@@ -405,7 +410,7 @@ export const EditorModals = {
             let html = `<div class="reward-row">`;
             let imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
             
-            if (t !== 'checkbox') html += `<div class="mc-slot item-icon-btn" data-idx="${idx}" title="Изменить иконку" style="cursor: pointer; flex-shrink:0;"><img src="${imgPath}" width="24" height="24"></div>`;
+            if (t !== 'checkbox') html += `<div class="mc-slot item-icon-btn" data-idx="${idx}" title="Изменить иконку" style="cursor: pointer; flex-shrink:0;"><img src="${imgPath}"></div>`;
             
             html += `<select id="req-type-${idx}" class="mc-input task-type-select" data-idx="${idx}" style="width:160px; flex-shrink:0;">
                         <option value="retrieval" ${t==='retrieval'?'selected':''}>Принести</option>
@@ -427,7 +432,7 @@ export const EditorModals = {
 
             if (['retrieval', 'crafting', 'block_break'].includes(t)) {
                 html += `<input type="number" id="req-count-${idx}" class="mc-input" value="${r.count||1}" style="width:60px;" title="Кол-во">`;
-                html += `<input type="text" id="req-name-${idx}" class="mc-input custom-name-input" value="${r.customName||''}" placeholder="Имя (&6Цвет)">`;
+                html += `<input type="text" id="req-name-${idx}" class="mc-input custom-name-input" value="${r.customName||''}" placeholder="Имя (&6Цвет)" style="flex:1;">`;
                 if (t === 'retrieval') html += `<label class="mc-checkbox"><input type="checkbox" id="req-consume-${idx}" ${r.consume!==false?'checked':''}> Забрать</label>`;
             } else if (['hunt', 'meeting', 'interact_entity'].includes(t)) {
                 let mobOpts = Object.entries(editor.MOB_LIST).map(([k,v]) => `<option value="${k}" ${r.target===k?'selected':''}>${v}</option>`).join('');
@@ -442,43 +447,43 @@ export const EditorModals = {
                     html += `<label class="mc-checkbox"><input type="checkbox" id="req-onInteract-${idx}" ${r.onInteract?'checked':''}> Клик</label>`;
                 }
             } else if (t === 'fluid') {
-                html += `<input type="text" id="req-target-${idx}" class="mc-input custom-name-input" value="${r.target||'water'}" placeholder="ID (water)">`;
+                html += `<input type="text" id="req-target-${idx}" class="mc-input custom-name-input" value="${r.target||'water'}" placeholder="ID (water)" style="flex:1;">`;
                 html += `<input type="number" id="req-count-${idx}" class="mc-input" value="${r.count||1000}" style="width:80px;" title="mB">`;
                 html += `<label class="mc-checkbox"><input type="checkbox" id="req-consume-${idx}" ${r.consume!==false?'checked':''}> Забрать</label>`;
             } else if (t === 'interact_item') {
-                html += `<label class="mc-checkbox"><input type="checkbox" id="req-onHit-${idx}" ${r.onHit?'checked':''}> Удар</label>`;
-                html += `<label class="mc-checkbox"><input type="checkbox" id="req-onInteract-${idx}" ${r.onInteract?'checked':''}> Клик</label>`;
+                html += `<label class="mc-checkbox" style="flex:1;"><input type="checkbox" id="req-onHit-${idx}" ${r.onHit?'checked':''}> Удар</label>`;
+                html += `<label class="mc-checkbox" style="flex:1;"><input type="checkbox" id="req-onInteract-${idx}" ${r.onInteract?'checked':''}> Клик</label>`;
             } else if (t === 'location') {
                 html += `<input type="text" id="req-locname-${idx}" class="mc-input" value="${r.name||''}" placeholder="Имя" style="flex:1;">`;
-                html += `<input type="number" id="req-x-${idx}" class="mc-input" value="${r.posX||0}" style="width:50px;" title="X">`;
-                html += `<input type="number" id="req-y-${idx}" class="mc-input" value="${r.posY||0}" style="width:50px;" title="Y">`;
-                html += `<input type="number" id="req-z-${idx}" class="mc-input" value="${r.posZ||0}" style="width:50px;" title="Z">`;
-                html += `<input type="number" id="req-dim-${idx}" class="mc-input" value="${r.dimension||0}" style="width:40px;" title="Dim">`;
-                html += `<input type="number" id="req-range-${idx}" class="mc-input" value="${r.range||-1}" style="width:50px;" title="Range">`;
+                html += `<input type="number" id="req-x-${idx}" class="mc-input" value="${r.posX||0}" style="width:60px;" title="X" placeholder="X">`;
+                html += `<input type="number" id="req-y-${idx}" class="mc-input" value="${r.posY||0}" style="width:60px;" title="Y" placeholder="Y">`;
+                html += `<input type="number" id="req-z-${idx}" class="mc-input" value="${r.posZ||0}" style="width:60px;" title="Z" placeholder="Z">`;
+                html += `<input type="number" id="req-dim-${idx}" class="mc-input" value="${r.dimension||0}" style="width:50px;" title="Dim" placeholder="Dim">`;
+                html += `<input type="number" id="req-range-${idx}" class="mc-input" value="${r.range||-1}" style="width:50px;" title="Range" placeholder="R">`;
             } else if (t === 'scoreboard') {
-                html += `<input type="text" id="req-scoreName-${idx}" class="mc-input" value="${r.scoreName||''}" placeholder="Score ID" style="width:90px;">`;
-                html += `<input type="text" id="req-scoreDisp-${idx}" class="mc-input" value="${r.scoreDisp||''}" placeholder="Отобр. Имя">`;
-                html += `<select id="req-operation-${idx}" class="mc-input" style="width:50px;">
+                html += `<input type="text" id="req-scoreName-${idx}" class="mc-input" value="${r.scoreName||''}" placeholder="Score ID" style="width:100px;">`;
+                html += `<input type="text" id="req-scoreDisp-${idx}" class="mc-input" value="${r.scoreDisp||''}" placeholder="Отобр. Имя" style="flex:1;">`;
+                html += `<select id="req-operation-${idx}" class="mc-input" style="width:60px;">
                             <option value="EQUAL" ${r.operation==='EQUAL'?'selected':''}>=</option>
                             <option value="MORE_OR_EQUAL" ${r.operation==='MORE_OR_EQUAL'?'selected':''}>&gt;=</option>
                             <option value="LESS_OR_EQUAL" ${r.operation==='LESS_OR_EQUAL'?'selected':''}>&lt;=</option>
                          </select>`;
-                html += `<input type="number" id="req-targetValue-${idx}" class="mc-input" value="${r.targetValue||1}" style="width:60px;" title="Значение">`;
+                html += `<input type="number" id="req-targetValue-${idx}" class="mc-input" value="${r.targetValue||1}" style="width:70px;" title="Значение">`;
             } else if (t === 'npc_dialog') {
-                html += `<input type="number" id="req-dialog-${idx}" class="mc-input" value="${r.dialogId||0}" style="width:70px;" title="Dialog ID">`;
-                html += `<input type="text" id="req-desc-${idx}" class="mc-input custom-name-input" value="${r.desc||''}" placeholder="Описание в книге">`;
+                html += `<input type="number" id="req-dialog-${idx}" class="mc-input" value="${r.dialogId||0}" style="width:80px;" title="Dialog ID">`;
+                html += `<input type="text" id="req-desc-${idx}" class="mc-input custom-name-input" value="${r.desc||''}" placeholder="Описание в книге" style="flex:1;">`;
             } else if (t === 'npc_faction') {
-                html += `<input type="number" id="req-faction-${idx}" class="mc-input" value="${r.factionId||0}" style="width:60px;" title="Faction ID">`;
-                html += `<select id="req-operation-${idx}" class="mc-input" style="width:50px;">
+                html += `<input type="number" id="req-faction-${idx}" class="mc-input" value="${r.factionId||0}" style="width:80px;" title="Faction ID" placeholder="Fact ID">`;
+                html += `<select id="req-operation-${idx}" class="mc-input" style="width:60px;">
                             <option value="EQUAL" ${r.operation==='EQUAL'?'selected':''}>=</option>
                             <option value="MORE_OR_EQUAL" ${r.operation==='MORE_OR_EQUAL'?'selected':''}>&gt;=</option>
                             <option value="LESS_OR_EQUAL" ${r.operation==='LESS_OR_EQUAL'?'selected':''}>&lt;=</option>
                          </select>`;
-                html += `<input type="number" id="req-targetValue-${idx}" class="mc-input" value="${r.targetValue||1}" style="width:60px;" title="Значение">`;
+                html += `<input type="number" id="req-targetValue-${idx}" class="mc-input" value="${r.targetValue||1}" style="width:80px;" title="Значение">`;
             } else if (t === 'npc_quest') {
-                html += `<input type="number" id="req-quest-${idx}" class="mc-input" value="${r.questId||0}" style="width:100px;" title="Quest ID">`;
+                html += `<input type="number" id="req-quest-${idx}" class="mc-input" value="${r.questId||0}" style="flex:1;" title="Quest ID" placeholder="ID Квеста NPC">`;
             } else if (t === 'xp') {
-                html += `<input type="number" id="req-count-${idx}" class="mc-input" value="${r.count||1}" style="width:80px;" title="Уровни">`;
+                html += `<input type="number" id="req-count-${idx}" class="mc-input" value="${r.count||1}" style="flex:1;" title="Уровни" placeholder="Количество уровней">`;
             }
 
             let nbtBtnStyle = r.nbtTag ? 'color: #55ffff; border-color: #55ffff;' : '';
@@ -494,9 +499,9 @@ export const EditorModals = {
             let html = `<div class="reward-row">`;
             let imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
             
-            html += `<div class="mc-slot item-icon-btn" data-idx="${idx}" title="Изменить иконку" style="cursor: pointer; flex-shrink:0;"><img src="${imgPath}" width="24" height="24"></div>`;
+            html += `<div class="mc-slot item-icon-btn" data-idx="${idx}" title="Изменить иконку" style="cursor: pointer; flex-shrink:0;"><img src="${imgPath}"></div>`;
                      
-            html += `<select id="rew-type-${idx}" class="mc-input task-type-select" data-idx="${idx}" style="width:150px; flex-shrink:0;">
+            html += `<select id="rew-type-${idx}" class="mc-input task-type-select" data-idx="${idx}" style="width:160px; flex-shrink:0;">
                 <option value="item" ${t==='item'?'selected':''}>Выдать предмет</option>
                 <option value="choice" ${t==='choice'?'selected':''}>На выбор</option>
                 <option value="command" ${t==='command'?'selected':''}>Команда</option>
@@ -515,20 +520,20 @@ export const EditorModals = {
                     html += `<select id="rew-tier-${idx}" class="mc-input" style="width: 140px;">${options}${fallbackOption}</select>`;
                 }
                 html += `<input type="number" id="rew-count-${idx}" class="mc-input" value="${r.count||1}" style="width:60px;" title="Количество">`;
-                html += `<input type="text" id="rew-name-${idx}" class="mc-input custom-name-input" value="${r.customName||''}" placeholder="Имя (&6Цвет)">`;
+                html += `<input type="text" id="rew-name-${idx}" class="mc-input custom-name-input" value="${r.customName||''}" placeholder="Имя (&6Цвет)" style="flex:1;">`;
             } else if (t === 'command') {
-                html += `<input type="text" id="rew-command-${idx}" class="mc-input custom-name-input" value="${r.command||''}" placeholder="/команда">`;
+                html += `<input type="text" id="rew-command-${idx}" class="mc-input custom-name-input" value="${r.command||''}" placeholder="/команда" style="flex:1;">`;
             } else if (t === 'xp') {
-                html += `<input type="number" id="rew-count-${idx}" class="mc-input" value="${r.count||1}" style="width:100px;" title="Уровни">`;
+                html += `<input type="number" id="rew-count-${idx}" class="mc-input" value="${r.count||1}" style="flex:1;" title="Уровни" placeholder="Уровни">`;
             } else if (t === 'npc_faction') {
-                html += `<input type="number" id="rew-faction-${idx}" class="mc-input" value="${r.factionId||0}" style="width:80px;" title="Faction ID" placeholder="Faction ID">`;
-                html += `<input type="number" id="rew-targetValue-${idx}" class="mc-input" value="${r.targetValue||1}" style="width:80px;" title="Значение" placeholder="Значение">`;
+                html += `<input type="number" id="rew-faction-${idx}" class="mc-input" value="${r.factionId||0}" style="width:100px;" title="Faction ID" placeholder="Faction ID">`;
+                html += `<input type="number" id="rew-targetValue-${idx}" class="mc-input" value="${r.targetValue||1}" style="width:100px;" title="Значение" placeholder="Значение">`;
             } else if (t === 'npc_mail') {
                 html += `<input type="text" id="rew-sender-${idx}" class="mc-input" value="${r.sender||'Anonymous'}" style="width:100px;" placeholder="Отправитель">`;
                 html += `<input type="text" id="rew-subject-${idx}" class="mc-input" value="${r.subject||'Reward'}" style="width:100px;" placeholder="Тема">`;
-                html += `<input type="text" id="rew-message-${idx}" class="mc-input custom-name-input" value="${r.message||''}" placeholder="Текст письма">`;
+                html += `<input type="text" id="rew-message-${idx}" class="mc-input custom-name-input" value="${r.message||''}" placeholder="Текст письма" style="flex:1;">`;
             } else if (t === 'scoreboard') {
-                html += `<input type="text" id="rew-scoreName-${idx}" class="mc-input" value="${r.scoreName||''}" style="width:100px;" placeholder="Score ID">`;
+                html += `<input type="text" id="rew-scoreName-${idx}" class="mc-input" value="${r.scoreName||''}" style="flex:1;" placeholder="Score ID">`;
                 html += `<input type="number" id="rew-targetValue-${idx}" class="mc-input" value="${r.targetValue||1}" style="width:80px;" title="Значение" placeholder="Значение">`;
             }
 
@@ -554,7 +559,6 @@ export const EditorModals = {
                 this.saveTempState(editor); 
                 list[b.dataset.idx].taskType = e.target.value;
                 
-                // Дефолтные предметы-заглушки для новых типов при переключении
                 if(e.target.value === 'xp') list[b.dataset.idx].item = { item_key: 'xp', name: 'Опыт', image: 'experience_bottle.png', mod: 'Система' };
                 else if(e.target.value === 'checkbox') list[b.dataset.idx].item = { item_key: 'checkbox', name: 'Галочка', image: 'checkbox.png', mod: 'Система' };
                 else if(e.target.value === 'command') list[b.dataset.idx].item = { item_key: 'command', name: 'Команда', image: 'command_block.png', mod: 'Система' };
