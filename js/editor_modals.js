@@ -350,13 +350,13 @@ export const EditorModals = {
         } else { pContainer.classList.add('hidden'); }
 
         document.getElementById('view-reqs-list').innerHTML = (quest.reqs && quest.reqs.length > 0) ? quest.reqs.map(r => {
-            const consumeText = (r.taskType !== 'hunt' && r.taskType !== 'block_break' && r.taskType !== 'checkbox' && r.taskType !== 'xp') ? (r.consume !== false ? '<span style="color:#ff5555;">[Забирается]</span>' : '<span style="color:#aaaaaa;">[Только наличие]</span>') : '';
+            const consumeText = (r.taskType !== 'hunt' && r.taskType !== 'block_break' && r.taskType !== 'checkbox' && r.taskType !== 'xp') ? (r.consume !== false ? '<span style="color:#ff5555; white-space: nowrap;">[Забирается]</span>' : '<span style="color:#aaaaaa; white-space: nowrap;">[Только наличие]</span>') : '';
             const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
             return `<div class="view-item-row"><div class="mc-slot"><img src="${imgPath}"></div><div class="item-info"><span class="item-name">${r.count}x ${editor.getTaskLabel(r)}</span><span class="item-meta">${consumeText}</span></div></div>`;
         }).join('') : '<div style="padding: 15px; color: #aaa; font-size: 16px;">Нет требований</div>';
 
         document.getElementById('view-rewards-list').innerHTML = (quest.rewards && quest.rewards.length > 0) ? quest.rewards.map(r => {
-            const choiceText = r.isChoice ? '<span style="color:#ffff55;">[На выбор]</span>' : '<span style="color:#55ff55;">[Гарантировано]</span>';
+            const choiceText = r.isChoice ? '<span style="color:#ffff55; white-space: nowrap;">[На выбор]</span>' : '<span style="color:#55ff55; white-space: nowrap;">[Гарантировано]</span>';
             const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
             return `<div class="view-item-row"><div class="mc-slot"><img src="${imgPath}"></div><div class="item-info"><span class="item-name">${r.count}x ${editor.getRewardLabel(r)}</span><span class="item-meta">${choiceText}</span></div></div>`;
         }).join('') : '<div style="padding: 15px; color: #aaa; font-size: 16px;">Нет наград</div>';
