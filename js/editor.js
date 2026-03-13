@@ -11,6 +11,8 @@ const getSafeSize = (s) => {
 
 export const Editor = {
     data: { mods: [] }, 
+    history: [],
+    historyIndex: -1,
     activeModId: null, 
     originalData: null, 
     isImportMode: false, 
@@ -61,6 +63,55 @@ export const Editor = {
         this.bindItemPickerEvents(); 
         this.bindTopBarEvents();
         this.bindNbtModalEvents(); 
+        this.bindHotkeys();
+        this.bindTemplatesEvents();
+    },
+
+    bindHotkeys() {
+        window.addEventListener('keydown', (e) => {
+            if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+            if (e.ctrlKey && e.key === 'z') {
+                e.preventDefault();
+                this.undo();
+            }
+            if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'Z')) {
+                e.preventDefault();
+                this.redo();
+            }
+        });
+    },
+
+    pushHistory() {
+        if (!Auth.user || this.isImportMode) return;
+        if (this.historyIndex < this.history.length - 1) {
+            this.history = this.history.slice(0, this.historyIndex + 1);
+        }
+        this.history.push(JSON.parse(JSON.stringify(this.data.mods)));
+        if (this.history.length > 30) {
+            this.history.shift();
+            this.historyIndex--;
+        }
+        this.historyIndex++;
+    },
+
+    undo() {
+        if (this.historyIndex > 0) {
+            this.historyIndex--;
+            this.data.mods = JSON.parse(JSON.stringify(this.history[this.historyIndex]));
+            DB.saveQuestsSilent(this.data.mods);
+            this.renderSidebar();
+            this.renderCanvas();
+        }
+    },
+
+    redo() {
+        if (this.historyIndex < this.history.length - 1) {
+            this.historyIndex++;
+            this.data.mods = JSON.parse(JSON.stringify(this.history[this.historyIndex]));
+            DB.saveQuestsSilent(this.data.mods);
+            this.renderSidebar();
+            this.renderCanvas();
+        }
     },
 
     hideTooltip() {
@@ -144,6 +195,10 @@ export const Editor = {
 
     triggerAutoSave() {
         if (!Auth.user || this.isImportMode) return; 
+        
+        // Добавляем текущее состояние в историю перед сохранением
+        this.pushHistory();
+
         const indicator = document.getElementById('save-indicator');
         indicator.classList.remove('hidden'); 
         indicator.innerText = "Сохранение..."; 
@@ -359,6 +414,10 @@ export const Editor = {
             document.getElementById('canvas-context-menu').classList.add('hidden');
             this.openQuestModal();
         });
+        document.getElementById('menu-add-template')?.addEventListener('click', async () => {
+            document.getElementById('canvas-context-menu').classList.add('hidden');
+            this.openTemplatesModal();
+        });
         document.getElementById('menu-add-comment')?.addEventListener('click', () => {
             document.getElementById('canvas-context-menu').classList.add('hidden');
             this.openCommentModal();
@@ -368,6 +427,10 @@ export const Editor = {
         document.getElementById('menu-copy')?.addEventListener('click', () => { 
             nodeMenu.classList.add('hidden'); 
             this.copyQuest(this.contextNodeId); 
+        });
+        document.getElementById('menu-save-template')?.addEventListener('click', () => { 
+            nodeMenu.classList.add('hidden'); 
+            this.saveQuestAsTemplate(this.contextNodeId); 
         });
         document.getElementById('menu-delete')?.addEventListener('click', () => { 
             nodeMenu.classList.add('hidden'); 
@@ -397,6 +460,76 @@ export const Editor = {
                 this.renderCanvas();
             }
         });
+    },
+
+    bindTemplatesEvents() {
+        document.getElementById('btn-close-templates').addEventListener('click', () => {
+            document.getElementById('templates-modal').classList.add('hidden');
+        });
+    },
+
+    saveQuestAsTemplate(questId) {
+        const mod = this.getActiveMod();
+        const quest = mod.quests.find(q => q.id === questId);
+        if (!quest) return;
+
+        const name = prompt("Введите название для шаблона:", quest.title);
+        if (name && name.trim()) {
+            const templateData = JSON.parse(JSON.stringify(quest));
+            // Удаляем специфичные данные
+            delete templateData.id;
+            delete templateData.x;
+            delete templateData.y;
+            delete templateData.parents;
+            
+            DB.saveTemplate(name.trim(), templateData);
+            alert("Шаблон успешно сохранен!");
+        }
+    },
+
+    async openTemplatesModal() {
+        const modal = document.getElementById('templates-modal');
+        const list = document.getElementById('templates-list');
+        list.innerHTML = '<div style="padding:10px; color:#aaa;">Загрузка...</div>';
+        modal.classList.remove('hidden');
+
+        const templates = await DB.getTemplates();
+        list.innerHTML = '';
+        
+        if (templates.length === 0) {
+            list.innerHTML = '<div style="padding:10px; color:#aaa;">Нет сохраненных шаблонов</div>';
+            return;
+        }
+
+        templates.forEach(t => {
+            const div = document.createElement('div');
+            div.className = 'search-result-item';
+            
+            let iconPath = ItemsDB.getImageUrl('book.png');
+            if (t.quest.icon) iconPath = ItemsDB.getImageUrl(t.quest.icon);
+            else if (t.quest.reqs && t.quest.reqs[0] && t.quest.reqs[0].item) iconPath = ItemsDB.getImageUrl(t.quest.reqs[0].item.image);
+
+            div.innerHTML = `<img src="${iconPath}" width="32" height="32" style="image-rendering:pixelated;"><span>${ItemsDB.formatMC(t.name)}</span>`;
+            
+            div.addEventListener('click', () => {
+                modal.classList.add('hidden');
+                this.insertQuestFromTemplate(t.quest);
+            });
+            list.appendChild(div);
+        });
+    },
+
+    insertQuestFromTemplate(templateData) {
+        const mod = this.getActiveMod();
+        const newQuest = JSON.parse(JSON.stringify(templateData));
+        newQuest.id = 'q_' + Date.now();
+        newQuest.x = this.newQuestX;
+        newQuest.y = this.newQuestY;
+        newQuest.parents = [];
+        
+        mod.quests.push(newQuest);
+        this.triggerAutoSave();
+        this.renderCanvas();
     },
 
     updateTransform() { 
@@ -623,6 +756,43 @@ export const Editor = {
         return ItemsDB.formatMC(name);
     },
 
+    formatNBTForTooltip(nbt) {
+        if (!nbt || Object.keys(nbt).length === 0) return '';
+        let html = '<div class="nbt-tooltip-data" style="margin-left: 28px; font-size: 11px; color: #aaa; margin-bottom: 4px; border-left: 2px solid #555; padding-left: 5px;">';
+        
+        // Поиск чар
+        const enchants = nbt['StoredEnchantments:9'] || nbt['ench:9'];
+        if (enchants) {
+            html += '<div style="color: #55ffff;">✨ Чары:</div>';
+            for (let key in enchants) {
+                const e = enchants[key];
+                if (e && e['id:2'] !== undefined) {
+                    html += `<div>- ID: ${e['id:2']} (Ур. ${e['lvl:2'] || e['lvl:4']})</div>`;
+                }
+            }
+        }
+        
+        // Поиск Display Name / Lore
+        const display = nbt['display:10'];
+        if (display) {
+            if (display['Name:8']) html += `<div style="color: #ffaa00;">📛 ${display['Name:8']}</div>`;
+            const lore = display['Lore:9'];
+            if (lore) {
+                for (let key in lore) {
+                    html += `<div style="color: #aa00aa; font-style: italic;">"${lore[key].replace(/§[0-9a-fk-or]/gi, '')}"</div>`;
+                }
+            }
+        }
+        
+        if (!enchants && !display) {
+            const keys = Object.keys(nbt).map(k => k.split(':')[0]).join(', ');
+            html += `<div>📦 Теги: <span style="color:#55ff55;">${keys}</span></div>`;
+        }
+
+        html += '</div>';
+        return html;
+    },
+
     // Тултип для комментария
     showCommentTooltip(comment) {
         const tt = document.getElementById('quest-tooltip');
@@ -674,6 +844,7 @@ export const Editor = {
                     : '';
                 const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
                 reqHtml += `<div class="tt-item"><img src="${imgPath}">${this.getTaskLabel(r)} x${r.count}${consumeTag}</div>`;
+                reqHtml += this.formatNBTForTooltip(r.nbtTag);
             });
         } else {
             reqHtml = 'Нет требований';
@@ -686,6 +857,7 @@ export const Editor = {
                 const choiceTag = r.isChoice ? ' <span style="color:#ffff55; font-size:12px; margin-left:6px;">[На выбор]</span>' : '';
                 const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
                 rewHtml += `<div class="tt-item"><img src="${imgPath}">${this.getRewardLabel(r)} x${r.count}${choiceTag}</div>`;
+                rewHtml += this.formatNBTForTooltip(r.nbtTag);
             });
         } else {
             rewHtml = 'Нет наград';
@@ -1124,12 +1296,15 @@ export const Editor = {
                     ? (r.consume !== false ? '<span style="color:#ff5555;">[Забирается]</span>' : '<span style="color:#aaaaaa;">[Только наличие]</span>') : '';
                 const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
                 reqsBox.innerHTML += `
-                    <div class="view-item-row">
-                        <div class="mc-slot"><img src="${imgPath}"></div>
-                        <div class="item-info">
-                            <span class="item-name">${r.count}x ${this.getTaskLabel(r)}</span>
-                            <span class="item-meta">${consumeText}</span>
+                    <div class="view-item-row" style="display:block;">
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <div class="mc-slot"><img src="${imgPath}"></div>
+                            <div class="item-info" style="display:flex; flex-direction:column; justify-content:center;">
+                                <span class="item-name">${r.count}x ${this.getTaskLabel(r)}</span>
+                                <span class="item-meta">${consumeText}</span>
+                            </div>
                         </div>
+                        ${this.formatNBTForTooltip(r.nbtTag)}
                     </div>`;
             });
         } else { reqsBox.innerHTML = '<div style="padding: 15px; color: #aaa; font-size: 16px;">Нет требований</div>'; }
@@ -1141,12 +1316,15 @@ export const Editor = {
                 const choiceText = r.isChoice ? '<span style="color:#ffff55;">[На выбор]</span>' : '<span style="color:#55ff55;">[Гарантировано]</span>';
                 const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
                 rewsBox.innerHTML += `
-                    <div class="view-item-row">
-                        <div class="mc-slot"><img src="${imgPath}"></div>
-                        <div class="item-info">
-                            <span class="item-name">${r.count}x ${this.getRewardLabel(r)}</span>
-                            <span class="item-meta">${choiceText}</span>
+                    <div class="view-item-row" style="display:block;">
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <div class="mc-slot"><img src="${imgPath}"></div>
+                            <div class="item-info" style="display:flex; flex-direction:column; justify-content:center;">
+                                <span class="item-name">${r.count}x ${this.getRewardLabel(r)}</span>
+                                <span class="item-meta">${choiceText}</span>
+                            </div>
                         </div>
+                        ${this.formatNBTForTooltip(r.nbtTag)}
                     </div>`;
             });
         } else { rewsBox.innerHTML = '<div style="padding: 15px; color: #aaa; font-size: 16px;">Нет наград</div>'; }

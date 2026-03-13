@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { firebaseConfig } from './firebase-config.js';
 import { Auth } from './auth.js';
 
@@ -8,11 +8,27 @@ const db = getFirestore(app);
 
 export const DB = {
     currentWorkspace: 'Основной', // Это значение будет меняться из main.js
+    unsubscribeQuests: null,
 
     _getWorkspaceDocName() {
         // Чтобы не ломать старую базу, "Основной" сохраняем по старому пути
         if (this.currentWorkspace === 'Основной') return "main";
         return `workspace_${this.currentWorkspace}`;
+    },
+
+    subscribeToQuests(callback) {
+        if (this.unsubscribeQuests) {
+            this.unsubscribeQuests();
+            this.unsubscribeQuests = null;
+        }
+        const docName = this._getWorkspaceDocName();
+        this.unsubscribeQuests = onSnapshot(doc(db, "quests", docName), (docSnap) => {
+            if (docSnap.exists()) {
+                callback(docSnap.data().mods || []);
+            } else {
+                callback([]);
+            }
+        });
     },
 
     async saveQuestsSilent(modsData) {
@@ -121,5 +137,62 @@ export const DB = {
             snap.forEach(doc => items.push(doc.data()));
             return items;
         } catch (e) { return []; }
+    },
+
+    async saveVersion(comment, modsData) {
+        if (!Auth.user) return;
+        try {
+            await addDoc(collection(db, "quests_versions"), {
+                workspace: this.currentWorkspace,
+                comment: comment,
+                author: Auth.user.username,
+                timestamp: new Date().toISOString(),
+                mods: modsData
+            });
+            this.logAction(`Создал коммит: ${comment}`);
+        } catch (e) {
+            console.error("Ошибка создания коммита:", e);
+        }
+    },
+
+    async saveTemplate(name, questData) {
+        if (!Auth.user) return;
+        try {
+            await addDoc(collection(db, "quest_templates"), {
+                name: name,
+                quest: questData,
+                timestamp: new Date().toISOString()
+            });
+            this.logAction(`Создал шаблон: ${name}`);
+        } catch(e) { console.error(e); }
+    },
+
+    async getTemplates() {
+        try {
+            const q = query(collection(db, "quest_templates"), orderBy("timestamp", "desc"));
+            const snap = await getDocs(q);
+            const templates = [];
+            snap.forEach(doc => templates.push({ id: doc.id, ...doc.data() }));
+            return templates;
+        } catch(e) { return []; }
+    },
+
+    async getVersions() {
+        if (!Auth.user) return [];
+        try {
+            const q = query(collection(db, "quests_versions"), orderBy("timestamp", "desc"), limit(100));
+            const querySnapshot = await getDocs(q);
+            const versions = [];
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                if (data.workspace === this.currentWorkspace) {
+                    versions.push({ id: doc.id, ...data });
+                }
+            });
+            return versions;
+        } catch(e) { 
+            console.error(e);
+            return []; 
+        }
     }
 };

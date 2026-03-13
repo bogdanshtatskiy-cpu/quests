@@ -54,40 +54,52 @@ document.addEventListener('DOMContentLoaded', () => {
     indicator.style.color = "#ffaa00";
     indicator.innerText = "⏳ Синхронизация данных...";
 
-    // 4. ПАРАЛЛЕЛЬНАЯ ЗАГРУЗКА
-    const loadItemsTask = ItemsDB.load().then(async () => {
+    // 4. ЗАГРУЗКА И ПОДПИСКА
+    ItemsDB.load().then(async () => {
         const customItems = await DB.loadCustomItems();
         ItemsDB.addCustomItems(customItems);
-    });
+        
+        // Подписка на изменения квестов в реальном времени
+        DB.subscribeToQuests((savedQuests) => {
+            if (Editor.isImportMode) return; // Не обновляем, если мы в режиме импорта
 
-    const loadQuestsTask = DB.loadQuests();
-
-    Promise.all([loadItemsTask, loadQuestsTask]).then(([_, savedQuests]) => {
-        if (savedQuests && savedQuests.length > 0) {
-            // Восстановление старых форматов
-            savedQuests.forEach(mod => {
-                mod.quests.forEach(q => {
-                    if (q.req && !q.reqs) q.reqs = [q.req];
-                    if (!q.reqs) q.reqs = [];
-                    if (!q.rewards) q.rewards = [];
+            if (savedQuests && savedQuests.length > 0) {
+                // Восстановление старых форматов
+                savedQuests.forEach(mod => {
+                    mod.quests.forEach(q => {
+                        if (q.req && !q.reqs) q.reqs = [q.req];
+                        if (!q.reqs) q.reqs = [];
+                        if (!q.rewards) q.rewards = [];
+                    });
                 });
-            });
-            Editor.data.mods = savedQuests;
-            Editor.activeModId = savedQuests[0].id; 
-        } else {
-            Editor.data.mods = [];
-            Editor.activeModId = null;
-        }
-        
-        Editor.renderSidebar();
-        Editor.renderCanvas();
-        Editor.centerCanvas();
-        
-        indicator.style.color = "#55ff55";
-        indicator.innerText = "✔ Готово!";
-        setTimeout(() => {
-            indicator.classList.add('hidden');
-        }, 2000);
+                Editor.data.mods = savedQuests;
+                if (!Editor.activeModId || !savedQuests.find(m => m.id === Editor.activeModId)) {
+                    Editor.activeModId = savedQuests[0].id; 
+                }
+            } else {
+                Editor.data.mods = [];
+                Editor.activeModId = null;
+            }
+            
+            // Если история пуста, добавляем изначальное состояние
+            if (Editor.history.length === 0) {
+                Editor.history.push(JSON.parse(JSON.stringify(Editor.data.mods)));
+                Editor.historyIndex = 0;
+            } else {
+                // Синхронизация истории с внешними изменениями
+                Editor.history[Editor.historyIndex] = JSON.parse(JSON.stringify(Editor.data.mods));
+            }
+            
+            Editor.renderSidebar();
+            Editor.renderCanvas();
+            Editor.centerCanvas();
+            
+            indicator.style.color = "#55ff55";
+            indicator.innerText = "✔ Синхронизировано!";
+            setTimeout(() => {
+                indicator.classList.add('hidden');
+            }, 2000);
+        });
     }).catch(err => {
         console.error("Ошибка при загрузке данных:", err);
         indicator.style.color = "#ff5555";
@@ -105,31 +117,45 @@ document.addEventListener('DOMContentLoaded', () => {
         indicator.style.color = "#ffaa00";
         indicator.innerText = `⏳ Загрузка профиля: ${AppState.activeWorkspace}...`;
 
-        const savedQuests = await DB.loadQuests();
-        if (savedQuests && savedQuests.length > 0) {
-            savedQuests.forEach(mod => {
-                mod.quests.forEach(q => {
-                    if (q.req && !q.reqs) q.reqs = [q.req];
-                    if (!q.reqs) q.reqs = [];
-                    if (!q.rewards) q.rewards = [];
+        // Переподписываемся на новый воркспейс
+        DB.subscribeToQuests((savedQuests) => {
+            if (Editor.isImportMode) return;
+            if (savedQuests && savedQuests.length > 0) {
+                savedQuests.forEach(mod => {
+                    mod.quests.forEach(q => {
+                        if (q.req && !q.reqs) q.reqs = [q.req];
+                        if (!q.reqs) q.reqs = [];
+                        if (!q.rewards) q.rewards = [];
+                    });
                 });
-            });
-            Editor.data.mods = savedQuests;
-            Editor.activeModId = savedQuests[0].id; 
-        } else {
-            Editor.data.mods = [];
-            Editor.activeModId = null;
-        }
-        
-        Editor.renderSidebar();
-        Editor.renderCanvas();
-        Editor.centerCanvas();
+                Editor.data.mods = savedQuests;
+                if (!Editor.activeModId || !savedQuests.find(m => m.id === Editor.activeModId)) {
+                    Editor.activeModId = savedQuests[0].id; 
+                }
+            } else {
+                Editor.data.mods = [];
+                Editor.activeModId = null;
+            }
+            
+            // Если история пуста, добавляем изначальное состояние
+            if (Editor.history.length === 0) {
+                Editor.history.push(JSON.parse(JSON.stringify(Editor.data.mods)));
+                Editor.historyIndex = 0;
+            } else {
+                // Синхронизация истории с внешними изменениями
+                Editor.history[Editor.historyIndex] = JSON.parse(JSON.stringify(Editor.data.mods));
+            }
+            
+            Editor.renderSidebar();
+            Editor.renderCanvas();
+            Editor.centerCanvas();
 
-        indicator.style.color = "#55ff55";
-        indicator.innerText = "✔ Профиль загружен!";
-        setTimeout(() => {
-            indicator.classList.add('hidden');
-        }, 2000);
+            indicator.style.color = "#55ff55";
+            indicator.innerText = "✔ Профиль загружен!";
+            setTimeout(() => {
+                indicator.classList.add('hidden');
+            }, 2000);
+        });
     });
 
     document.getElementById('btn-add-workspace').addEventListener('click', () => {
@@ -242,4 +268,80 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     });
+
+    // ==========================================
+    // ЛОГИКА СИСТЕМЫ ВЕРСИЙ (КОММИТОВ)
+    // ==========================================
+    document.getElementById('btn-open-versions').addEventListener('click', async () => {
+        document.getElementById('versions-modal').classList.remove('hidden');
+        await renderVersionsTable();
+    });
+
+    document.getElementById('btn-close-versions').addEventListener('click', () => {
+        document.getElementById('versions-modal').classList.add('hidden');
+    });
+
+    document.getElementById('btn-create-commit').addEventListener('click', async () => {
+        const comment = document.getElementById('commit-message').value;
+        if (!comment.trim()) return alert("Введите описание коммита!");
+        
+        const btn = document.getElementById('btn-create-commit');
+        btn.disabled = true;
+        btn.innerText = "Сохраняем...";
+        
+        await DB.saveVersion(comment, Editor.data.mods);
+        
+        btn.disabled = false;
+        btn.innerText = "💾 Создать коммит";
+        document.getElementById('commit-message').value = '';
+        await renderVersionsTable();
+    });
+
+    async function renderVersionsTable() {
+        const tbody = document.getElementById('versions-tbody');
+        tbody.innerHTML = '<tr><td colspan="4">Загрузка...</td></tr>';
+        
+        const versions = await DB.getVersions();
+        tbody.innerHTML = '';
+        
+        if (versions.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #aaa;">Нет сохраненных версий</td></tr>';
+            return;
+        }
+        
+        versions.forEach(v => {
+            let d = new Date(v.timestamp);
+            if (isNaN(d.getTime())) d = new Date(); 
+            
+            const time = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second:'2-digit' });
+            const date = d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+            
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${date} ${time}</td>
+                <td><b style="color:#55ffff;">${v.author}</b></td>
+                <td>${v.comment}</td>
+                <td>
+                    <button class="mc-button btn-restore-version" data-id="${v.id}" style="font-size:12px; padding:4px 8px; background-color: #005500;">Восстановить</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        document.querySelectorAll('.btn-restore-version').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                if (confirm('Вы уверены? Это полностью перезапишет текущую базу этим коммитом!')) {
+                    const vId = e.target.getAttribute('data-id');
+                    const version = versions.find(v => v.id === vId);
+                    if (version && version.mods) {
+                        Editor.data.mods = version.mods;
+                        await DB.saveQuestsSilent(Editor.data.mods);
+                        DB.logAction(`Откат базы к коммиту: ${version.comment}`);
+                        document.getElementById('versions-modal').classList.add('hidden');
+                        alert("База успешно восстановлена!");
+                    }
+                }
+            });
+        });
+    }
 });

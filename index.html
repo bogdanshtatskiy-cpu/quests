@@ -33,6 +33,7 @@
             
             <button id="btn-open-admin" class="mc-button" style="color: #ff5555; margin-right: 5px;">⚡ Админка</button>
             <button id="btn-open-loot-editor" class="mc-button" style="color: #ffaa00; margin-right: 5px;">📦 Лутбоксы</button>
+            <button id="btn-open-versions" class="mc-button" style="color: #aaffaa; margin-right: 5px;">📜 История версий</button>
             <button id="btn-import-bq" class="mc-button" style="color: #55ffff; margin-right: 5px;">📥 Импорт BQ</button>
             <button id="btn-export-bq" class="mc-button" style="color: #55ff55;">📤 Экспорт BQ</button>
         </span>
@@ -62,12 +63,14 @@
 
     <div id="canvas-context-menu" class="mc-panel context-menu hidden">
         <div class="menu-item admin-only" id="menu-add-quest">📦 Добавить квест</div>
+        <div class="menu-item admin-only" id="menu-add-template">📋 Вставить из шаблона</div>
         <div class="menu-item admin-only" id="menu-add-comment">💬 Добавить комментарий</div>
     </div>
 
     <div id="node-context-menu" class="mc-panel context-menu hidden">
         <div class="menu-item admin-only" id="menu-edit">Редактировать</div>
         <div class="menu-item admin-only" id="menu-copy">Копировать</div>
+        <div class="menu-item admin-only" id="menu-save-template">💾 Сохранить как шаблон</div>
         <div class="menu-item admin-only" id="menu-link">Соединить (Shift+ЛКМ)</div>
         <div class="menu-item delete admin-only" id="menu-delete">Удалить</div>
     </div>
@@ -367,6 +370,37 @@
             </div>
             <div class="modal-actions" style="margin-top: 15px;">
                 <button id="btn-picker-cancel" class="mc-button btn-cancel">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="templates-modal" class="modal hidden">
+        <div class="mc-panel modal-content">
+            <h2 class="mc-title">Шаблоны квестов</h2>
+            <div id="templates-list" class="item-list-container" style="max-height: 400px; overflow-y: auto; margin-bottom: 15px;"></div>
+            <div class="modal-actions">
+                <button id="btn-close-templates" class="mc-button btn-cancel">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="versions-modal" class="modal hidden">
+        <div class="mc-panel modal-content large" style="height: 80vh; display: flex; flex-direction: column;">
+            <h2 class="mc-title">Система версий (Коммиты)</h2>
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <input type="text" id="commit-message" class="mc-input" placeholder="Описание коммита (например: Добавлены квесты IC2)" style="flex: 1;">
+                <button id="btn-create-commit" class="mc-button" style="color:#55ff55;">💾 Создать коммит</button>
+            </div>
+            <div class="form-row" style="flex: 1; overflow: hidden;">
+                <div class="item-list-container" style="flex: 1; overflow-y: auto;">
+                    <table class="admin-table">
+                        <thead><tr><th style="width:150px;">Дата</th><th style="width:120px;">Автор</th><th>Комментарий</th><th style="width:120px;">Действие</th></tr></thead>
+                        <tbody id="versions-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-actions" style="margin-top: 15px;">
+                <button id="btn-close-versions" class="mc-button btn-cancel" style="width: 100%;">Закрыть</button>
             </div>
         </div>
     </div>
