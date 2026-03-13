@@ -45,8 +45,6 @@
         <button id="btn-toggle-titles" class="mc-button">Скрыть названия</button>
     </div>
 
-    <div class="controls-hint">ЛКМ: Просмотр/Двигать | ПКМ: Настройки | Shift+ЛКМ: Связать | Ctrl+Z: Отменить | Ctrl+Y: Вернуть</div>
-
     <div id="import-mode-bar" class="mc-panel hidden ui-element" style="position: absolute; top: 45px; left: 0; width: 100%; height: 45px; z-index: 99; display: flex; align-items: center; gap: 10px; padding: 0 10px; background-color: #555500; border-bottom-width: 3px;">
         <span style="color: #ffff55; font-weight: bold; margin-right: 20px;">⚠️ РЕЖИМ ИМПОРТА (АВТОСОХРАНЕНИЕ ОТКЛЮЧЕНО)</span>
         <button id="btn-apply-import" class="mc-button" style="background-color: #005500; color: white;">💾 Перезаписать текущую базу</button>
@@ -89,10 +87,15 @@
             <ul id="mod-list"></ul>
         </aside>
         <main id="canvas-container">
+            <div id="undo-redo-container" class="admin-only" style="display: none; position: absolute; top: 10px; left: 10px; z-index: 100; gap: 5px;">
+                <button id="btn-undo" class="mc-button" title="Отменить (Ctrl+Z)" style="padding: 4px 10px;">⬅</button>
+                <button id="btn-redo" class="mc-button" title="Вернуть (Ctrl+Y)" style="padding: 4px 10px;">➡</button>
+            </div>
             <div id="quest-canvas">
                 <svg id="connections-layer"></svg>
                 <div id="nodes-layer"></div>
             </div>
+            <div class="controls-hint">ЛКМ: Просмотр/Двигать | ПКМ: Настройки | Shift+ЛКМ: Связать</div>
         </main>
     </div>
 

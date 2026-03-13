@@ -70,21 +70,16 @@ export const Editor = {
         this.bindItemPickerEvents(); 
         this.bindTopBarEvents();
         this.bindNbtModalEvents(); 
-        this.bindHotkeys();
+        this.bindHistoryButtons();
         this.bindTemplatesEvents();
     },
 
-    bindHotkeys() {
-        window.addEventListener('keydown', (e) => {
-            if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
-            if (e.ctrlKey && e.key === 'z') {
-                e.preventDefault();
-                this.undo();
-            }
-            if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'Z')) {
-                e.preventDefault();
-                this.redo();
-            }
+    bindHistoryButtons() {
+        document.getElementById('btn-undo').addEventListener('click', () => {
+            this.undo();
+        });
+        document.getElementById('btn-redo').addEventListener('click', () => {
+            this.redo();
         });
     },
 
@@ -147,10 +142,25 @@ export const Editor = {
         const btnToggleSummary = document.getElementById('btn-toggle-summary-size');
         const summaryPanel = document.getElementById('rewards-summary');
         
+        // Restore state from localStorage or default to minimized
+        const isMinimized = localStorage.getItem('rewards_summary_minimized') !== 'false';
+        if (isMinimized) {
+            summaryPanel.classList.add('minimized');
+            btnToggleSummary.innerText = '▲';
+        } else {
+            summaryPanel.classList.remove('minimized');
+            btnToggleSummary.innerText = '▼';
+        }
+
         btnToggleSummary.addEventListener('click', () => {
             summaryPanel.classList.toggle('minimized');
-            if (summaryPanel.classList.contains('minimized')) btnToggleSummary.innerText = '▲';
-            else btnToggleSummary.innerText = '▼';
+            if (summaryPanel.classList.contains('minimized')) {
+                btnToggleSummary.innerText = '▲';
+                localStorage.setItem('rewards_summary_minimized', 'true');
+            } else {
+                btnToggleSummary.innerText = '▼';
+                localStorage.setItem('rewards_summary_minimized', 'false');
+            }
         });
 
         const fileInput = document.getElementById('bq-file-input');

@@ -52,7 +52,7 @@ textarea.mc-input { resize: none; height: 120px; }
 }
 #top-bar .mc-button { padding: 4px 8px; font-size: 14px; }
 .vertical-divider { width: 2px; height: 24px; background-color: #777; margin: 0 8px; border-right: 1px solid #fff; }
-.controls-hint { position: fixed; bottom: 10px; left: 10px; z-index: 1000; color: #404040; text-shadow: 1px 1px 0 #fff; font-size: 14px; background: rgba(255,255,255,0.7); padding: 4px 8px; border-radius: 4px; pointer-events: none; }
+.controls-hint { position: absolute; bottom: 10px; left: 10px; z-index: 1000; color: #404040; text-shadow: 1px 1px 0 #fff; font-size: 14px; background: rgba(255,255,255,0.7); padding: 4px 8px; border-radius: 4px; pointer-events: none; }
 
 #app-container { display: flex; height: 100vh; width: 100vw; padding-top: 45px; transition: padding-top 0.2s; }
 body.import-mode #app-container { padding-top: 90px; }
