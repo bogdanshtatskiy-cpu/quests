@@ -52,71 +52,98 @@ document.addEventListener('DOMContentLoaded', () => {
     // Показываем фоновый статус
     indicator.classList.remove('hidden');
     indicator.style.color = "#ffaa00";
-    indicator.innerText = "⏳ Синхронизация данных...";
+    indicator.innerText = "⏳ Загрузка базы предметов...";
 
-    // 4. ЗАГРУЗКА И ПОДПИСКА
-    ItemsDB.load().then(async () => {
+    // 4. ЗАГРУЗКА И ПОДПИСКА (Параллельно)
+    const itemsPromise = ItemsDB.load().then(async () => {
         const customItems = await DB.loadCustomItems();
         ItemsDB.addCustomItems(customItems);
-        
-        // Подписка на изменения квестов в реальном времени
-        DB.subscribeToQuests((savedQuests) => {
-            if (Editor.isImportMode) return; // Не обновляем, если мы в режиме импорта
-
-            if (savedQuests && savedQuests.length > 0) {
-                // Восстановление старых форматов
-                savedQuests.forEach(mod => {
-                    mod.quests.forEach(q => {
-                        if (q.req && !q.reqs) q.reqs = [q.req];
-                        if (!q.reqs) q.reqs = [];
-                        if (!q.rewards) q.rewards = [];
-                    });
-                });
-                Editor.data.mods = savedQuests;
-                if (!Editor.activeModId || !savedQuests.find(m => m.id === Editor.activeModId)) {
-                    Editor.activeModId = savedQuests[0].id; 
-                }
-            } else {
-                Editor.data.mods = [];
-                Editor.activeModId = null;
-            }
-            
-            // Если история пуста, добавляем изначальное состояние
-            if (Editor.history.length === 0) {
-                Editor.history.push(JSON.parse(JSON.stringify(Editor.data.mods)));
-                Editor.historyIndex = 0;
-            } else {
-                // Синхронизация истории с внешними изменениями
-                Editor.history[Editor.historyIndex] = JSON.parse(JSON.stringify(Editor.data.mods));
-            }
-            
-            // Сохраняем стейт просмотра до рендера
-            Editor.saveViewState();
-
-            Editor.renderSidebar();
-            Editor.renderCanvas(true);
-
-            if (Editor.activeModId && Editor.viewStates[Editor.activeModId]) {
-                const state = Editor.viewStates[Editor.activeModId];
-                Editor.scale = state.scale;
-                Editor.panX = state.panX;
-                Editor.panY = state.panY;
-                Editor.updateTransform();
-            } else {
-                Editor.centerCanvas();
-            }
-            
-            indicator.style.color = "#55ff55";
-            indicator.innerText = "✔ Синхронизировано!";
-            setTimeout(() => {
-                indicator.classList.add('hidden');
-            }, 2000);
-        });
-    }).catch(err => {
-        console.error("Ошибка при загрузке данных:", err);
-        indicator.style.color = "#ff5555";
-        indicator.innerText = "❌ Ошибка соединения";
     });
+
+    let isFirstLoad = true;
+
+    const handleQuestsUpdate = async (savedQuests) => {
+        if (Editor.isImportMode) return;
+
+        // Игнорируем эхо-ответы от сервера, если данные не изменились
+        const newDataStr = JSON.stringify(savedQuests || []);
+        const currentDataStr = JSON.stringify(Editor.data.mods || []);
+        if (newDataStr === currentDataStr) return;
+
+        // Откладываем обновление, если пользователь что-то перетаскивает
+        if (Editor.isPanning || Editor.draggedQuestId || Editor.draggedCommentId || Editor.linkingFromNodeId) {
+            if (!Editor.pendingUpdate) {
+                Editor.pendingUpdate = true;
+                const checkInterval = setInterval(() => {
+                    if (!Editor.isPanning && !Editor.draggedQuestId && !Editor.draggedCommentId && !Editor.linkingFromNodeId) {
+                        clearInterval(checkInterval);
+                        Editor.pendingUpdate = false;
+                        handleQuestsUpdate(savedQuests);
+                    }
+                }, 200);
+            }
+            return;
+        }
+
+        // Ждем загрузки предметов перед рендером
+        await itemsPromise;
+
+        if (savedQuests && savedQuests.length > 0) {
+            // Восстановление старых форматов
+            savedQuests.forEach(mod => {
+                mod.quests.forEach(q => {
+                    if (q.req && !q.reqs) q.reqs = [q.req];
+                    if (!q.reqs) q.reqs = [];
+                    if (!q.rewards) q.rewards = [];
+                });
+            });
+            Editor.data.mods = savedQuests;
+            if (!Editor.activeModId || !savedQuests.find(m => m.id === Editor.activeModId)) {
+                Editor.activeModId = savedQuests[0].id; 
+            }
+        } else {
+            Editor.data.mods = [];
+            Editor.activeModId = null;
+        }
+        
+        // Если история пуста, добавляем изначальное состояние
+        if (Editor.history.length === 0) {
+            Editor.history.push(JSON.parse(JSON.stringify(Editor.data.mods)));
+            Editor.historyIndex = 0;
+        } else {
+            // Синхронизация истории с внешними изменениями
+            Editor.history[Editor.historyIndex] = JSON.parse(JSON.stringify(Editor.data.mods));
+        }
+        
+        // Сохраняем стейт просмотра до рендера
+        Editor.saveViewState();
+
+        Editor.renderSidebar();
+        Editor.renderCanvas(true);
+
+        if (isFirstLoad) {
+            Editor.centerCanvas(true);
+            isFirstLoad = false;
+        } else if (Editor.activeModId && Editor.viewStates[Editor.activeModId]) {
+            const state = Editor.viewStates[Editor.activeModId];
+            Editor.scale = state.scale;
+            Editor.panX = state.panX;
+            Editor.panY = state.panY;
+            Editor.updateTransform();
+        } else {
+            Editor.centerCanvas();
+        }
+        
+        indicator.classList.remove('hidden');
+        indicator.style.color = "#55ff55";
+        indicator.innerText = "✔ Синхронизировано!";
+        setTimeout(() => {
+            indicator.classList.add('hidden');
+        }, 1500);
+    };
+
+    // Подписка на изменения квестов в реальном времени
+    DB.subscribeToQuests(handleQuestsUpdate);
 
     // --- СОБЫТИЯ ПРОФИЛЕЙ ---
     
@@ -128,6 +155,10 @@ document.addEventListener('DOMContentLoaded', () => {
         indicator.classList.remove('hidden');
         indicator.style.color = "#ffaa00";
         indicator.innerText = `⏳ Загрузка профиля: ${AppState.activeWorkspace}...`;
+
+        isFirstLoad = true;
+        Editor.viewStates = {};
+        Editor.history = [];
 
         // Переподписываемся на новый воркспейс
         DB.subscribeToQuests(handleQuestsUpdate);

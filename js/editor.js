@@ -217,7 +217,7 @@ export const Editor = {
             indicator.innerText = "Сохранено ✔"; 
             indicator.style.color = "#55ff55";
             setTimeout(() => { indicator.classList.add('hidden'); }, 2000);
-        }, 1500);
+        }, 300); // Быстрое сохранение (300мс) для лучшей синхронизации
     },
 
     centerCanvas(force = false) {
