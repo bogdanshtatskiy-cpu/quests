@@ -23,7 +23,7 @@ export const MOB_LIST = {
 export const Editor = {
     data: { mods: [] }, 
     history: [], historyIndex: -1, activeModId: null, originalData: null, 
-    isImportMode: false, lootGroups: {}, questSettings: null, viewStates: {},
+    isImportMode: false, lootGroups: {}, questSettings: null, viewStates: {}, pendingUpdate: false,
     
     scale: 1, panX: 0, panY: 0, isPanning: false, panStartX: 0, panStartY: 0, initialPanX: 0, initialPanY: 0,
     draggedQuestId: null, draggedCommentId: null, mouseStartX: 0, mouseStartY: 0, nodeStartX: 0, nodeStartY: 0, hasMovedNode: false, linkingFromNodeId: null, 
@@ -52,22 +52,50 @@ export const Editor = {
     },
 
     bindHistoryEvents() {
+        const btnUndo = document.getElementById('btn-undo');
+        const btnRedo = document.getElementById('btn-redo');
+
+        const updateButtons = () => {
+            if(btnUndo) btnUndo.disabled = this.historyIndex <= 0;
+            if(btnRedo) btnRedo.disabled = this.historyIndex >= this.history.length - 1;
+        };
+
+        this.undo = () => {
+            if (this.historyIndex > 0) {
+                this.historyIndex--;
+                this.data.mods = JSON.parse(this.history[this.historyIndex]);
+                this.triggerAutoSave(true); 
+                this.renderSidebar(); 
+                this.renderCanvas();
+                updateButtons();
+            }
+        };
+
+        this.redo = () => {
+            if (this.historyIndex < this.history.length - 1) {
+                this.historyIndex++;
+                this.data.mods = JSON.parse(this.history[this.historyIndex]);
+                this.triggerAutoSave(true); 
+                this.renderSidebar(); 
+                this.renderCanvas();
+                updateButtons();
+            }
+        };
+
+        if(btnUndo) btnUndo.addEventListener('click', this.undo);
+        if(btnRedo) btnRedo.addEventListener('click', this.redo);
+
         document.addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.key === 'z') {
-                if (this.historyIndex > 0) {
-                    this.historyIndex--;
-                    this.data.mods = JSON.parse(this.history[this.historyIndex]);
-                    this.triggerAutoSave(true); this.renderSidebar(); this.renderCanvas();
-                }
-            }
-            if (e.ctrlKey && e.key === 'y') {
-                if (this.historyIndex < this.history.length - 1) {
-                    this.historyIndex++;
-                    this.data.mods = JSON.parse(this.history[this.historyIndex]);
-                    this.triggerAutoSave(true); this.renderSidebar(); this.renderCanvas();
-                }
-            }
+            if (e.ctrlKey && e.key === 'z') { e.preventDefault(); this.undo(); }
+            if (e.ctrlKey && e.key === 'y') { e.preventDefault(); this.redo(); }
         });
+
+        // Подменяем метод сохранения, чтобы каждый раз проверять доступность кнопок
+        const originalSave = this.saveHistoryState.bind(this);
+        this.saveHistoryState = () => {
+            originalSave();
+            updateButtons();
+        };
     },
 
     addMobToDatalist(mobName) {
@@ -180,7 +208,7 @@ export const Editor = {
         return ItemsDB.formatMC(name);
     },
 
-    // ДЕЛЕГИРОВАНИЕ ФУНКЦИЙ К ПОДМОДУЛЯМ
+    // ДЕЛЕГИРОВАНИЕ К ПОДМОДУЛЯМ
     renderSidebar() { EditorSidebar.renderSidebar(this); },
     renderCanvas(skipSave) { EditorCanvas.renderCanvas(this, skipSave); },
     centerCanvas() { EditorCanvas.centerCanvas(this); },
