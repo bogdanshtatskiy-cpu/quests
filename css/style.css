@@ -82,19 +82,20 @@ body { background-color: #202020; color: #404040; overflow: hidden; user-select:
     background-color: #555500; border-bottom-width: 3px;
 }
 
-/* Статистика наград */
+/* ШИРОКОЕ ОКНО НАГРАД (Исправлено) */
 #rewards-summary {
-    position: absolute; top: 60px; right: 10px; width: 300px;
+    position: absolute; top: 60px; right: 10px; width: 450px; /* Увеличено с 300 до 450 */
     background: rgba(0,0,0,0.85); border: 2px solid #555; color: #fff;
     z-index: 90; display: flex; flex-direction: column; max-height: 70vh;
+    border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.6);
 }
-.summary-header { display: flex; justify-content: space-between; align-items: center; background: #333; padding: 8px; border-bottom: 2px solid #555; }
+.summary-header { display: flex; justify-content: space-between; align-items: center; background: #222; padding: 10px; border-bottom: 2px solid #555; border-radius: 4px 4px 0 0;}
 .summary-header .mc-title { margin: 0; font-size: 16px; color: #ffaa00; text-shadow: 1px 1px 0 #000; }
-.summary-header .mc-button { padding: 2px 8px; font-size: 12px; }
-#rewards-summary-list { padding: 10px; overflow-y: auto; flex: 1; }
+.summary-header .mc-button { padding: 4px 10px; font-size: 12px; }
+#rewards-summary-list { padding: 10px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 5px; }
 #rewards-summary.minimized #rewards-summary-list { display: none; }
-.summary-item { display: flex; align-items: center; gap: 8px; font-size: 14px; padding: 5px 0; border-bottom: 1px solid #333; }
-.summary-item img { width: 24px; height: 24px; image-rendering: pixelated; }
+.summary-item { display: flex; align-items: center; gap: 10px; font-size: 14px; padding: 6px; border: 1px solid #333; background: #1a1a1a; border-radius: 4px; word-break: break-word; }
+.summary-item img { width: 24px; height: 24px; image-rendering: pixelated; object-fit: contain; flex-shrink: 0; }
 
 /* Основной лейаут и Сайдбар с анимацией */
 #app-container { display: flex; height: 100vh; padding-top: 50px; width: 100%; overflow: hidden; }
@@ -141,7 +142,6 @@ body { background-color: #202020; color: #404040; overflow: hidden; user-select:
     font-size: 13px; white-space: nowrap; pointer-events: none; display: none; text-shadow: 1px 1px 0 #000; z-index: 10;
 }
 .show-titles .node-title { display: block; }
-/* Размеры узлов восстановлены и увеличены */
 .quest-node.size-x1 { width: 52px; height: 52px; }
 .quest-node.size-x2 { width: 104px; height: 104px; }
 .quest-node.size-x3 { width: 156px; height: 156px; }
@@ -182,7 +182,6 @@ body { background-color: #202020; color: #404040; overflow: hidden; user-select:
 /* Модальные окна */
 .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); display: flex; justify-content: center; align-items: center; z-index: 3000; }
 .modal-content { width: 450px; padding: 20px; box-shadow: 5px 5px 20px rgba(0,0,0,0.8); max-height: 95vh; overflow-y: auto; }
-/* Окно редактирования на весь экран */
 .modal-content.fullscreen { width: 95vw; height: 95vh; max-width: 1600px; display: flex; flex-direction: column; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 15px; margin-top: 20px; padding-top: 15px; border-top: 2px solid #555; }
 
