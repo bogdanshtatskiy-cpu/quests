@@ -20,6 +20,7 @@ export const EditorCanvas = {
         const nodeMenu = document.getElementById('node-context-menu');
         const commentMenu = document.getElementById('comment-context-menu');
 
+        // Скрываем все меню при клике мимо
         window.addEventListener('click', (e) => {
             if (!e.target.closest('.context-menu')) {
                 if (canvasMenu) canvasMenu.classList.add('hidden');
@@ -28,9 +29,10 @@ export const EditorCanvas = {
             }
         });
 
+        // Зум колесиком мыши
         container.addEventListener('wheel', (e) => {
             e.preventDefault();
-            editor.hideTooltip();
+            this.hideTooltip(editor);
             const zoomAmount = e.deltaY > 0 ? 0.9 : 1.1;
             const rect = container.getBoundingClientRect();
             const mouseX = e.clientX - rect.left; 
@@ -44,9 +46,10 @@ export const EditorCanvas = {
             editor.panY = mouseY - canvasY * editor.scale;
             
             if (editor.activeModId) editor.viewStates[editor.activeModId] = { panX: editor.panX, panY: editor.panY, scale: editor.scale };
-            editor.updateTransform();
+            this.updateTransform(editor);
         });
 
+        // Начало панорамирования или клик
         container.addEventListener('mousedown', (e) => {
             if (nodeMenu) nodeMenu.classList.add('hidden');
             if (canvasMenu) canvasMenu.classList.add('hidden');
@@ -59,18 +62,21 @@ export const EditorCanvas = {
                 editor.initialPanX = editor.panX; 
                 editor.initialPanY = editor.panY; 
                 container.style.cursor = 'grabbing';
-                editor.hideTooltip();
+                this.hideTooltip(editor);
             }
         });
 
+        // Движение мыши (Перетаскивание узлов, камеры + Тултипы)
         container.addEventListener('mousemove', (e) => {
-            if (editor.isPanning || editor.draggedQuestId || editor.draggedCommentId) editor.hideTooltip();
+            if (editor.isPanning || editor.draggedQuestId || editor.draggedCommentId) {
+                this.hideTooltip(editor);
+            }
             
             if (editor.isPanning) {
                 editor.panX = editor.initialPanX + (e.clientX - editor.panStartX);
                 editor.panY = editor.initialPanY + (e.clientY - editor.panStartY);
                 if (editor.activeModId) editor.viewStates[editor.activeModId] = { panX: editor.panX, panY: editor.panY, scale: editor.scale };
-                editor.updateTransform();
+                this.updateTransform(editor);
             }
             
             if (editor.draggedQuestId) {
@@ -80,7 +86,7 @@ export const EditorCanvas = {
                 if (Math.abs(dx) > 3 || Math.abs(dy) > 3) editor.hasMovedNode = true;
                 quest.x = editor.nodeStartX + dx; 
                 quest.y = editor.nodeStartY + dy;
-                editor.renderCanvas(true); 
+                this.renderCanvas(editor, true); 
             }
 
             if (editor.draggedCommentId) {
@@ -90,12 +96,15 @@ export const EditorCanvas = {
                 if (Math.abs(dx) > 3 || Math.abs(dy) > 3) editor.hasMovedNode = true;
                 comment.x = editor.nodeStartX + dx; 
                 comment.y = editor.nodeStartY + dy;
-                editor.renderCanvas(true); 
+                this.renderCanvas(editor, true); 
             }
 
+            // ЛОГИКА ТУЛТИПОВ (ВСПЛЫВАЮЩИЕ ОКНА)
             const hoveredNode = e.target.closest('.quest-node');
             const hoveredComment = e.target.closest('.quest-comment');
-            const isMenuHidden = (!nodeMenu || nodeMenu.classList.contains('hidden')) && (!canvasMenu || canvasMenu.classList.contains('hidden')) && (!commentMenu || commentMenu.classList.contains('hidden'));
+            const isMenuHidden = (!nodeMenu || nodeMenu.classList.contains('hidden')) && 
+                                 (!canvasMenu || canvasMenu.classList.contains('hidden')) && 
+                                 (!commentMenu || commentMenu.classList.contains('hidden'));
 
             if (hoveredNode && !editor.isPanning && !editor.draggedQuestId && !editor.draggedCommentId && isMenuHidden) {
                 const questId = hoveredNode.dataset.id;
@@ -103,7 +112,7 @@ export const EditorCanvas = {
                     editor.hoveredQuestId = questId;
                     editor.hoveredCommentId = null;
                     const quest = editor.getActiveMod().quests.find(q => q.id === questId);
-                    if (quest) editor.showTooltip(quest);
+                    if (quest) this.showTooltip(editor, quest);
                 }
                 tooltip.style.left = (e.clientX + 15) + 'px'; 
                 tooltip.style.top = (e.clientY + 15) + 'px';
@@ -114,18 +123,18 @@ export const EditorCanvas = {
                     editor.hoveredCommentId = cId;
                     editor.hoveredQuestId = null;
                     const comment = editor.getActiveMod().comments?.find(c => c.id === cId);
-                    if (comment) editor.showCommentTooltip(comment);
+                    if (comment) this.showCommentTooltip(editor, comment);
                 }
                 tooltip.style.left = (e.clientX + 15) + 'px'; 
                 tooltip.style.top = (e.clientY + 15) + 'px';
             } 
             else { 
-                editor.hideTooltip();
+                this.hideTooltip(editor);
             }
         });
 
         const stopDrag = () => {
-            editor.hideTooltip();
+            this.hideTooltip(editor);
             editor.isPanning = false;
             if ((editor.draggedQuestId || editor.draggedCommentId) && editor.hasMovedNode) editor.triggerAutoSave();
             editor.draggedQuestId = null;
@@ -136,8 +145,11 @@ export const EditorCanvas = {
         container.addEventListener('mouseleave', stopDrag);
         window.addEventListener('mouseup', stopDrag);
 
+        // ПКМ по холсту
         container.addEventListener('contextmenu', (e) => {
-            e.preventDefault(); editor.hideTooltip(); 
+            e.preventDefault(); 
+            this.hideTooltip(editor); 
+            
             if (!Auth.user) return; 
             if (!editor.activeModId) return alert('Сначала выберите или создайте ветку квестов!');
             if (e.target.closest('.quest-node') || e.target.closest('.quest-comment') || e.target.closest('.ui-element')) return;
@@ -154,19 +166,21 @@ export const EditorCanvas = {
             canvasMenu.classList.remove('hidden');
         });
 
+        // Кнопки меню
         document.getElementById('menu-add-quest')?.addEventListener('click', () => { document.getElementById('canvas-context-menu').classList.add('hidden'); editor.openQuestModal(); });
         document.getElementById('menu-add-comment')?.addEventListener('click', () => { document.getElementById('canvas-context-menu').classList.add('hidden'); editor.openCommentModal(); });
         document.getElementById('menu-copy')?.addEventListener('click', () => { nodeMenu.classList.add('hidden'); editor.copyQuest(editor.contextNodeId); });
         document.getElementById('menu-delete')?.addEventListener('click', () => { nodeMenu.classList.add('hidden'); editor.deleteQuest(editor.contextNodeId); });
         document.getElementById('menu-edit')?.addEventListener('click', () => { nodeMenu.classList.add('hidden'); editor.openQuestModal(editor.contextNodeId); });
-        document.getElementById('menu-link')?.addEventListener('click', () => { nodeMenu.classList.add('hidden'); editor.linkingFromNodeId = editor.contextNodeId; editor.renderCanvas(); });
+        document.getElementById('menu-link')?.addEventListener('click', () => { nodeMenu.classList.add('hidden'); editor.linkingFromNodeId = editor.contextNodeId; this.renderCanvas(editor); });
         document.getElementById('menu-edit-comment')?.addEventListener('click', () => { commentMenu.classList.add('hidden'); editor.openCommentModal(editor.contextCommentId); });
         document.getElementById('menu-delete-comment')?.addEventListener('click', () => {
             commentMenu.classList.add('hidden');
             if (confirm('Удалить комментарий?')) {
                 const mod = editor.getActiveMod();
                 mod.comments = mod.comments.filter(c => c.id !== editor.contextCommentId);
-                editor.triggerAutoSave(); editor.renderCanvas();
+                editor.triggerAutoSave(); 
+                this.renderCanvas(editor);
             }
         });
     },
@@ -188,8 +202,9 @@ export const EditorCanvas = {
         
         if (!mod || !mod.quests || mod.quests.length === 0) {
             editor.scale = 1; editor.panX = container.clientWidth / 2 - 26; editor.panY = container.clientHeight / 2 - 26;
-            editor.updateTransform(); return;
+            this.updateTransform(editor); return;
         }
+
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         mod.quests.forEach(q => {
             const size = SIZE_MAP[getSafeSize(q.size)];
@@ -210,10 +225,9 @@ export const EditorCanvas = {
             editor.panY = editor.viewStates[mod.id].panY;
             editor.scale = editor.viewStates[mod.id].scale;
         }
-        editor.updateTransform();
+        this.updateTransform(editor);
     },
 
-    // Исправление: Линии всегда по центру иконок 
     drawLine(svg, parent, child) {
         const pSize = SIZE_MAP[getSafeSize(parent.size)] / 2; 
         const cSize = SIZE_MAP[getSafeSize(child.size)] / 2;
@@ -232,7 +246,7 @@ export const EditorCanvas = {
         nodesLayer.innerHTML = ''; linesLayer.innerHTML = '';
         
         const mod = editor.getActiveMod();
-        if (!mod) { editor.updateSummary(); return; }
+        if (!mod) { this.updateSummary(editor); return; }
 
         const nodesFragment = document.createDocumentFragment();
         const linesFragment = document.createDocumentFragment();
@@ -258,7 +272,7 @@ export const EditorCanvas = {
                     }
                 });
                 cNode.addEventListener('contextmenu', (e) => {
-                    e.preventDefault(); e.stopPropagation(); editor.hideTooltip();
+                    e.preventDefault(); e.stopPropagation(); this.hideTooltip(editor);
                     if (!Auth.user) return;
                     editor.contextCommentId = c.id;
                     document.getElementById('canvas-context-menu').classList.add('hidden');
@@ -309,7 +323,7 @@ export const EditorCanvas = {
                             }
                             editor.linkingFromNodeId = null;
                         }
-                        editor.renderCanvas();
+                        this.renderCanvas(editor);
                     } else {
                         e.stopPropagation(); editor.draggedQuestId = quest.id; editor.hasMovedNode = false;
                         editor.mouseStartX = e.clientX; editor.mouseStartY = e.clientY; editor.nodeStartX = quest.x; editor.nodeStartY = quest.y;
@@ -318,13 +332,13 @@ export const EditorCanvas = {
             });
 
             node.addEventListener('click', (e) => {
-                editor.hideTooltip(); 
+                this.hideTooltip(editor); 
                 if (e.button !== 0 || (e.shiftKey && Auth.user) || editor.hasMovedNode) return; 
                 editor.openQuestViewModal(quest.id);
             });
 
             node.addEventListener('contextmenu', (e) => {
-                e.preventDefault(); e.stopPropagation(); editor.hideTooltip(); 
+                e.preventDefault(); e.stopPropagation(); this.hideTooltip(editor); 
                 if (!Auth.user) return; 
                 editor.contextNodeId = quest.id;
                 document.getElementById('canvas-context-menu').classList.add('hidden');
@@ -338,7 +352,56 @@ export const EditorCanvas = {
 
         linesLayer.appendChild(linesFragment);
         nodesLayer.appendChild(nodesFragment);
-        if (!skipSave) editor.updateSummary();
+        if (!skipSave) this.updateSummary(editor);
+    },
+
+    // Отрисовка тултипа для комментариев
+    showCommentTooltip(editor, comment) {
+        const tt = document.getElementById('quest-tooltip');
+        document.getElementById('tt-title').innerHTML = "<span style='color:#ffaa00;'>Комментарий</span>";
+        document.getElementById('tt-desc').innerHTML = ItemsDB.formatMC(comment.text || '');
+        document.getElementById('tt-parents-container').style.display = 'none';
+        document.getElementById('tt-reqs-container').style.display = 'none';
+        document.getElementById('tt-rewards-container').style.display = 'none';
+        tt.classList.remove('hidden');
+    },
+
+    // Отрисовка тултипа для квестов
+    showTooltip(editor, quest) {
+        const tt = document.getElementById('quest-tooltip');
+        document.getElementById('tt-title').innerHTML = ItemsDB.formatMC(quest.title);
+        document.getElementById('tt-desc').innerHTML = ItemsDB.formatMC(quest.desc || '');
+        document.getElementById('tt-reqs-container').style.display = 'block';
+        document.getElementById('tt-rewards-container').style.display = 'block';
+
+        const parentsContainer = document.getElementById('tt-parents-container');
+        if (quest.parents && quest.parents.length > 0) {
+            let pNames = [];
+            quest.parents.forEach(pId => {
+                let foundTitle = pId; let foundModName = "?";
+                editor.data.mods.forEach(m => {
+                    const found = m.quests.find(q => q.id === pId);
+                    if(found) { foundTitle = found.title; foundModName = m.name; }
+                });
+                pNames.push(`• ${ItemsDB.formatMC(foundTitle)} <small>[${ItemsDB.formatMC(foundModName)}]</small>`);
+            });
+            parentsContainer.innerHTML = `<div style="color:#ffaa00; font-size:13px; margin-bottom:10px; border-bottom:1px solid #555; padding-bottom:5px;">Зависит от:<br>${pNames.join('<br>')}</div>`;
+            parentsContainer.style.display = 'block';
+        } else { parentsContainer.style.display = 'none'; }
+
+        document.getElementById('tt-reqs').innerHTML = (quest.reqs || []).map(r => {
+            const consumeTag = (r.taskType !== 'hunt' && r.taskType !== 'block_break' && r.taskType !== 'checkbox' && r.taskType !== 'xp') ? (r.consume !== false ? ' <span style="color:#ff5555; font-size:12px; margin-left:6px;">[Забрать]</span>' : ' <span style="color:#aaaaaa; font-size:12px; margin-left:6px;">[Наличие]</span>') : '';
+            const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
+            return `<div class="tt-item"><img src="${imgPath}">${editor.getTaskLabel(r)} x${r.count}${consumeTag}</div>`;
+        }).join('') || 'Нет требований';
+
+        document.getElementById('tt-rewards').innerHTML = (quest.rewards || []).map(r => {
+            const choiceTag = r.isChoice ? ' <span style="color:#ffff55; font-size:12px; margin-left:6px;">[На выбор]</span>' : '';
+            const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
+            return `<div class="tt-item"><img src="${imgPath}">${editor.getRewardLabel(r)} x${r.count}${choiceTag}</div>`;
+        }).join('') || 'Нет наград';
+
+        tt.classList.remove('hidden');
     },
 
     updateSummary(editor) {
@@ -352,16 +415,25 @@ export const EditorCanvas = {
             (q.rewards || []).forEach(r => {
                 const name = editor.getRewardLabel(r);
                 const key = name + (r.isChoice ? '___CHOICE' : '___GUARANTEED');
-                if (!totals[key]) totals[key] = { count: 0, item: r.item, name: name, isChoice: r.isChoice };
+                if (!totals[key]) {
+                    totals[key] = { count: 0, item: r.item, name: name, isChoice: r.isChoice };
+                }
                 totals[key].count += parseInt(r.count || 1);
             });
         });
 
         if (Object.keys(totals).length > 0) {
             summaryPanel.classList.remove('hidden');
-            container.innerHTML = Object.values(totals).map(t => `<div class="summary-item"><img src="${t.item && t.item.image ? ItemsDB.getImageUrl(t.item.image) : ItemsDB.getImageUrl('book.png')}"> ${t.count}x ${t.name}${t.isChoice ? ' <span style="color:#ffff55; font-size:12px; margin-left:4px;">[На выбор]</span>' : ''}</div>`).join('');
+            let htmlStr = ''; 
+            for (const key in totals) {
+                const choiceTag = totals[key].isChoice ? ' <span style="color:#ffff55; font-size:12px; margin-left:4px;">[На выбор]</span>' : '';
+                const imgPath = totals[key].item && totals[key].item.image ? ItemsDB.getImageUrl(totals[key].item.image) : ItemsDB.getImageUrl('book.png');
+                htmlStr += `<div class="summary-item"><img src="${imgPath}"> ${totals[key].count}x ${totals[key].name}${choiceTag}</div>`;
+            }
+            container.innerHTML = htmlStr;
         } else {
-            summaryPanel.classList.add('hidden'); container.innerHTML = '';
+            summaryPanel.classList.add('hidden');
+            container.innerHTML = '';
         }
     }
 };
