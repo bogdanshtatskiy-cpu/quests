@@ -95,9 +95,14 @@ export const EditorModals = {
             r.scoreName = getValue(`req-scoreName-${idx}`, r.scoreName);
             r.scoreDisp = getValue(`req-scoreDisp-${idx}`, r.scoreDisp);
             
-            if (r.taskType === 'fluid' && r.target) r.customName = BQ.FLUIDS[r.target] || r.target;
-            else if (r.taskType === 'hunt') r.customName = r.target;
-            else if (r.taskType !== 'xp' && r.taskType !== 'checkbox') r.customName = getValue(`req-name-${idx}`, r.customName);
+            // Сохранение переводов и кастомных имен
+            if (r.taskType === 'fluid' && r.target) {
+                r.customName = BQ.FLUIDS[r.target] || r.target;
+            } else if (r.taskType === 'hunt') {
+                r.customName = r.target;
+            } else if (r.taskType !== 'xp' && r.taskType !== 'checkbox') {
+                r.customName = getValue(`req-name-${idx}`, r.customName);
+            }
         });
         
         editor.tempRewards.forEach((r, idx) => {
@@ -230,8 +235,8 @@ export const EditorModals = {
                 
                 editor.tempReqs.push({
                     taskType: type, item: newItem, rawId: newItem.item_key, rawDamage: 0, count: 1, 
-                    customName: type === 'fluid' ? 'water' : '', 
-                    target: (type === 'hunt' || type === 'meeting' || type === 'interact_entity') ? 'Zombie' : '', 
+                    customName: type === 'fluid' ? 'Вода' : '', 
+                    target: (type === 'hunt' || type === 'meeting' || type === 'interact_entity') ? 'Zombie' : (type === 'fluid' ? 'water' : ''), 
                     consume: false, nbtTag: null 
                 });
                 this.renderQuestEditForm(editor);
@@ -393,7 +398,6 @@ export const EditorModals = {
         modal.classList.remove('hidden');
     },
 
-    // ГЕНЕРАТОР ИДЕАЛЬНО СИММЕТРИЧНЫХ СТРОК
     renderQuestEditForm(editor) {
         const reqBox = document.getElementById('reqs-list');
         reqBox.innerHTML = editor.tempReqs.map((r, idx) => {
@@ -418,7 +422,13 @@ export const EditorModals = {
                     midHtml += `<label class="mc-checkbox" style="margin-left:5px;"><input type="checkbox" id="req-onInteract-${idx}" ${r.onInteract?'checked':''}>Клик</label>`;
                 }
             } else if (t === 'fluid') {
-                midHtml = `<input type="text" id="req-target-${idx}" class="mc-input flex-1" value="${r.target||'water'}" placeholder="ID (water)">`;
+                // Создаем выпадающий список жидкостей
+                let fluidOpts = Object.entries(BQ.FLUIDS).map(([k,v]) => `<option value="${k}" ${(r.target||'water')===k?'selected':''}>${v}</option>`).join('');
+                // Защита, если жидкости нет в словаре (оставляем ее ID)
+                if (r.target && !BQ.FLUIDS[r.target]) {
+                    fluidOpts = `<option value="${r.target}" selected>${r.target}</option>` + fluidOpts;
+                }
+                midHtml = `<select id="req-target-${idx}" class="mc-input flex-1">${fluidOpts}</select>`;
             } else if (t === 'interact_item') {
                 midHtml = `<label class="mc-checkbox flex-1"><input type="checkbox" id="req-onHit-${idx}" ${r.onHit?'checked':''}>Удар</label>
                            <label class="mc-checkbox flex-1"><input type="checkbox" id="req-onInteract-${idx}" ${r.onInteract?'checked':''}>Клик</label>`;
@@ -444,7 +454,7 @@ export const EditorModals = {
             } else if (t === 'npc_quest') {
                 midHtml = `<input type="number" id="req-quest-${idx}" class="mc-input flex-1" value="${r.questId||0}" title="Quest ID" placeholder="ID Квеста">`;
             } else if (t === 'xp' || t === 'checkbox') {
-                midHtml = `<div class="flex-1"></div>`; // Заполнитель пустоты
+                midHtml = `<div class="flex-1"></div>`;
             }
 
             return `
@@ -501,7 +511,7 @@ export const EditorModals = {
             } else if (t === 'command') {
                 midHtml += `<input type="text" id="rew-command-${idx}" class="mc-input flex-1" value="${r.command||''}" placeholder="/команда">`;
             } else if (t === 'xp') {
-                midHtml += `<div class="flex-1"></div>`; // Место заполняет flex
+                midHtml += `<div class="flex-1"></div>`;
             } else if (t === 'npc_faction') {
                 midHtml += `<input type="number" id="rew-faction-${idx}" class="mc-input" value="${r.factionId||0}" style="width:100px;" title="Faction ID" placeholder="Fact ID">`;
                 midHtml += `<input type="number" id="rew-targetValue-${idx}" class="mc-input" value="${r.targetValue||1}" style="width:100px;" title="Значение" placeholder="Значение">`;
