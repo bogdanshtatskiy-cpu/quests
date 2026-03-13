@@ -366,7 +366,6 @@ export const EditorCanvas = {
         tt.classList.remove('hidden');
     },
 
-    // Отрисовка тултипа для квестов
     showTooltip(editor, quest) {
         const tt = document.getElementById('quest-tooltip');
         document.getElementById('tt-title').innerHTML = ItemsDB.formatMC(quest.title);
@@ -390,16 +389,18 @@ export const EditorCanvas = {
         } else { parentsContainer.style.display = 'none'; }
 
         document.getElementById('tt-reqs').innerHTML = (quest.reqs || []).map(r => {
-            const consumeTag = (r.taskType !== 'hunt' && r.taskType !== 'block_break' && r.taskType !== 'checkbox' && r.taskType !== 'xp') ? (r.consume !== false ? ' <span style="color:#ff5555; font-size:12px; margin-left:6px;">[Забрать]</span>' : ' <span style="color:#aaaaaa; font-size:12px; margin-left:6px;">[Наличие]</span>') : '';
+            const consumeTag = (r.taskType !== 'hunt' && r.taskType !== 'block_break' && r.taskType !== 'checkbox' && r.taskType !== 'xp') ? (r.consume !== false ? ' <span style="color:#ff5555; font-size:12px; margin-left:4px; white-space: nowrap;">[Забрать]</span>' : ' <span style="color:#aaaaaa; font-size:12px; margin-left:4px; white-space: nowrap;">[Наличие]</span>') : '';
             const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
-            return `<div class="tt-item"><img src="${imgPath}">${editor.getTaskLabel(r)} x${r.count}${consumeTag}</div>`;
-        }).join('') || 'Нет требований';
+            // Оборачиваем текст в .tt-item-text для ровного переноса
+            return `<div class="tt-item"><img src="${imgPath}"><div class="tt-item-text">${editor.getTaskLabel(r)} x${r.count}${consumeTag}</div></div>`;
+        }).join('') || '<div style="color:#888; font-style:italic;">Нет требований</div>';
 
         document.getElementById('tt-rewards').innerHTML = (quest.rewards || []).map(r => {
-            const choiceTag = r.isChoice ? ' <span style="color:#ffff55; font-size:12px; margin-left:6px;">[На выбор]</span>' : '';
+            const choiceTag = r.isChoice ? ' <span style="color:#ffff55; font-size:12px; margin-left:4px; white-space: nowrap;">[На выбор]</span>' : '';
             const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
-            return `<div class="tt-item"><img src="${imgPath}">${editor.getRewardLabel(r)} x${r.count}${choiceTag}</div>`;
-        }).join('') || 'Нет наград';
+            // Оборачиваем текст в .tt-item-text для ровного переноса
+            return `<div class="tt-item"><img src="${imgPath}"><div class="tt-item-text">${editor.getRewardLabel(r)} x${r.count}${choiceTag}</div></div>`;
+        }).join('') || '<div style="color:#888; font-style:italic;">Нет наград</div>';
 
         tt.classList.remove('hidden');
     },
