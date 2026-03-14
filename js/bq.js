@@ -96,7 +96,6 @@ export const BQ = {
 
     parseData(jsonString, editor) {
         try {
-            // КРИОКАМЕРА: Замораживаем огромные числа (UUID) и нули с точкой (0.0)
             let safeJson = jsonString.replace(/([:\[,]\s*)([-]?\d+\.\d+|[-]?\d{15,})(?=\s*[,}\]])/g, '$1"__BQ_NUM__$2"');
 
             const rawData = JSON.parse(safeJson);
@@ -142,7 +141,7 @@ export const BQ = {
                             let rawTKey = Object.keys(rawTasks).find(k => k.startsWith(tKey + ':') || k === tKey);
                             let rawTaskProps = rawTKey ? rawTasks[rawTKey] : null;
                             
-                            if (!task.taskID) return; // Защита от битых задач
+                            if (!task.taskID) return; 
                             const tType = task.taskID.replace('bq_standard:', '').replace('bq_npc_integration:', '');
                             let req = { taskType: tType, rawTaskProps: rawTaskProps, nbtTag: task.targetNBT || null };
                             
@@ -185,6 +184,15 @@ export const BQ = {
                                 req.target = task.targetID || 'Villager';
                                 req.onHit = task.onHit || 0;
                                 req.onInteract = task.onInteract || 0;
+                                req.count = task.requiredUses !== undefined ? task.requiredUses : 1;
+                                let i = task.item || {};
+                                if (i.id && i.id !== "minecraft:air") {
+                                    const foundItem = ItemsDB.findItemByBQ(i.id, i.Damage);
+                                    req.item = foundItem; req.rawId = i.id; req.rawDamage = i.Damage; req.nbtTag = i.tag;
+                                } else {
+                                    req.item = { item_key: 'minecraft:air', name: 'Пустая рука', image: 'book.png', mod: 'Система' };
+                                    req.rawId = "minecraft:air"; req.rawDamage = 0;
+                                }
                                 reqs.push(req);
                             } else if (tType === 'interact_item') {
                                 req.onHit = task.onHit || 0;
@@ -223,7 +231,7 @@ export const BQ = {
                             let rawRKey = Object.keys(rawRewards).find(k => k.startsWith(rKey + ':') || k === rKey);
                             let rawRewProps = rawRKey ? rawRewards[rawRKey] : null;
                             
-                            if (!rew.rewardID) return; // Защита от битых наград
+                            if (!rew.rewardID) return; 
                             const rType = rew.rewardID.replace('bq_standard:', '').replace('bq_npc_integration:', '');
                             let reward = { taskType: rType, rawRewProps: rawRewProps };
 
@@ -408,7 +416,7 @@ export const BQ = {
                         let nbt = req.nbtTag ? JSON.parse(JSON.stringify(req.nbtTag)) : null;
                         
                         if (req.customName && req.item && req.customName !== req.item.name && req.customName !== "Нажать галочку" && req.customName !== "Уровни опыта" && req.customName !== "Команда") {
-                            let formattedName = req.customName.replace(/&/g, '§'); 
+                            let formattedName = req.customName; 
                             if (!nbt) nbt = {};
                             if (!nbt["display:10"]) nbt["display:10"] = {};
                             nbt["display:10"]["Name:8"] = formattedName;
@@ -517,6 +525,26 @@ export const BQ = {
                         p["targetID:8"] = t.target || "Villager";
                         p["onHit:1"] = t.onHit ? 1 : 0;
                         p["onInteract:1"] = t.onInteract ? 1 : 0;
+                        p["requiredUses:3"] = parseInt(t.count) || 1;
+                        
+                        let rawId = t.rawId !== undefined ? t.rawId : (t.item ? (t.item.string_id || t.item.item_key) : "minecraft:air");
+                        if (rawId === 'mob') rawId = 'minecraft:air'; 
+                        
+                        if (rawId !== "minecraft:air") {
+                            const { idKey, finalId, damage } = extractItemData({ ...t, rawId });
+                            p["item:10"] = { "Count:3": 1, "Damage:2": damage, "OreDict:8": "" };
+                            p["item:10"][idKey] = finalId;
+                            if (t.nbtTag) p["item:10"]["tag:10"] = t.nbtTag;
+                            p["ignoreItemNBT:1"] = t.nbtTag ? 0 : 1;
+                        } else {
+                            p["item:10"] = { "Count:3": 1, "Damage:2": 0, "OreDict:8": "", "id:8": "minecraft:air" };
+                            p["ignoreItemNBT:1"] = 1;
+                        }
+                        p["partialItemMatch:1"] = 0;
+                        p["targetSubtypes:1"] = 1;
+                        p["ignoreTargetNBT:1"] = 1;
+                        p["targetNBT:10"] = {};
+
                     } else if (tType === 'interact_item') {
                         p["taskID:8"] = "bq_standard:interact_item";
                         p["onHit:1"] = t.onHit ? 1 : 0;
@@ -690,7 +718,6 @@ export const BQ = {
 
         let outStr = JSON.stringify(bqData, null, 2);
         
-        // РАЗМОРОЗКА ЧИСЕЛ: Возвращаем огромные UUID и дроби (0.0) в исходный вид без кавычек
         outStr = outStr.replace(/"__BQ_NUM__([-]?\d+\.\d+|[-]?\d{15,})"/g, '$1');
 
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(outStr);
