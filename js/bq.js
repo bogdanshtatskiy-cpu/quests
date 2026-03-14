@@ -97,15 +97,11 @@ export const BQ = {
     parseData(jsonString, editor) {
         try {
             let safeJson = jsonString.replace(/([:\[,]\s*)([-]?\d+\.\d+|[-]?\d{15,})(?=\s*[,}\]])/g, '$1"__BQ_NUM__$2"');
-
             const rawData = JSON.parse(safeJson);
             
             const qsKey = Object.keys(rawData).find(k => k.startsWith('questSettings'));
-            if (qsKey) {
-                editor.questSettings = { key: qsKey, data: rawData[qsKey] };
-            } else {
-                editor.questSettings = null;
-            }
+            if (qsKey) editor.questSettings = { key: qsKey, data: rawData[qsKey] };
+            else editor.questSettings = null;
 
             const cleanKeys = (obj) => {
                 if (Array.isArray(obj)) return obj.map(cleanKeys);
@@ -132,7 +128,6 @@ export const BQ = {
 
                     let actualId = String(q.questID !== undefined ? q.questID : cleanQKey).split(':')[0];
                     let reqs = []; let rewards = [];
-                    
                     let rawTasks = rawQ["tasks:9"] || {};
                     let rawRewards = rawQ["rewards:9"] || {};
                     
@@ -140,7 +135,6 @@ export const BQ = {
                         Object.entries(q.tasks).forEach(([tKey, task]) => {
                             let rawTKey = Object.keys(rawTasks).find(k => k.startsWith(tKey + ':') || k === tKey);
                             let rawTaskProps = rawTKey ? rawTasks[rawTKey] : null;
-                            
                             if (!task.taskID) return; 
                             const tType = task.taskID.replace('bq_standard:', '').replace('bq_npc_integration:', '');
                             let req = { taskType: tType, rawTaskProps: rawTaskProps, nbtTag: task.targetNBT || null };
@@ -163,7 +157,8 @@ export const BQ = {
                                 Object.values(task.requiredFluids || {}).forEach(f => {
                                     reqs.push({ ...req, target: f.FluidName, count: f.Amount || 1000, consume: task.consume || 0 });
                                 });
-                            } else if (tType === 'checkbox') {
+                            } else if (tType === 'checkbox' || tType === 'npc_quest') {
+                                req.questId = task.npcQuestID || 0;
                                 reqs.push(req);
                             } else if (tType === 'xp') {
                                 req.count = task.amount !== undefined ? task.amount : 1;
@@ -176,9 +171,6 @@ export const BQ = {
                                 req.factionId = task.factionID || 0;
                                 req.operation = task.operation || 'MORE_OR_EQUAL';
                                 req.targetValue = task.target || 1;
-                                reqs.push(req);
-                            } else if (tType === 'npc_quest') {
-                                req.questId = task.npcQuestID || 0;
                                 reqs.push(req);
                             } else if (tType === 'interact_entity') {
                                 req.target = task.targetID || 'Villager';
@@ -197,30 +189,28 @@ export const BQ = {
                             } else if (tType === 'interact_item') {
                                 req.onHit = task.onHit || 0;
                                 req.onInteract = task.onInteract || 0;
+                                req.count = task.requiredUses !== undefined ? task.requiredUses : 1;
                                 let i = task.item || {};
-                                if (i.id) {
+                                if (i.id && i.id !== "minecraft:air") {
                                     const foundItem = ItemsDB.findItemByBQ(i.id, i.Damage);
                                     req.item = foundItem; req.rawId = i.id; req.rawDamage = i.Damage; req.nbtTag = i.tag;
+                                } else {
+                                    req.item = { item_key: 'minecraft:air', name: 'Любой предмет в руке', image: 'book.png', mod: 'Система' };
+                                    req.rawId = "minecraft:air"; req.rawDamage = 0;
                                 }
                                 reqs.push(req);
                             } else if (tType === 'location') {
                                 req.name = task.name || '';
-                                req.posX = task.posX || 0;
-                                req.posY = task.posY || 0;
-                                req.posZ = task.posZ || 0;
-                                req.dimension = task.dimension || 0;
-                                req.range = task.range || -1;
+                                req.posX = task.posX || 0; req.posY = task.posY || 0; req.posZ = task.posZ || 0;
+                                req.dimension = task.dimension || 0; req.range = task.range || -1;
                                 reqs.push(req);
                             } else if (tType === 'meeting') {
                                 req.target = task.target || 'Villager';
-                                req.count = task.amount || 1;
-                                req.range = task.range || 4;
+                                req.count = task.amount || 1; req.range = task.range || 4;
                                 reqs.push(req);
                             } else if (tType === 'scoreboard') {
-                                req.scoreName = task.scoreName || '';
-                                req.scoreDisp = task.scoreDisp || '';
-                                req.operation = task.operation || 'MORE_OR_EQUAL';
-                                req.targetValue = task.target || 1;
+                                req.scoreName = task.scoreName || ''; req.scoreDisp = task.scoreDisp || '';
+                                req.operation = task.operation || 'MORE_OR_EQUAL'; req.targetValue = task.target || 1;
                                 reqs.push(req);
                             }
                         });
@@ -230,7 +220,6 @@ export const BQ = {
                         Object.entries(q.rewards).forEach(([rKey, rew]) => {
                             let rawRKey = Object.keys(rawRewards).find(k => k.startsWith(rKey + ':') || k === rKey);
                             let rawRewProps = rawRKey ? rawRewards[rawRKey] : null;
-                            
                             if (!rew.rewardID) return; 
                             const rType = rew.rewardID.replace('bq_standard:', '').replace('bq_npc_integration:', '');
                             let reward = { taskType: rType, rawRewProps: rawRewProps };
@@ -338,6 +327,14 @@ export const BQ = {
         
         if (editor && editor.questSettings) {
             bqData[editor.questSettings.key] = editor.questSettings.data;
+        } else {
+            bqData["questSettings:10"] = {
+                "betterquesting:10": {
+                    "livesMax:3": 10, "pack_name:8": "", "home_anchor_y:5": 0.0, "livesDef:3": 3,
+                    "home_anchor_x:5": 0.5, "hardcore:1": 0, "home_image:8": "betterquesting:textures/gui/default_title.png",
+                    "party_enable:1": 1, "pack_version:3": 0, "editMode:1": 1, "home_offset_x:3": -128, "home_offset_y:3": 0
+                }
+            };
         }
 
         let maxQuestId = -1;
@@ -413,18 +410,16 @@ export const BQ = {
                         const dictObj = { "Count:3": parseInt(req.count) || 1, "Damage:2": damage, "OreDict:8": "" };
                         dictObj[idKey] = finalId;
                         
-                        let nbt = req.nbtTag ? JSON.parse(JSON.stringify(req.nbtTag)) : null;
+                        let nbt = req.nbtTag ? JSON.parse(JSON.stringify(req.nbtTag)) : {}; 
                         
-                        if (req.customName && req.item && req.customName !== req.item.name && req.customName !== "Нажать галочку" && req.customName !== "Уровни опыта" && req.customName !== "Команда") {
-                            let formattedName = req.customName; 
-                            if (!nbt) nbt = {};
+                        if (req.customName && req.item && req.customName !== req.item.name && req.customName !== "Нажать галочку" && req.customName !== "Опыт" && req.customName !== "Команда") {
+                            let formattedName = req.customName; // Уже в формате §
                             if (!nbt["display:10"]) nbt["display:10"] = {};
                             nbt["display:10"]["Name:8"] = formattedName;
                         }
+                        if (finalId === 'bq_standard:loot_chest') nbt["hideLootInfo:1"] = 1;
                         
-                        if (nbt) dictObj["tag:10"] = nbt;
-                        else if (finalId === 'bq_standard:loot_chest') dictObj["tag:10"] = { "hideLootInfo:1": 1 };
-                        
+                        dictObj["tag:10"] = nbt;
                         dict[`${idx}:10`] = dictObj;
                     });
                     return dict;
@@ -460,10 +455,22 @@ export const BQ = {
                 const getTaskProps = (arr, defType) => {
                     let props = arr[0] && arr[0].rawTaskProps ? JSON.parse(JSON.stringify(arr[0].rawTaskProps)) : null;
                     if (!props) {
-                        props = { "taskID:8": defType, "autoConsume:1": 0, "consume:1": arr[0]?.consume ? 1 : 0, "groupDetect:1": 0, "ignoreNBT:1": 1, "partialMatch:1": 1 };
+                        if (defType === "bq_standard:retrieval") {
+                            props = { "taskID:8": defType, "autoConsume:1": 0, "consume:1": arr[0]?.consume ? 1 : 0, "groupDetect:1": 0, "ignoreNBT:1": 1, "partialMatch:1": 1 };
+                        } else if (defType === "bq_standard:crafting") {
+                            props = { "taskID:8": defType, "allowAnvil:1": 0, "allowCraft:1": 1, "allowSmelt:1": 1, "ignoreNBT:1": 1, "partialMatch:1": 1 };
+                        } else if (defType === "bq_standard:block_break") {
+                            props = { "taskID:8": defType };
+                        } else if (defType === "bq_standard:fluid") {
+                            props = { "taskID:8": defType, "autoConsume:1": 0, "consume:1": arr[0]?.consume ? 1 : 0, "groupDetect:1": 0, "ignoreNBT:1": 1 };
+                        } else {
+                            props = { "taskID:8": defType };
+                        }
                         props["index:3"] = taskIdx++;
                     } else {
-                        if (arr[0] && arr[0].consume !== undefined) props["consume:1"] = arr[0].consume ? 1 : 0;
+                        if (arr[0] && arr[0].consume !== undefined && (defType === "bq_standard:retrieval" || defType === "bq_standard:fluid")) {
+                            props["consume:1"] = arr[0].consume ? 1 : 0;
+                        }
                         if (props["index:3"] === undefined) props["index:3"] = taskIdx++;
                     }
                     return props;
@@ -501,7 +508,10 @@ export const BQ = {
                         p["taskID:8"] = "bq_standard:hunt";
                         p["target:8"] = t.target || "Zombie";
                         p["required:3"] = parseInt(t.count) || 1;
-                        if (t.nbtTag) p["targetNBT:10"] = t.nbtTag;
+                        p["subtypes:1"] = 1;
+                        p["damageType:8"] = "";
+                        p["ignoreNBT:1"] = 1;
+                        p["targetNBT:10"] = t.nbtTag || {};
                     } else if (tType === 'checkbox') {
                         p["taskID:8"] = "bq_standard:checkbox";
                     } else if (tType === 'xp') {
@@ -526,36 +536,50 @@ export const BQ = {
                         p["onHit:1"] = t.onHit ? 1 : 0;
                         p["onInteract:1"] = t.onInteract ? 1 : 0;
                         p["requiredUses:3"] = parseInt(t.count) || 1;
-                        
-                        let rawId = t.rawId !== undefined ? t.rawId : (t.item ? (t.item.string_id || t.item.item_key) : "minecraft:air");
-                        if (rawId === 'mob') rawId = 'minecraft:air'; 
-                        
-                        if (rawId !== "minecraft:air") {
-                            const { idKey, finalId, damage } = extractItemData({ ...t, rawId });
-                            p["item:10"] = { "Count:3": 1, "Damage:2": damage, "OreDict:8": "" };
-                            p["item:10"][idKey] = finalId;
-                            if (t.nbtTag) p["item:10"]["tag:10"] = t.nbtTag;
-                            p["ignoreItemNBT:1"] = t.nbtTag ? 0 : 1;
-                        } else {
-                            p["item:10"] = { "Count:3": 1, "Damage:2": 0, "OreDict:8": "", "id:8": "minecraft:air" };
-                            p["ignoreItemNBT:1"] = 1;
-                        }
                         p["partialItemMatch:1"] = 0;
                         p["targetSubtypes:1"] = 1;
                         p["ignoreTargetNBT:1"] = 1;
-                        p["targetNBT:10"] = {};
+                        p["targetNBT:10"] = t.targetNBT || {};
 
+                        let rawId = t.rawId !== undefined ? t.rawId : (t.item ? (t.item.string_id || t.item.item_key) : "minecraft:air");
+                        if (rawId === 'mob') rawId = 'minecraft:air'; 
+                        
+                        if (rawId !== "minecraft:air" && rawId !== "") {
+                            const { idKey, finalId, damage } = extractItemData({ ...t, rawId });
+                            p["item:10"] = { "Count:3": 1, "Damage:2": damage, "OreDict:8": "" };
+                            p["item:10"][idKey] = finalId;
+                            if (t.nbtTag) {
+                                p["item:10"]["tag:10"] = t.nbtTag;
+                                p["ignoreItemNBT:1"] = 0;
+                            } else {
+                                p["item:10"]["tag:10"] = {};
+                                p["ignoreItemNBT:1"] = 1;
+                            }
+                        } else {
+                            p["item:10"] = { "Count:3": 1, "Damage:2": 0, "OreDict:8": "", "id:8": "minecraft:air", "tag:10": {} };
+                            p["ignoreItemNBT:1"] = 1;
+                        }
                     } else if (tType === 'interact_item') {
                         p["taskID:8"] = "bq_standard:interact_item";
                         p["onHit:1"] = t.onHit ? 1 : 0;
                         p["onInteract:1"] = t.onInteract ? 1 : 0;
-                        if (t.item) {
-                            const { idKey, finalId, damage } = extractItemData(t);
+                        p["requiredUses:3"] = parseInt(t.count) || 1;
+                        p["partialMatch:1"] = 0;
+                        p["ignoreNbt:1"] = 1;
+                        p["block:10"] = { "blockID:8": "minecraft:air", "nbt:10": {}, "amount:3": 0, "oreDict:8": "", "meta:3": 0 };
+
+                        let rawId = t.rawId !== undefined ? t.rawId : (t.item ? (t.item.string_id || t.item.item_key) : "minecraft:air");
+                        if (rawId !== "minecraft:air" && rawId !== "") {
+                            const { idKey, finalId, damage } = extractItemData({ ...t, rawId });
                             p["item:10"] = { "Count:3": 1, "Damage:2": damage, "OreDict:8": "" };
                             p["item:10"][idKey] = finalId;
-                            if (t.nbtTag) p["item:10"]["tag:10"] = t.nbtTag;
+                            if (t.nbtTag) {
+                                p["item:10"]["tag:10"] = t.nbtTag;
+                            } else {
+                                p["item:10"]["tag:10"] = {};
+                            }
                         } else {
-                            p["item:10"] = {};
+                            p["item:10"] = { "Count:3": 1, "Damage:2": 0, "OreDict:8": "", "id:8": "minecraft:air", "tag:10": {} };
                         }
                     } else if (tType === 'location') {
                         p["taskID:8"] = "bq_standard:location";
@@ -595,10 +619,11 @@ export const BQ = {
                 const getRewProps = (arr, defType) => {
                     let props = arr[0] && arr[0].rawRewProps ? JSON.parse(JSON.stringify(arr[0].rawRewProps)) : null;
                     if (!props) {
-                        props = { "rewardID:8": defType, "ignoreNBT:1": 1 };
+                        props = { "rewardID:8": defType };
                         props["index:3"] = rewIdx++;
                     } else {
                         if (props["index:3"] === undefined) props["index:3"] = rewIdx++;
+                        delete props["ignoreNBT:1"]; // Удаляем мусорный тег из наград
                     }
                     return props;
                 }
@@ -622,6 +647,8 @@ export const BQ = {
                     if (rType === 'command') {
                         p["rewardID:8"] = "bq_standard:command";
                         p["command:8"] = r.command || "";
+                        p["hideCommand:1"] = 0;
+                        p["viaPlayer:1"] = 0;
                     } else if (rType === 'xp') {
                         p["rewardID:8"] = "bq_standard:xp";
                         p["amount:3"] = parseInt(r.count) || 1;
@@ -635,6 +662,11 @@ export const BQ = {
                         p["Sender:8"] = r.sender || "Anonymous";
                         p["Subject:8"] = r.subject || "Reward";
                         p["Message:10"] = { "pages:9": { "0:8": r.message || "" } };
+                        p["MailItems:9"] = {};
+                        p["MailQuest:3"] = -1;
+                        p["TimePast:4"] = 1773448209190;
+                        p["Time:4"] = 0;
+                        p["BeenRead:1"] = 0;
                     } else if (rType === 'scoreboard') {
                         p["rewardID:8"] = "bq_standard:scoreboard";
                         p["score:8"] = r.scoreName || "";
@@ -684,12 +716,13 @@ export const BQ = {
             });
         });
 
+        let lineOrder = 0;
         mods.forEach(mod => {
             const lineQuests = {};
             mod.quests.forEach(q => {
                 const bqId = idMap[q.id];
                 const sz = q.size === 'x2' ? 48 : 24;
-                lineQuests[`${bqId}:10`] = { "x:3": Math.round(q.x / 3), "y:3": Math.round(q.y / 3), "id:3": bqId, "sizeX:3": sz, "sizeY:3": sz };
+                lineQuests[`${bqId}:10`] = { "sizeX:3": sz, "x:3": Math.round(q.x / 3), "y:3": Math.round(q.y / 3), "id:3": bqId, "sizeY:3": sz };
             });
 
             let lineProps = mod.rawProps ? JSON.parse(JSON.stringify(mod.rawProps)) : {
@@ -699,7 +732,7 @@ export const BQ = {
                     "bms_complete:8": "minecraft:entity.player.levelup",
                     "bms_update:8": "minecraft:entity.player.levelup",
                     "desc:8": "Сгенерировано в редакторе",
-                    "icon:10": { "Count:3": 1, "Damage:2": 0, "OreDict:8": "", "id:8": "minecraft:book" },
+                    "icon:10": { "id:8": "minecraft:book", "Count:3": 1, "Damage:2": 0, "OreDict:8": "" },
                     "name:8": mod.name,
                     "visibility:8": "NORMAL"
                 }
@@ -711,6 +744,7 @@ export const BQ = {
 
             bqData["questLines:9"][`${mod.numericId}:10`] = {
                 "lineID:3": mod.numericId,
+                "order:3": lineOrder++,
                 "properties:10": lineProps,
                 "quests:9": lineQuests
             };
