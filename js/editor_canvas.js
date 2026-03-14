@@ -1,7 +1,6 @@
 import { ItemsDB } from './items.js';
 import { Auth } from './auth.js';
 
-// Актуальные размеры для центрирования линий
 const SIZE_MAP = { x1: 52, x2: 104, x3: 156, x4: 208 };
 const getSafeSize = (s) => { 
     const compat = { sm: 'x1', md: 'x1', lg: 'x2' }; 
@@ -20,7 +19,6 @@ export const EditorCanvas = {
         const nodeMenu = document.getElementById('node-context-menu');
         const commentMenu = document.getElementById('comment-context-menu');
 
-        // Скрываем все меню при клике мимо
         window.addEventListener('click', (e) => {
             if (!e.target.closest('.context-menu')) {
                 if (canvasMenu) canvasMenu.classList.add('hidden');
@@ -29,7 +27,6 @@ export const EditorCanvas = {
             }
         });
 
-        // Зум колесиком мыши
         container.addEventListener('wheel', (e) => {
             e.preventDefault();
             this.hideTooltip(editor);
@@ -49,7 +46,6 @@ export const EditorCanvas = {
             this.updateTransform(editor);
         });
 
-        // Начало панорамирования или клик
         container.addEventListener('mousedown', (e) => {
             if (nodeMenu) nodeMenu.classList.add('hidden');
             if (canvasMenu) canvasMenu.classList.add('hidden');
@@ -66,7 +62,6 @@ export const EditorCanvas = {
             }
         });
 
-        // Движение мыши (Перетаскивание узлов, камеры + Тултипы)
         container.addEventListener('mousemove', (e) => {
             if (editor.isPanning || editor.draggedQuestId || editor.draggedCommentId) {
                 this.hideTooltip(editor);
@@ -99,7 +94,6 @@ export const EditorCanvas = {
                 this.renderCanvas(editor, true); 
             }
 
-            // ЛОГИКА ТУЛТИПОВ (ВСПЛЫВАЮЩИЕ ОКНА)
             const hoveredNode = e.target.closest('.quest-node');
             const hoveredComment = e.target.closest('.quest-comment');
             const isMenuHidden = (!nodeMenu || nodeMenu.classList.contains('hidden')) && 
@@ -145,7 +139,6 @@ export const EditorCanvas = {
         container.addEventListener('mouseleave', stopDrag);
         window.addEventListener('mouseup', stopDrag);
 
-        // ПКМ по холсту
         container.addEventListener('contextmenu', (e) => {
             e.preventDefault(); 
             this.hideTooltip(editor); 
@@ -166,7 +159,6 @@ export const EditorCanvas = {
             canvasMenu.classList.remove('hidden');
         });
 
-        // Кнопки меню
         document.getElementById('menu-add-quest')?.addEventListener('click', () => { document.getElementById('canvas-context-menu').classList.add('hidden'); editor.openQuestModal(); });
         document.getElementById('menu-add-comment')?.addEventListener('click', () => { document.getElementById('canvas-context-menu').classList.add('hidden'); editor.openCommentModal(); });
         document.getElementById('menu-copy')?.addEventListener('click', () => { nodeMenu.classList.add('hidden'); editor.copyQuest(editor.contextNodeId); });
@@ -355,7 +347,6 @@ export const EditorCanvas = {
         if (!skipSave) this.updateSummary(editor);
     },
 
-    // Отрисовка тултипа для комментариев
     showCommentTooltip(editor, comment) {
         const tt = document.getElementById('quest-tooltip');
         document.getElementById('tt-title').innerHTML = "<span style='color:#ffaa00;'>Комментарий</span>";
@@ -391,14 +382,12 @@ export const EditorCanvas = {
         document.getElementById('tt-reqs').innerHTML = (quest.reqs || []).map(r => {
             const consumeTag = (r.taskType !== 'hunt' && r.taskType !== 'block_break' && r.taskType !== 'checkbox' && r.taskType !== 'xp') ? (r.consume !== false ? ' <span style="color:#ff5555; font-size:12px; margin-left:4px; white-space: nowrap;">[Забрать]</span>' : ' <span style="color:#aaaaaa; font-size:12px; margin-left:4px; white-space: nowrap;">[Наличие]</span>') : '';
             const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
-            // Оборачиваем текст в .tt-item-text для ровного переноса
             return `<div class="tt-item"><img src="${imgPath}"><div class="tt-item-text">${editor.getTaskLabel(r)} x${r.count}${consumeTag}</div></div>`;
         }).join('') || '<div style="color:#888; font-style:italic;">Нет требований</div>';
 
         document.getElementById('tt-rewards').innerHTML = (quest.rewards || []).map(r => {
             const choiceTag = r.isChoice ? ' <span style="color:#ffff55; font-size:12px; margin-left:4px; white-space: nowrap;">[На выбор]</span>' : '';
             const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
-            // Оборачиваем текст в .tt-item-text для ровного переноса
             return `<div class="tt-item"><img src="${imgPath}"><div class="tt-item-text">${editor.getRewardLabel(r)} x${r.count}${choiceTag}</div></div>`;
         }).join('') || '<div style="color:#888; font-style:italic;">Нет наград</div>';
 
@@ -436,5 +425,120 @@ export const EditorCanvas = {
             summaryPanel.classList.add('hidden');
             container.innerHTML = '';
         }
+    },
+
+    // --- МАГИЯ СОРТИРОВКИ (АВТО-РАССТАНОВКА) ---
+    autoLayout(editor) {
+        const mod = editor.getActiveMod();
+        if (!mod || !mod.quests || mod.quests.length === 0) return;
+
+        if (!confirm('Авто-расстановка переместит все квесты в этой ветке. Это действие можно отменить с помощью кнопки "↩ Отменить" (Ctrl+Z). Продолжить?')) return;
+
+        // Расстояние между квестами (учитываем большие рамки)
+        const GRID_X = 160; 
+        const GRID_Y = 160; 
+
+        const qMap = {};
+        const childrenMap = {};
+        const levels = {};
+
+        // 1. Инициализация графа
+        mod.quests.forEach(q => {
+            qMap[q.id] = q;
+            childrenMap[q.id] = [];
+            levels[q.id] = 0;
+        });
+
+        // 2. Строим связи (кто чей ребенок)
+        mod.quests.forEach(q => {
+            if (q.parents) {
+                q.parents.forEach(pId => {
+                    if (childrenMap[pId]) childrenMap[pId].push(q.id);
+                });
+            }
+        });
+
+        // 3. Вычисляем уровни (Глубину дерева по оси Y)
+        let changed = true;
+        let iter = 0;
+        while (changed && iter < 1000) { // Защита от бесконечного цикла, если юзер сделал круговую зависимость
+            changed = false;
+            iter++;
+            mod.quests.forEach(q => {
+                if (q.parents && q.parents.length > 0) {
+                    let maxPLevel = -1;
+                    q.parents.forEach(pId => {
+                        if (levels[pId] !== undefined) maxPLevel = Math.max(maxPLevel, levels[pId]);
+                    });
+                    if (levels[q.id] <= maxPLevel) {
+                        levels[q.id] = maxPLevel + 1;
+                        changed = true;
+                    }
+                }
+            });
+        }
+
+        // Группируем квесты по их уровню глубины
+        const levelGroups = {};
+        let maxLvl = 0;
+        mod.quests.forEach(q => {
+            const lvl = levels[q.id];
+            if (!levelGroups[lvl]) levelGroups[lvl] = [];
+            levelGroups[lvl].push(q);
+            if (lvl > maxLvl) maxLvl = lvl;
+        });
+
+        // 4. Расставляем квесты по оси X (Проход сверху вниз)
+        for (let i = 0; i <= maxLvl; i++) {
+            if (!levelGroups[i]) continue;
+
+            // Сортируем квесты на одном уровне: те, чьи родители левее, тоже встанут левее
+            levelGroups[i].sort((a, b) => {
+                const getAvg = (node) => {
+                    if (!node.parents || node.parents.length === 0) return 0;
+                    let sum = 0, count = 0;
+                    node.parents.forEach(pId => { if (qMap[pId]) { sum += qMap[pId].x; count++; } });
+                    return count > 0 ? sum / count : 0;
+                };
+                return getAvg(a) - getAvg(b);
+            });
+
+            let currentX = 0;
+            levelGroups[i].forEach(q => {
+                let idealX = currentX;
+                // Пытаемся поставить квест прямо под его родителями
+                if (q.parents && q.parents.length > 0) {
+                    let sum = 0, count = 0;
+                    q.parents.forEach(pId => { if (qMap[pId]) { sum += qMap[pId].x; count++; } });
+                    if (count > 0) {
+                        idealX = Math.round((sum / count) / GRID_X) * GRID_X;
+                    }
+                }
+
+                // Запрещаем квесту наезжать на предыдущий квест на этом же уровне
+                q.x = Math.max(currentX, idealX);
+                q.y = i * GRID_Y;
+                
+                // Следующий квест на этом уровне должен стоять минимум на GRID_X правее
+                currentX = q.x + GRID_X;
+            });
+        }
+
+        // 5. Финальное центрирование всей ветки (чтобы она не улетала далеко в координаты 10000)
+        let minX = Infinity, minY = Infinity;
+        mod.quests.forEach(q => {
+            if (q.x < minX) minX = q.x;
+            if (q.y < minY) minY = q.y;
+        });
+
+        mod.quests.forEach(q => {
+            q.x -= minX;
+            q.y -= minY;
+        });
+
+        // Сохраняем состояние для Ctrl+Z и рендерим
+        editor.triggerAutoSave();
+        this.renderCanvas(editor);
+        this.centerCanvas(editor);
     }
 };
