@@ -90,12 +90,8 @@ export const Editor = {
             if (e.ctrlKey && e.key === 'y') { e.preventDefault(); this.redo(); }
         });
 
-        // Подменяем метод сохранения, чтобы каждый раз обновлять доступность кнопок Undo/Redo
         const originalSave = this.saveHistoryState.bind(this);
-        this.saveHistoryState = () => {
-            originalSave();
-            updateButtons();
-        };
+        this.saveHistoryState = () => { originalSave(); updateButtons(); };
     },
 
     addMobToDatalist(mobName) {
@@ -106,14 +102,13 @@ export const Editor = {
     },
 
     bindTopBarEvents() {
-        // --- ПРИВЯЗКА КНОПКИ АВТО-СОРТИРОВКИ ---
-        document.getElementById('btn-auto-layout')?.addEventListener('click', () => {
+        // --- КНОПКА СОРТИРОВКИ ---
+        document.getElementById('btn-apply-layout')?.addEventListener('click', () => {
             this.hideTooltip();
             EditorCanvas.autoLayout(this);
         });
 
         document.getElementById('btn-toggle-titles').addEventListener('click', () => { document.body.classList.toggle('show-titles'); });
-        
         const btnToggleSummary = document.getElementById('btn-toggle-summary-size');
         const summaryPanel = document.getElementById('rewards-summary');
         
@@ -216,20 +211,17 @@ export const Editor = {
         return ItemsDB.formatMC(name);
     },
 
-    // --- ДЕЛЕГИРОВАНИЕ К ПОДМОДУЛЯМ ---
     renderSidebar() { EditorSidebar.renderSidebar(this); },
     renderCanvas(skipSave) { EditorCanvas.renderCanvas(this, skipSave); },
     centerCanvas() { EditorCanvas.centerCanvas(this); },
     updateTransform() { EditorCanvas.updateTransform(this); },
     updateSummary() { EditorCanvas.updateSummary(this); },
     hideTooltip() { EditorCanvas.hideTooltip(this); },
-    
     openQuestModal(id) { EditorModals.openQuestModal(this, id); },
     openQuestViewModal(id) { EditorModals.openQuestViewModal(this, id); },
     openCommentModal(id) { EditorModals.openCommentModal(this, id); },
     renderQuestEditForm() { EditorModals.renderQuestEditForm(this); },
     copyQuest(id) { EditorModals.copyQuest(this, id); },
     deleteQuest(id) { EditorModals.deleteQuest(this, id); },
-
     openItemPicker(cb) { EditorPicker.openItemPicker(this, cb); }
 };
