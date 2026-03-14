@@ -60,7 +60,7 @@ export const EditorModals = {
                 errDiv.innerText = ''; 
                 this.renderQuestEditForm(editor); 
             } catch(e) { 
-                errDiv.innerText = 'Ошибка JSON! Проверьте скобки и запятые. Подробно: ' + e.message; 
+                errDiv.innerText = 'Ошибка JSON! Проверьте скобки и запятые.'; 
                 switchTab(false);
             }
         });
@@ -84,7 +84,7 @@ export const EditorModals = {
         const flat = this.flattenNbt(editor.currentNbtObj);
         
         if (flat.length === 0) {
-            container.innerHTML = '<div style="color:#888; padding:10px; text-align:center; margin-top:20px;">Нет данных для редактирования.</div>';
+            container.innerHTML = '<div style="color:#888; padding:10px; text-align:center; margin-top:20px;">Нет данных для редактирования.<br><br>Перейдите во вкладку "Код (JSON)" и вставьте базовую структуру, чтобы она появилась здесь.</div>';
             return;
         }
         
@@ -129,7 +129,6 @@ export const EditorModals = {
                 } else {
                     current[key] = e.target.value;
                 }
-                
                 document.getElementById('nbt-editor-textarea').value = JSON.stringify(editor.currentNbtObj, null, 2);
             });
         });
@@ -231,7 +230,7 @@ export const EditorModals = {
             parents: [] 
         };
         mod.quests.push(newQuest); 
-        DB.logAction(`Скопировал квест: ${originalQuest.title}`);
+        DB.logAction(`Скопировал квест: ${originalQuest.title.replace(/§/g, '&')}`);
         editor.triggerAutoSave(); 
         editor.renderCanvas();
     },
@@ -315,7 +314,7 @@ export const EditorModals = {
             this.saveTempState(editor);
             const type = document.getElementById('new-req-type-select').value;
             
-            if (type === 'retrieval' || type === 'crafting' || type === 'block_break' || type === 'interact_item') {
+            if (type === 'retrieval' || type === 'crafting' || type === 'block_break' || type === 'interact_item' || type === 'interact_entity') {
                 editor.openItemPicker((item) => { 
                     editor.tempReqs.push({ taskType: type, item: item, rawId: item.string_id || item.item_key, rawDamage: item.damage !== undefined ? item.damage : 0, count: 1, customName: BQ.getCustomName(item, null), consume: true, nbtTag: null }); 
                     this.renderQuestEditForm(editor); 
@@ -326,14 +325,13 @@ export const EditorModals = {
                 if (type === 'checkbox') newItem = { item_key: 'checkbox', name: 'Галочка', image: 'checkbox.png' };
                 if (type === 'fluid') newItem = { item_key: 'fluid', name: 'Жидкость', image: 'fluid_bucket.png' };
                 if (type === 'hunt' || type === 'meeting') newItem = { item_key: 'mob', name: 'Моб', image: 'skull.png' };
-                if (type === 'interact_entity') newItem = { item_key: 'minecraft:air', name: 'Пустая рука', image: 'book.png' }; // Игрок может выбрать оружие!
                 if (type === 'npc_dialog' || type === 'npc_faction' || type === 'npc_quest') newItem = { item_key: 'npc', name: 'NPC', image: 'oak_sign.png' };
                 if (type === 'scoreboard') newItem = { item_key: 'scoreboard', name: 'Счетчик', image: 'oak_sign.png' };
                 
                 editor.tempReqs.push({
                     taskType: type, item: newItem, rawId: newItem.item_key, rawDamage: 0, count: 1, 
                     customName: type === 'fluid' ? 'Вода' : '', 
-                    target: (type === 'hunt' || type === 'meeting' || type === 'interact_entity') ? 'Zombie' : (type === 'fluid' ? 'water' : ''), 
+                    target: (type === 'hunt' || type === 'meeting') ? 'Zombie' : (type === 'fluid' ? 'water' : ''), 
                     consume: false, nbtTag: null 
                 });
                 this.renderQuestEditForm(editor);
@@ -402,6 +400,59 @@ export const EditorModals = {
         });
 
         document.getElementById('btn-close-quest').addEventListener('click', () => { modal.classList.add('hidden'); });
+    },
+
+    openQuestViewModal(editor, questId) {
+        editor.hideTooltip(); 
+        const mod = editor.getActiveMod();
+        const quest = mod.quests.find(q => q.id === questId);
+        if (!quest) return;
+
+        const modal = document.getElementById('quest-view-modal');
+        
+        let iconFile = quest.icon;
+        if (!iconFile && quest.reqs && quest.reqs.length > 0 && quest.reqs[0].item) iconFile = quest.reqs[0].item.image;
+        if (!iconFile && quest.rewards && quest.rewards.length > 0 && quest.rewards[0].item) iconFile = quest.rewards[0].item.image;
+        if (!iconFile) iconFile = 'book.png';
+        
+        document.getElementById('view-quest-icon').innerHTML = `<img src="${ItemsDB.getImageUrl(iconFile)}" style="width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated;">`;
+        document.getElementById('view-quest-title').innerHTML = ItemsDB.formatMC(quest.title);
+        
+        const descEl = document.getElementById('view-quest-desc');
+        const descContainer = document.getElementById('view-desc-container');
+        if (quest.desc && quest.desc.trim().length > 0) {
+            descEl.innerHTML = ItemsDB.formatMC(quest.desc);
+            descContainer.style.display = 'block';
+        } else {
+            descContainer.style.display = 'none';
+        }
+
+        const pContainer = document.getElementById('view-parents-container');
+        const pList = document.getElementById('view-parents-list');
+        if (quest.parents && quest.parents.length > 0) {
+            pContainer.classList.remove('hidden');
+            pList.innerHTML = quest.parents.map(pId => {
+                let pQuest = null; let pMod = null;
+                editor.data.mods.forEach(m => { const f = m.quests.find(q => q.id === pId); if (f) { pQuest = f; pMod = m; } });
+                const t = pQuest ? pQuest.title : `Скрытый квест: ${pId}`;
+                const m = pMod ? pMod.name : '?';
+                return `<div class="view-item-row" style="padding: 8px;"><div class="item-info"><span class="item-name">🔗 ${ItemsDB.formatMC(t)} <small style="color:#aaa;">[${ItemsDB.formatMC(m)}]</small></span></div></div>`;
+            }).join('');
+        } else { pContainer.classList.add('hidden'); }
+
+        document.getElementById('view-reqs-list').innerHTML = (quest.reqs && quest.reqs.length > 0) ? quest.reqs.map(r => {
+            const consumeText = (r.taskType !== 'hunt' && r.taskType !== 'block_break' && r.taskType !== 'checkbox' && r.taskType !== 'xp') ? (r.consume !== false ? '<span style="color:#ff5555; white-space: nowrap;">[Забирается]</span>' : '<span style="color:#aaaaaa; white-space: nowrap;">[Только наличие]</span>') : '';
+            const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
+            return `<div class="view-item-row"><div class="mc-slot"><img src="${imgPath}"></div><div class="item-info"><span class="item-name">${r.count}x ${editor.getTaskLabel(r)}</span><span class="item-meta">${consumeText}</span></div></div>`;
+        }).join('') : '<div style="padding: 10px; color: #888; font-style: italic;">Нет требований</div>';
+
+        document.getElementById('view-rewards-list').innerHTML = (quest.rewards && quest.rewards.length > 0) ? quest.rewards.map(r => {
+            const choiceText = r.isChoice ? '<span style="color:#ffff55; white-space: nowrap;">[На выбор]</span>' : '<span style="color:#55ff55; white-space: nowrap;">[Гарантировано]</span>';
+            const imgPath = r.item && r.item.image ? ItemsDB.getImageUrl(r.item.image) : ItemsDB.getImageUrl('book.png');
+            return `<div class="view-item-row"><div class="mc-slot"><img src="${imgPath}"></div><div class="item-info"><span class="item-name">${r.count}x ${editor.getRewardLabel(r)}</span><span class="item-meta">${choiceText}</span></div></div>`;
+        }).join('') : '<div style="padding: 10px; color: #888; font-style: italic;">Нет наград</div>';
+
+        modal.classList.remove('hidden');
     },
 
     openQuestModal(editor, questId = null) {
@@ -515,7 +566,7 @@ export const EditorModals = {
 
             return `
             <div class="reward-row">
-                <div class="mc-slot item-icon-btn ${t==='checkbox'?'hidden':''}" data-idx="${idx}" title="Изменить оружие/предмет" style="cursor: pointer;"><img src="${imgPath}"></div>
+                <div class="mc-slot item-icon-btn ${t==='checkbox'?'hidden':''}" data-idx="${idx}" title="Изменить иконку / Оружие" style="cursor: pointer;"><img src="${imgPath}"></div>
                 <select id="req-type-${idx}" class="mc-input task-type-select" data-idx="${idx}" style="width: 160px; flex-shrink: 0;">
                     <option value="retrieval" ${t==='retrieval'?'selected':''}>Принести предмет</option>
                     <option value="crafting" ${t==='crafting'?'selected':''}>Создать предмет</option>
@@ -533,7 +584,7 @@ export const EditorModals = {
                     <option value="xp" ${t==='xp'?'selected':''}>Сдать опыт</option>
                     <option value="checkbox" ${t==='checkbox'?'selected':''}>Галочка</option>
                 </select>
-                <input type="number" id="req-count-${idx}" class="mc-input ${t==='checkbox'?'hidden':''}" value="${r.count||1}" style="width: 90px; flex-shrink: 0;" title="Количество">
+                <input type="number" id="req-count-${idx}" class="mc-input ${t==='checkbox'?'hidden':''}" value="${r.count||1}" style="width: 90px; flex-shrink: 0;" title="Количество / Удары">
                 
                 <div class="middle-inputs">${midHtml}</div>
                 
