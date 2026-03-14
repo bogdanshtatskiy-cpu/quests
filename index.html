@@ -10,29 +10,33 @@
 </head>
 <body class="show-titles">
 
-    <div id="global-loader"><div class="spinner"></div><div id="loader-text">Инициализация...</div></div>
+    <div id="global-loader">
+        <div class="spinner"></div>
+        <div id="loader-text">Инициализация...</div>
+    </div>
 
     <div id="top-bar" class="mc-panel ui-element">
         <div class="top-bar-section left">
             <button id="btn-toggle-sidebar" class="mc-button" title="Скрыть/Показать список веток" style="font-size: 20px; padding: 2px 10px;">☰</button>
             <div class="vertical-divider"></div>
-            <button id="btn-undo" class="mc-button admin-only" title="Отменить" style="padding: 4px 10px; font-size: 14px; display: none;">↩ Отменить</button>
-            <button id="btn-redo" class="mc-button admin-only" title="Повторить" style="padding: 4px 10px; font-size: 14px; display: none;">↪ Повторить</button>
+            
+            <button id="btn-undo" class="mc-button admin-only" title="Отменить (Шаг назад)" style="padding: 4px 10px; font-size: 14px; display: none;">↩ Отменить</button>
+            <button id="btn-redo" class="mc-button admin-only" title="Повторить (Шаг вперед)" style="padding: 4px 10px; font-size: 14px; display: none;">↪ Повторить</button>
+            
             <div class="vertical-divider"></div>
             <span style="color: #ffaa00; font-size: 15px;">👤 <span id="current-user-name">Загрузка...</span></span>
             <button id="btn-show-login" class="mc-button guest-only" style="display: none; padding: 4px 8px;">Войти</button>
             <button id="btn-logout" class="mc-button admin-only" style="display: none; padding: 4px 8px;">Выйти</button>
         </div>
+
         <div class="top-bar-section center admin-only" style="display: none;">
             <span style="color: #aaa; font-size: 14px;">Профиль:</span>
             <select id="workspace-select" class="mc-input" style="width: 160px; padding: 4px; font-size: 14px; margin-bottom: 0;"></select>
             <button id="btn-add-workspace" class="mc-button" style="padding: 4px 10px;">+</button>
             <button id="btn-delete-workspace" class="mc-button danger" style="padding: 4px 10px;">-</button>
         </div>
-       <div class="top-bar-section right admin-only" style="display: none;">
-            <button id="btn-auto-layout" class="mc-button" style="color: #ffff55; padding: 4px 10px;" title="Автоматически расставить квесты">🪄 Сортировка</button>
-            <div class="vertical-divider"></div>
-            
+
+        <div class="top-bar-section right admin-only" style="display: none;">
             <button id="btn-open-admin" class="mc-button" style="color: #ff5555; padding: 4px 10px;">⚡ Админка</button>
             <button id="btn-open-versions" class="mc-button" style="color: #55ffff; padding: 4px 10px;">💾 Коммиты</button>
             <button id="btn-open-loot-editor" class="mc-button" style="color: #ffaa00; padding: 4px 10px;">📦 Лутбоксы</button>
@@ -45,26 +49,181 @@
         <input type="file" id="bq-file-input" accept=".json" class="hidden">
     </div>
 
-    <div id="import-mode-bar" class="mc-panel hidden ui-element"><span style="color: #ffff55; font-size: 16px; font-weight: bold;">⚠️ РЕЖИМ ИМПОРТА (АВТОСОХРАНЕНИЕ ОТКЛЮЧЕНО)</span><button id="btn-apply-import" class="mc-button" style="background-color: #005500; color: white;">💾 Перезаписать текущую базу</button><button id="btn-cancel-import" class="mc-button btn-cancel">❌ Отменить</button></div>
-
-    <div id="rewards-summary" class="hidden ui-element"><div class="summary-header"><h3 class="mc-title">Награды ветки</h3><button id="btn-toggle-summary-size" class="mc-button">▼</button></div><div id="rewards-summary-list"></div></div>
-
-    <div id="canvas-context-menu" class="mc-panel context-menu hidden"><div class="menu-item admin-only" id="menu-add-quest">📦 Добавить квест</div><div class="menu-item admin-only" id="menu-add-comment">💬 Добавить комментарий</div></div>
-    <div id="node-context-menu" class="mc-panel context-menu hidden"><div class="menu-item admin-only" id="menu-edit">Редактировать</div><div class="menu-item admin-only" id="menu-copy">Копировать</div><div class="menu-item admin-only" id="menu-link">Соединить (Shift+ЛКМ)</div><div class="menu-item delete admin-only" id="menu-delete">Удалить</div></div>
-    <div id="comment-context-menu" class="mc-panel context-menu hidden"><div class="menu-item admin-only" id="menu-edit-comment">Редактировать</div><div class="menu-item delete admin-only" id="menu-delete-comment">Удалить</div></div>
-
-    <div id="app-container">
-        <aside id="sidebar" class="mc-panel ui-element"><div class="sidebar-header"><h3 style="font-size: 16px;">Ветки квестов</h3><button id="btn-add-mod" class="mc-button admin-only" style="padding: 2px 8px;">+</button></div><ul id="mod-list"></ul></aside>
-        <main id="canvas-container"><div id="quest-canvas"><svg id="connections-layer"></svg><div id="nodes-layer"></div></div><div class="controls-hint">ЛКМ: Двигать/Открыть | ПКМ: Меню | Shift+ЛКМ: Связать | Колесико: Зум | Ctrl+Z: Отмена</div></main>
+    <div id="import-mode-bar" class="mc-panel hidden ui-element">
+        <span style="color: #ffff55; font-size: 16px; font-weight: bold;">⚠️ РЕЖИМ ИМПОРТА (АВТОСОХРАНЕНИЕ ОТКЛЮЧЕНО)</span>
+        <button id="btn-apply-import" class="mc-button" style="background-color: #005500; color: white;">💾 Перезаписать текущую базу</button>
+        <button id="btn-cancel-import" class="mc-button btn-cancel">❌ Отменить</button>
     </div>
 
-    <div id="quest-tooltip" class="mc-panel hidden ui-element"><h3 id="tt-title"></h3><div id="tt-desc"></div><div id="tt-parents-container"></div><div class="tt-section" id="tt-reqs-container"><span class="tt-label">Требуется:</span><div id="tt-reqs"></div></div><div class="tt-section" id="tt-rewards-container"><span class="tt-label">Награда:</span><div id="tt-rewards"></div></div></div>
+    <div id="rewards-summary" class="hidden ui-element">
+        <div class="summary-header">
+            <h3 class="mc-title">Награды ветки</h3>
+            <button id="btn-toggle-summary-size" class="mc-button">▼</button>
+        </div>
+        <div id="rewards-summary-list"></div>
+    </div>
 
-    <div id="auth-modal" class="modal hidden"><div class="mc-panel modal-content"><h2 class="mc-title">Вход в редактор</h2><input type="text" id="auth-login" class="mc-input" placeholder="Логин (например: DesOope)"><input type="password" id="auth-pass" class="mc-input" placeholder="Пароль"><div class="modal-actions"><button id="btn-login" class="mc-button">Войти</button><button id="btn-guest" class="mc-button btn-cancel">Режим просмотра</button></div></div></div>
-    <div id="admin-modal" class="modal hidden"><div class="mc-panel modal-content" style="width: 1000px; max-height: 90vh;"><h2 class="mc-title">Панель администратора</h2><div class="form-row" style="flex: 1;"><div class="form-group" style="width: 35%; display: flex; flex-direction: column;"><h3 style="color:#fff; margin-bottom: 10px;">Доступ редакторов</h3><div style="display: flex; gap: 5px; margin-bottom: 10px;"><input type="text" id="new-user-login" class="mc-input" placeholder="Логин" style="margin-bottom:0;"><input type="text" id="new-user-pass" class="mc-input" placeholder="Пароль" style="margin-bottom:0;"><button id="btn-create-user" class="mc-button">Добавить</button></div><div class="item-list-container" style="flex: 1;"><table class="admin-table"><thead><tr><th>Логин</th><th>Действие</th></tr></thead><tbody id="users-tbody"></tbody></table></div></div><div class="form-group" style="width: 65%; display: flex; flex-direction: column;"><h3 style="color:#fff; margin-bottom: 10px;">Логи действий (последние 50)</h3><div class="item-list-container" style="flex: 1;"><table class="admin-table"><thead><tr><th style="width:130px;">Время</th><th style="width:100px;">Пользователь</th><th>Действие</th></tr></thead><tbody id="logs-tbody"></tbody></table></div></div></div><div class="modal-actions"><button id="btn-close-admin" class="mc-button btn-cancel">Закрыть</button></div></div></div>
-    <div id="versions-modal" class="modal hidden"><div class="mc-panel modal-content" style="width: 800px; max-height: 80vh;"><h2 class="mc-title">История изменений (Бэкапы)</h2><div style="display: flex; gap: 10px; margin-bottom: 15px;"><input type="text" id="commit-message" class="mc-input" placeholder="Описание коммита" style="flex: 1; margin-bottom:0;"><button id="btn-create-commit" class="mc-button" style="color:#55ff55;">💾 Создать коммит</button></div><div class="form-row" style="flex: 1;"><div class="item-list-container" style="flex: 1;"><table class="admin-table"><thead><tr><th style="width:150px;">Дата</th><th style="width:120px;">Автор</th><th>Комментарий</th><th style="width:120px;">Действие</th></tr></thead><tbody id="versions-tbody"></tbody></table></div></div><div class="modal-actions"><button id="btn-close-versions" class="mc-button btn-cancel" style="width: 100%;">Закрыть</button></div></div></div>
-    <div id="add-mod-modal" class="modal hidden"><div class="mc-panel modal-content"><h2 id="mod-modal-title" class="mc-title">Настройки ветки</h2><input type="text" id="new-mod-name" class="mc-input" placeholder="Название ветки"><div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;"><div id="mod-icon-preview" class="mc-slot"></div><button id="btn-select-mod-icon" class="mc-button">Выбрать иконку</button></div><div class="modal-actions"><button id="btn-save-mod" class="mc-button">Сохранить</button><button id="btn-close-mod" class="mc-button btn-cancel">Отмена</button></div></div></div>
-    <div id="comment-edit-modal" class="modal hidden"><div class="mc-panel modal-content"><h2 class="mc-title">Текст комментария</h2><textarea id="comment-text" class="mc-input" style="height: 150px; font-size: 16px;" placeholder="Введите информацию..."></textarea><div class="modal-actions"><button id="btn-save-comment" class="mc-button">Сохранить</button><button id="btn-close-comment" class="mc-button btn-cancel">Отмена</button></div></div></div>
+    <div id="canvas-context-menu" class="mc-panel context-menu hidden">
+        <div class="menu-item admin-only" id="menu-add-quest">📦 Добавить квест</div>
+        <div class="menu-item admin-only" id="menu-add-comment">💬 Добавить комментарий</div>
+    </div>
+    
+    <div id="node-context-menu" class="mc-panel context-menu hidden">
+        <div class="menu-item admin-only" id="menu-edit">Редактировать</div>
+        <div class="menu-item admin-only" id="menu-copy">Копировать</div>
+        <div class="menu-item admin-only" id="menu-link">Соединить (Shift+ЛКМ)</div>
+        <div class="menu-item delete admin-only" id="menu-delete">Удалить</div>
+    </div>
+    
+    <div id="comment-context-menu" class="mc-panel context-menu hidden">
+        <div class="menu-item admin-only" id="menu-edit-comment">Редактировать</div>
+        <div class="menu-item delete admin-only" id="menu-delete-comment">Удалить</div>
+    </div>
+
+    <div id="app-container">
+        
+        <aside id="sidebar" class="mc-panel ui-element" style="display: flex; flex-direction: column;">
+            <div class="sidebar-header">
+                <h3 style="font-size: 16px;">Ветки квестов</h3>
+                <button id="btn-add-mod" class="mc-button admin-only" style="padding: 2px 8px;">+</button>
+            </div>
+            
+            <ul id="mod-list" style="flex: 1; overflow-y: auto;"></ul>
+            
+            <div id="layout-settings-panel" class="admin-only" style="background: #111; border-top: 2px solid #555; padding: 10px; flex-shrink: 0;">
+                <h3 style="color:#55ffff; font-size: 14px; margin-bottom: 8px; text-align: center; text-shadow: 1px 1px 0 #000;">Умная сортировка квестов</h3>
+                <div style="display: flex; gap: 5px; margin-bottom: 5px;">
+                    <select id="layout-type" class="mc-input" style="font-size:12px; padding: 4px; height: 26px; margin: 0; flex: 1;">
+                        <option value="smart">Сетка (Минимум пересечений)</option>
+                        <option value="tree">Дерево (Строго по порядку)</option>
+                    </select>
+                    <select id="layout-dir" class="mc-input" style="font-size:12px; padding: 4px; height: 26px; margin: 0; flex: 1;">
+                        <option value="TB">Сверху Вниз ↓</option>
+                        <option value="LR">Слева Направо →</option>
+                        <option value="BT">Снизу Вверх ↑</option>
+                        <option value="RL">Справа Налево ←</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 5px; align-items: center; margin-bottom: 8px;">
+                    <span style="color:#aaa; font-size: 12px; white-space: nowrap;">Отступ X:</span>
+                    <input type="number" id="layout-space-x" class="mc-input" value="160" style="font-size:12px; padding: 2px; height: 24px; margin: 0;">
+                    <span style="color:#aaa; font-size: 12px; white-space: nowrap;">Y:</span>
+                    <input type="number" id="layout-space-y" class="mc-input" value="160" style="font-size:12px; padding: 2px; height: 24px; margin: 0;">
+                </div>
+                <button id="btn-apply-layout" class="mc-button" style="width: 100%; font-size: 13px; padding: 6px; color: #ffff55;">🪄 Выстроить квесты</button>
+            </div>
+        </aside>
+        
+        <main id="canvas-container">
+            <div id="quest-canvas">
+                <svg id="connections-layer"></svg>
+                <div id="nodes-layer"></div>
+            </div>
+            <div class="controls-hint">ЛКМ: Двигать/Открыть | ПКМ: Меню | Shift+ЛКМ: Связать | Колесико: Зум | Ctrl+Z: Отмена</div>
+        </main>
+        
+    </div>
+
+    <div id="quest-tooltip" class="mc-panel hidden ui-element">
+        <h3 id="tt-title"></h3>
+        <div id="tt-desc"></div>
+        <div id="tt-parents-container"></div>
+        <div class="tt-section" id="tt-reqs-container"><span class="tt-label">Требуется:</span><div id="tt-reqs"></div></div>
+        <div class="tt-section" id="tt-rewards-container"><span class="tt-label">Награда:</span><div id="tt-rewards"></div></div>
+    </div>
+
+    <div id="auth-modal" class="modal hidden">
+        <div class="mc-panel modal-content">
+            <h2 class="mc-title">Вход в редактор</h2>
+            <input type="text" id="auth-login" class="mc-input" placeholder="Логин (например: DesOope)">
+            <input type="password" id="auth-pass" class="mc-input" placeholder="Пароль">
+            <div class="modal-actions">
+                <button id="btn-login" class="mc-button">Войти</button>
+                <button id="btn-guest" class="mc-button btn-cancel">Режим просмотра</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="admin-modal" class="modal hidden">
+        <div class="mc-panel modal-content" style="width: 1000px; max-height: 90vh;">
+            <h2 class="mc-title">Панель администратора</h2>
+            <div class="form-row" style="flex: 1;">
+                <div class="form-group" style="width: 35%; display: flex; flex-direction: column;">
+                    <h3 style="color:#fff; margin-bottom: 10px;">Доступ редакторов</h3>
+                    <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                        <input type="text" id="new-user-login" class="mc-input" placeholder="Логин" style="margin-bottom:0;">
+                        <input type="text" id="new-user-pass" class="mc-input" placeholder="Пароль" style="margin-bottom:0;">
+                        <button id="btn-create-user" class="mc-button">Добавить</button>
+                    </div>
+                    <div class="item-list-container" style="flex: 1;">
+                        <table class="admin-table">
+                            <thead><tr><th>Логин</th><th>Действие</th></tr></thead>
+                            <tbody id="users-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="form-group" style="width: 65%; display: flex; flex-direction: column;">
+                    <h3 style="color:#fff; margin-bottom: 10px;">Логи действий (последние 50)</h3>
+                    <div class="item-list-container" style="flex: 1;">
+                        <table class="admin-table">
+                            <thead><tr><th style="width:130px;">Время</th><th style="width:100px;">Пользователь</th><th>Действие</th></tr></thead>
+                            <tbody id="logs-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="btn-close-admin" class="mc-button btn-cancel">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="versions-modal" class="modal hidden">
+        <div class="mc-panel modal-content" style="width: 800px; max-height: 80vh;">
+            <h2 class="mc-title">История изменений (Бэкапы)</h2>
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <input type="text" id="commit-message" class="mc-input" placeholder="Описание коммита" style="flex: 1; margin-bottom:0;">
+                <button id="btn-create-commit" class="mc-button" style="color:#55ff55;">💾 Создать коммит</button>
+            </div>
+            <div class="form-row" style="flex: 1;">
+                <div class="item-list-container" style="flex: 1;">
+                    <table class="admin-table">
+                        <thead><tr><th style="width:150px;">Дата</th><th style="width:120px;">Автор</th><th>Комментарий</th><th style="width:120px;">Действие</th></tr></thead>
+                        <tbody id="versions-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="btn-close-versions" class="mc-button btn-cancel" style="width: 100%;">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="add-mod-modal" class="modal hidden">
+        <div class="mc-panel modal-content">
+            <h2 id="mod-modal-title" class="mc-title">Настройки ветки</h2>
+            <input type="text" id="new-mod-name" class="mc-input" placeholder="Название ветки">
+            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
+                <div id="mod-icon-preview" class="mc-slot"></div>
+                <button id="btn-select-mod-icon" class="mc-button">Выбрать иконку</button>
+            </div>
+            <div class="modal-actions">
+                <button id="btn-save-mod" class="mc-button">Сохранить</button>
+                <button id="btn-close-mod" class="mc-button btn-cancel">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="comment-edit-modal" class="modal hidden">
+        <div class="mc-panel modal-content">
+            <h2 class="mc-title">Текст комментария</h2>
+            <textarea id="comment-text" class="mc-input" style="height: 150px; font-size: 16px;" placeholder="Введите информацию..."></textarea>
+            <div class="modal-actions">
+                <button id="btn-save-comment" class="mc-button">Сохранить</button>
+                <button id="btn-close-comment" class="mc-button btn-cancel">Отмена</button>
+            </div>
+        </div>
+    </div>
 
     <div id="quest-edit-modal" class="modal hidden">
         <div class="mc-panel modal-content fullscreen">
@@ -135,8 +294,12 @@
             <div class="form-row" style="flex-shrink: 0; margin-top: 15px; height: 180px;">
                 <div class="form-col" style="flex: 1;">
                     <div style="display: flex; gap: 5px; background: #222; padding: 6px; border: 1px solid #444; border-radius: 4px 4px 0 0; align-items: center;">
-                        <select id="parent-mod-select" class="mc-input" style="margin: 0; height: 30px; font-size: 13px; padding: 2px 6px; flex: 1;"><option value="">-- Ветка --</option></select>
-                        <select id="parent-quest-select" class="mc-input" style="margin: 0; height: 30px; font-size: 13px; padding: 2px 6px; flex: 1;" disabled><option value="">-- Квест --</option></select>
+                        <select id="parent-mod-select" class="mc-input" style="margin: 0; height: 30px; font-size: 13px; padding: 2px 6px; flex: 1;">
+                            <option value="">-- Ветка --</option>
+                        </select>
+                        <select id="parent-quest-select" class="mc-input" style="margin: 0; height: 30px; font-size: 13px; padding: 2px 6px; flex: 1;" disabled>
+                            <option value="">-- Квест --</option>
+                        </select>
                         <button id="btn-add-parent" class="mc-button" style="height: 30px; padding: 0 10px; font-size: 13px; color:#ffaa00;">+ Связать</button>
                     </div>
                     <div id="parents-list" class="item-list-container" style="border-top: none; border-radius: 0 0 4px 4px;"></div>
@@ -160,6 +323,7 @@
                 <div id="view-quest-icon" class="mc-slot" style="width: 56px; height: 56px; border-width: 3px;"></div>
                 <h2 id="view-quest-title" class="mc-title" style="margin: 0; font-size: 24px; text-align: left; line-height: 1.2; flex: 1; overflow-wrap: break-word;">Название квеста</h2>
             </div>
+            
             <div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; padding-right: 10px;">
                 <div id="view-parents-container" class="form-group hidden" style="margin-bottom: 0;">
                     <h3 style="color:#ffaa00; margin-bottom:8px; font-size: 15px; text-shadow: 1px 1px 0 #000;">Для открытия нужно пройти:</h3>
@@ -186,8 +350,47 @@
         </div>
     </div>
 
-    <div id="loot-editor-modal" class="modal hidden"><div class="mc-panel modal-content large" style="height: 85vh;"><h2 class="mc-title">Менеджер Лутбоксов</h2><div style="display: flex; gap: 10px; margin-bottom: 15px;"><button id="btn-loot-import" class="mc-button" style="color:#55ffff;">📥 Загрузить QuestLoot.json</button><input type="file" id="loot-file-input" accept=".json" class="hidden"><button id="btn-loot-export" class="mc-button" style="color:#55ff55;">📤 Скачать QuestLoot.json</button></div><div class="form-row" style="flex: 1;"><div class="form-group" style="flex: 1;"><div class="form-group-header"><label>Рулетки:</label><button id="btn-add-loot-group" class="mc-button" style="padding: 2px 6px; font-size: 12px;">+ Группа</button></div><div id="loot-groups-list" class="item-list-container"></div></div><div id="loot-group-settings" class="form-group hidden" style="flex: 3; border-left: 2px solid #555; padding-left: 15px;"><h3 id="loot-selected-group-name" style="color:#55ffff; margin-bottom:10px;">Группа</h3><div style="display: flex; gap: 15px; margin-bottom: 15px;"><div style="flex: 2;"><label>Название:</label><input type="text" id="loot-group-name" class="mc-input"></div><div style="flex: 1;"><label>Вес:</label><input type="number" id="loot-group-weight" class="mc-input"></div></div><div class="form-group-header"><label>Дроп:</label><button id="btn-add-loot-reward" class="mc-button" style="padding: 2px 6px; font-size: 12px;">+ Вариант дропа</button></div><div id="loot-rewards-list" class="item-list-container"></div></div></div><div class="modal-actions"><button id="btn-close-loot" class="mc-button btn-cancel" style="width: 100%;">Закрыть</button></div></div></div>
-    
+    <div id="loot-editor-modal" class="modal hidden">
+        <div class="mc-panel modal-content large" style="height: 85vh;">
+            <h2 class="mc-title">Менеджер Лутбоксов</h2>
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <button id="btn-loot-import" class="mc-button" style="color:#55ffff;">📥 Загрузить QuestLoot.json</button>
+                <input type="file" id="loot-file-input" accept=".json" class="hidden">
+                <button id="btn-loot-export" class="mc-button" style="color:#55ff55;">📤 Скачать QuestLoot.json</button>
+            </div>
+            <div class="form-row" style="flex: 1;">
+                <div class="form-group" style="flex: 1;">
+                    <div class="form-group-header">
+                        <label>Рулетки:</label>
+                        <button id="btn-add-loot-group" class="mc-button" style="padding: 2px 6px; font-size: 12px;">+ Группа</button>
+                    </div>
+                    <div id="loot-groups-list" class="item-list-container"></div>
+                </div>
+                <div id="loot-group-settings" class="form-group hidden" style="flex: 3; border-left: 2px solid #555; padding-left: 15px;">
+                    <h3 id="loot-selected-group-name" style="color:#55ffff; margin-bottom:10px;">Группа</h3>
+                    <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                        <div style="flex: 2;">
+                            <label>Название:</label>
+                            <input type="text" id="loot-group-name" class="mc-input">
+                        </div>
+                        <div style="flex: 1;">
+                            <label>Вес:</label>
+                            <input type="number" id="loot-group-weight" class="mc-input">
+                        </div>
+                    </div>
+                    <div class="form-group-header">
+                        <label>Дроп:</label>
+                        <button id="btn-add-loot-reward" class="mc-button" style="padding: 2px 6px; font-size: 12px;">+ Вариант дропа</button>
+                    </div>
+                    <div id="loot-rewards-list" class="item-list-container"></div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="btn-close-loot" class="mc-button btn-cancel" style="width: 100%;">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
     <div id="nbt-editor-modal" class="modal hidden">
         <div class="mc-panel modal-content" style="width: 800px; display:flex; flex-direction:column; max-height:90vh;">
             <h2 class="mc-title">Редактор NBT Данных</h2>
@@ -220,7 +423,39 @@
         </div>
     </div>
 
-    <div id="item-picker-modal" class="modal hidden"><div class="mc-panel modal-content" style="width: 1000px; max-width: 95vw;"><h2 class="mc-title">Выбор предмета</h2><div class="mc-panel admin-only" style="margin-bottom: 10px; padding: 10px; display: flex; gap: 10px; align-items: center;"><span style="color:#55ffff;">Своя иконка:</span><input type="file" id="custom-item-file" accept="image/png, image/jpeg, image/gif" style="width: 180px; color:#fff;"><input type="text" id="custom-item-name" class="mc-input" placeholder="Название..." style="margin-bottom:0;"><button id="btn-upload-custom-item" class="mc-button">Добавить</button></div><div style="display: flex; gap: 15px; height: 500px;"><div style="flex: 2; display: flex; flex-direction: column;"><div style="display: flex; gap: 10px; margin-bottom: 10px;"><select id="picker-mod-filter" class="mc-input" style="flex: 1; margin: 0;"></select><input type="text" id="picker-search" class="mc-input" placeholder="Поиск..." style="flex: 2; margin: 0;"></div><div id="picker-results" class="item-list-container" style="flex: 1;"></div></div><div style="flex: 1; display: flex; flex-direction: column; gap: 10px;"><div style="flex: 1; display: flex; flex-direction: column; background: #1e1e1e; border: 2px solid #555; padding: 5px;"><h3 style="color:#ffaa00; text-align:center;">★ Избранное</h3><div id="picker-fav-results" class="item-list-container" style="border: none; padding: 0;"></div></div><div style="flex: 1; display: flex; flex-direction: column; background: #1e1e1e; border: 2px solid #555; padding: 5px;"><h3 style="color:#55ffff; text-align:center;">🎁 Лутбоксы</h3><div id="picker-loot-results" class="item-list-container" style="border: none; padding: 0;"></div></div></div></div><div class="modal-actions"><button id="btn-picker-cancel" class="mc-button btn-cancel">Отмена</button></div></div></div>
+    <div id="item-picker-modal" class="modal hidden">
+        <div class="mc-panel modal-content" style="width: 1000px; max-width: 95vw;">
+            <h2 class="mc-title">Выбор предмета</h2>
+            <div class="mc-panel admin-only" style="margin-bottom: 10px; padding: 10px; display: flex; gap: 10px; align-items: center;">
+                <span style="color:#55ffff;">Своя иконка:</span>
+                <input type="file" id="custom-item-file" accept="image/png, image/jpeg, image/gif" style="width: 180px; color:#fff;">
+                <input type="text" id="custom-item-name" class="mc-input" placeholder="Название..." style="margin-bottom:0;">
+                <button id="btn-upload-custom-item" class="mc-button">Добавить</button>
+            </div>
+            <div style="display: flex; gap: 15px; height: 500px;">
+                <div style="flex: 2; display: flex; flex-direction: column;">
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <select id="picker-mod-filter" class="mc-input" style="flex: 1; margin: 0;"></select>
+                        <input type="text" id="picker-search" class="mc-input" placeholder="Поиск..." style="flex: 2; margin: 0;">
+                    </div>
+                    <div id="picker-results" class="item-list-container" style="flex: 1;"></div>
+                </div>
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="flex: 1; display: flex; flex-direction: column; background: #1e1e1e; border: 2px solid #555; padding: 5px;">
+                        <h3 style="color:#ffaa00; text-align:center;">★ Избранное</h3>
+                        <div id="picker-fav-results" class="item-list-container" style="border: none; padding: 0;"></div>
+                    </div>
+                    <div style="flex: 1; display: flex; flex-direction: column; background: #1e1e1e; border: 2px solid #555; padding: 5px;">
+                        <h3 style="color:#55ffff; text-align:center;">🎁 Лутбоксы</h3>
+                        <div id="picker-loot-results" class="item-list-container" style="border: none; padding: 0;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="btn-picker-cancel" class="mc-button btn-cancel">Отмена</button>
+            </div>
+        </div>
+    </div>
 
     <datalist id="mob-list"></datalist>
     <div id="save-indicator" class="hidden">Сохранение...</div>
