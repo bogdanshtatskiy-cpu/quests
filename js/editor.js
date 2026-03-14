@@ -28,7 +28,7 @@ export const Editor = {
     scale: 1, panX: 0, panY: 0, isPanning: false, panStartX: 0, panStartY: 0, initialPanX: 0, initialPanY: 0,
     draggedQuestId: null, draggedCommentId: null, mouseStartX: 0, mouseStartY: 0, nodeStartX: 0, nodeStartY: 0, hasMovedNode: false, linkingFromNodeId: null, 
     contextNodeId: null, contextCommentId: null, editingNodeId: null, editingCommentId: null, hoveredQuestId: null, hoveredCommentId: null, 
-    pickerCallback: null, tempReqs: [], tempRewards: [], tempParents: [], tempQuestIcon: null, tempQuestIconItem: null, editingModId: null, tempModIcon: null, saveTimeout: null, tempNbtTarget: null,
+    pickerCallback: null, tempReqs: [], tempRewards: [], tempParents: [], tempQuestIcon: null, tempQuestIconItem: null, editingModId: null, tempModIcon: null, saveTimeout: null, tempNbtTarget: null, currentNbtObj: null,
 
     MOB_LIST: MOB_LIST,
 
@@ -90,7 +90,7 @@ export const Editor = {
             if (e.ctrlKey && e.key === 'y') { e.preventDefault(); this.redo(); }
         });
 
-        // Подменяем метод сохранения, чтобы каждый раз проверять доступность кнопок
+        // Подменяем метод сохранения, чтобы каждый раз обновлять доступность кнопок Undo/Redo
         const originalSave = this.saveHistoryState.bind(this);
         this.saveHistoryState = () => {
             originalSave();
@@ -106,7 +106,14 @@ export const Editor = {
     },
 
     bindTopBarEvents() {
+        // --- ПРИВЯЗКА КНОПКИ АВТО-СОРТИРОВКИ ---
+        document.getElementById('btn-auto-layout')?.addEventListener('click', () => {
+            this.hideTooltip();
+            EditorCanvas.autoLayout(this);
+        });
+
         document.getElementById('btn-toggle-titles').addEventListener('click', () => { document.body.classList.toggle('show-titles'); });
+        
         const btnToggleSummary = document.getElementById('btn-toggle-summary-size');
         const summaryPanel = document.getElementById('rewards-summary');
         
@@ -117,6 +124,7 @@ export const Editor = {
 
         const fileInput = document.getElementById('bq-file-input');
         document.getElementById('btn-import-bq').addEventListener('click', () => { this.hideTooltip(); fileInput.click(); });
+        
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -208,7 +216,7 @@ export const Editor = {
         return ItemsDB.formatMC(name);
     },
 
-    // ДЕЛЕГИРОВАНИЕ К ПОДМОДУЛЯМ
+    // --- ДЕЛЕГИРОВАНИЕ К ПОДМОДУЛЯМ ---
     renderSidebar() { EditorSidebar.renderSidebar(this); },
     renderCanvas(skipSave) { EditorCanvas.renderCanvas(this, skipSave); },
     centerCanvas() { EditorCanvas.centerCanvas(this); },
