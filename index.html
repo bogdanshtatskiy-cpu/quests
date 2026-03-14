@@ -68,7 +68,7 @@
             <h2 class="mc-title" style="margin-bottom: 10px;">Редактор квеста</h2>
             
             <div class="form-row" style="flex-shrink: 0; background: #151515; padding: 10px; border: 1px solid #444; border-radius: 4px; margin-bottom: 12px; align-items: center;">
-                <input type="text" id="quest-title" class="mc-input flex-1" style="font-size: 18px; margin: 0; height: 36px;" placeholder="Название квеста...">
+                <input type="text" id="quest-title" class="mc-input flex-1" style="font-size: 18px; margin: 0; height: 36px;" placeholder="Название квеста... (&eЦвета поддерживаются)">
                 <select id="quest-size" class="mc-input" style="width: 180px; margin: 0; height: 36px;">
                     <option value="x1">Рамка: Стандарт (x1)</option>
                     <option value="x2">Рамка: Большой (x2)</option>
@@ -93,7 +93,7 @@
                                 <option value="fluid">Сдать жидкость</option>
                                 <option value="hunt">Убить моба</option>
                                 <option value="meeting">Найти моба</option>
-                                <option value="interact_entity">Клик по мобу</option>
+                                <option value="interact_entity">Взаимодейств. с мобом</option>
                                 <option value="interact_item">Клик по предм.</option>
                                 <option value="location">Локация</option>
                                 <option value="npc_dialog">Диалог NPC</option>
@@ -139,7 +139,7 @@
                     <div id="parents-list" class="item-list-container" style="border-top: none; border-radius: 0 0 4px 4px;"></div>
                 </div>
                 <div class="form-col" style="flex: 1;">
-                    <textarea id="quest-desc" class="mc-input" style="flex: 1; resize: none; font-size: 15px; padding: 10px; margin: 0; border-radius: 4px;" placeholder="Описание задания в книге квестов..."></textarea>
+                    <textarea id="quest-desc" class="mc-input" style="flex: 1; resize: none; font-size: 15px; padding: 10px; margin: 0; border-radius: 4px;" placeholder="Описание задания в книге квестов... (&aЦвета поддерживаются)"></textarea>
                 </div>
             </div>
             
@@ -183,8 +183,40 @@
         </div>
     </div>
 
-    <div id="loot-editor-modal" class="modal hidden"><div class="mc-panel modal-content large" style="height: 85vh;"><h2 class="mc-title">Менеджер Лутбоксов</h2><div style="display: flex; gap: 10px; margin-bottom: 15px;"><button id="btn-loot-import" class="mc-button" style="color:#55ffff;">📥 Загрузить QuestLoot.json</button><input type="file" id="loot-file-input" accept=".json" class="hidden"><button id="btn-loot-export" class="mc-button" style="color:#55ff55;">📤 Скачать QuestLoot.json</button></div><div class="form-row" style="flex: 1;"><div class="form-group" style="flex: 1;"><div class="form-group-header"><label>Рулетки:</label><button id="btn-add-loot-group" class="mc-button" style="padding: 2px 6px; font-size: 12px;">+ Группа</button></div><div id="loot-groups-list" class="item-list-container"></div></div><div id="loot-group-settings" class="form-group hidden" style="flex: 3; border-left: 2px solid #555; padding-left: 15px;"><h3 id="loot-selected-group-name" style="color:#55ffff; margin-bottom:10px;">Группа</h3><div style="display: flex; gap: 15px; margin-bottom: 15px;"><div style="flex: 2;"><label>Название:</label><input type="text" id="loot-group-name" class="mc-input"></div><div style="flex: 1;"><label>Вес:</label><input type="number" id="loot-group-weight" class="mc-input"></div></div><div class="form-group-header"><label>Дроп:</label><button id="btn-add-loot-reward" class="mc-button" style="padding: 2px 6px; font-size: 12px;">+ Дроп</button></div><div id="loot-rewards-list" class="item-list-container"></div></div></div><div class="modal-actions"><button id="btn-close-loot" class="mc-button btn-cancel" style="width: 100%;">Закрыть</button></div></div></div>
-    <div id="nbt-editor-modal" class="modal hidden"><div class="mc-panel modal-content" style="width: 700px;"><h2 class="mc-title">NBT Данные</h2><textarea id="nbt-editor-textarea" class="mc-input" style="height: 300px; font-family: monospace; font-size: 14px; white-space: pre;" spellcheck="false"></textarea><div id="nbt-editor-error" style="color: #ff5555; margin-top: 5px; font-size: 14px; font-weight: bold;"></div><div class="modal-actions"><button id="btn-save-nbt" class="mc-button" style="color: #00aa00;">Сохранить NBT</button><button id="btn-close-nbt" class="mc-button btn-cancel">Отмена</button></div></div></div>
+    <div id="loot-editor-modal" class="modal hidden"><div class="mc-panel modal-content large" style="height: 85vh;"><h2 class="mc-title">Менеджер Лутбоксов</h2><div style="display: flex; gap: 10px; margin-bottom: 15px;"><button id="btn-loot-import" class="mc-button" style="color:#55ffff;">📥 Загрузить QuestLoot.json</button><input type="file" id="loot-file-input" accept=".json" class="hidden"><button id="btn-loot-export" class="mc-button" style="color:#55ff55;">📤 Скачать QuestLoot.json</button></div><div class="form-row" style="flex: 1;"><div class="form-group" style="flex: 1;"><div class="form-group-header"><label>Рулетки:</label><button id="btn-add-loot-group" class="mc-button" style="padding: 2px 6px; font-size: 12px;">+ Группа</button></div><div id="loot-groups-list" class="item-list-container"></div></div><div id="loot-group-settings" class="form-group hidden" style="flex: 3; border-left: 2px solid #555; padding-left: 15px;"><h3 id="loot-selected-group-name" style="color:#55ffff; margin-bottom:10px;">Группа</h3><div style="display: flex; gap: 15px; margin-bottom: 15px;"><div style="flex: 2;"><label>Название:</label><input type="text" id="loot-group-name" class="mc-input"></div><div style="flex: 1;"><label>Вес:</label><input type="number" id="loot-group-weight" class="mc-input"></div></div><div class="form-group-header"><label>Дроп:</label><button id="btn-add-loot-reward" class="mc-button" style="padding: 2px 6px; font-size: 12px;">+ Вариант дропа</button></div><div id="loot-rewards-list" class="item-list-container"></div></div></div><div class="modal-actions"><button id="btn-close-loot" class="mc-button btn-cancel" style="width: 100%;">Закрыть</button></div></div></div>
+    
+    <div id="nbt-editor-modal" class="modal hidden">
+        <div class="mc-panel modal-content" style="width: 800px; display:flex; flex-direction:column; max-height:90vh;">
+            <h2 class="mc-title">Редактор NBT Данных</h2>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <button id="tab-nbt-visual" class="mc-button active" style="flex:1;">Визуальный редактор (Удобно)</button>
+                <button id="tab-nbt-code" class="mc-button btn-cancel" style="flex:1;">Код (JSON)</button>
+            </div>
+            
+            <div id="nbt-tab-visual" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+                <div style="background: #1e1e1e; padding: 10px; border: 1px solid #555; margin-bottom: 10px; font-size: 14px; color:#aaa; line-height: 1.4;">
+                    Здесь можно изменять значения существующих тегов. Если список пуст — перейдите во вкладку "Код", вставьте нужный JSON-шаблон и вернитесь сюда.
+                </div>
+                <div id="nbt-visual-container" class="item-list-container" style="flex:1; padding: 10px;"></div>
+            </div>
+
+            <div id="nbt-tab-code" class="hidden" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+                <div style="background: #1e1e1e; padding: 10px; border: 1px solid #555; margin-bottom: 10px; font-size: 14px;">
+                    <div style="color:#fff; margin-bottom: 4px;"><b style="color:#55ffff;">Зачарованная книга (Удача V):</b> <code style="color:#aaa;">{"StoredEnchantments:9": {"0:10": {"id:2": 35, "lvl:2": 5}}}</code></div>
+                    <div style="color:#fff;"><b style="color:#55ffff;">Меч с уроном:</b> <code style="color:#aaa;">{"ench:9": {"0:10": {"id:2": 16, "lvl:2": 5}}}</code></div>
+                </div>
+                <textarea id="nbt-editor-textarea" class="mc-input" style="flex:1; height: 250px; font-family: monospace; font-size: 14px; white-space: pre;" spellcheck="false"></textarea>
+                <div id="nbt-editor-error" style="color: #ff5555; margin-top: 5px; font-size: 14px; font-weight: bold;"></div>
+            </div>
+            
+            <div class="modal-actions" style="margin-top: 15px;">
+                <button id="btn-save-nbt" class="mc-button" style="color: #00aa00; font-size: 16px; padding: 8px 20px;">💾 Сохранить NBT</button>
+                <button id="btn-close-nbt" class="mc-button btn-cancel" style="font-size: 16px; padding: 8px 20px;">Отмена</button>
+            </div>
+        </div>
+    </div>
+
     <div id="item-picker-modal" class="modal hidden"><div class="mc-panel modal-content" style="width: 1000px; max-width: 95vw;"><h2 class="mc-title">Выбор предмета</h2><div class="mc-panel admin-only" style="margin-bottom: 10px; padding: 10px; display: flex; gap: 10px; align-items: center;"><span style="color:#55ffff;">Своя иконка:</span><input type="file" id="custom-item-file" accept="image/png, image/jpeg, image/gif" style="width: 180px; color:#fff;"><input type="text" id="custom-item-name" class="mc-input" placeholder="Название..." style="margin-bottom:0;"><button id="btn-upload-custom-item" class="mc-button">Добавить</button></div><div style="display: flex; gap: 15px; height: 500px;"><div style="flex: 2; display: flex; flex-direction: column;"><div style="display: flex; gap: 10px; margin-bottom: 10px;"><select id="picker-mod-filter" class="mc-input" style="flex: 1; margin: 0;"></select><input type="text" id="picker-search" class="mc-input" placeholder="Поиск..." style="flex: 2; margin: 0;"></div><div id="picker-results" class="item-list-container" style="flex: 1;"></div></div><div style="flex: 1; display: flex; flex-direction: column; gap: 10px;"><div style="flex: 1; display: flex; flex-direction: column; background: #1e1e1e; border: 2px solid #555; padding: 5px;"><h3 style="color:#ffaa00; text-align:center;">★ Избранное</h3><div id="picker-fav-results" class="item-list-container" style="border: none; padding: 0;"></div></div><div style="flex: 1; display: flex; flex-direction: column; background: #1e1e1e; border: 2px solid #555; padding: 5px;"><h3 style="color:#55ffff; text-align:center;">🎁 Лутбоксы</h3><div id="picker-loot-results" class="item-list-container" style="border: none; padding: 0;"></div></div></div></div><div class="modal-actions"><button id="btn-picker-cancel" class="mc-button btn-cancel">Отмена</button></div></div></div>
 
     <datalist id="mob-list"></datalist>
