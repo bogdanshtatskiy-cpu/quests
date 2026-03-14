@@ -427,116 +427,177 @@ export const EditorCanvas = {
         }
     },
 
-    // --- МАГИЯ СОРТИРОВКИ (АВТО-РАССТАНОВКА) ---
+    // --- МАГИЯ: ТОПОЛОГИЧЕСКАЯ СОРТИРОВКА КВЕСТОВ ---
     autoLayout(editor) {
         const mod = editor.getActiveMod();
         if (!mod || !mod.quests || mod.quests.length === 0) return;
 
-        if (!confirm('Авто-расстановка переместит все квесты в этой ветке. Это действие можно отменить с помощью кнопки "↩ Отменить" (Ctrl+Z). Продолжить?')) return;
+        const type = document.getElementById('layout-type')?.value || 'smart';
+        const dir = document.getElementById('layout-dir')?.value || 'TB';
+        const spaceX = parseInt(document.getElementById('layout-space-x')?.value) || 160;
+        const spaceY = parseInt(document.getElementById('layout-space-y')?.value) || 160;
 
-        // Расстояние между квестами (учитываем большие рамки)
-        const GRID_X = 160; 
-        const GRID_Y = 160; 
+        if (!confirm('Авто-расстановка переместит все квесты в этой ветке (ваши старые расстановки сбросятся). Продолжить?')) return;
 
+        const quests = mod.quests;
         const qMap = {};
         const childrenMap = {};
-        const levels = {};
+        const parentsMap = {};
 
         // 1. Инициализация графа
-        mod.quests.forEach(q => {
+        quests.forEach(q => {
             qMap[q.id] = q;
             childrenMap[q.id] = [];
-            levels[q.id] = 0;
+            // Фильтруем родителей, оставляем только тех, кто в текущей ветке
+            parentsMap[q.id] = q.parents ? [...q.parents].filter(p => quests.find(mq => mq.id === p)) : [];
         });
 
-        // 2. Строим связи (кто чей ребенок)
-        mod.quests.forEach(q => {
-            if (q.parents) {
-                q.parents.forEach(pId => {
-                    if (childrenMap[pId]) childrenMap[pId].push(q.id);
-                });
-            }
+        quests.forEach(q => {
+            parentsMap[q.id].forEach(pId => {
+                childrenMap[pId].push(q.id);
+            });
         });
 
-        // 3. Вычисляем уровни (Глубину дерева по оси Y)
+        // 2. Расчет уровней (Слоев) дерева
+        const layers = {};
         let changed = true;
         let iter = 0;
-        while (changed && iter < 1000) { // Защита от бесконечного цикла, если юзер сделал круговую зависимость
-            changed = false;
-            iter++;
-            mod.quests.forEach(q => {
-                if (q.parents && q.parents.length > 0) {
-                    let maxPLevel = -1;
-                    q.parents.forEach(pId => {
-                        if (levels[pId] !== undefined) maxPLevel = Math.max(maxPLevel, levels[pId]);
-                    });
-                    if (levels[q.id] <= maxPLevel) {
-                        levels[q.id] = maxPLevel + 1;
-                        changed = true;
-                    }
+        quests.forEach(q => layers[q.id] = 0);
+
+        while (changed && iter < 1000) {
+            changed = false; iter++;
+            quests.forEach(q => {
+                let maxP = -1;
+                parentsMap[q.id].forEach(pId => {
+                    if (layers[pId] > maxP) maxP = layers[pId];
+                });
+                if (layers[q.id] <= maxP) {
+                    layers[q.id] = maxP + 1;
+                    changed = true;
                 }
             });
         }
 
-        // Группируем квесты по их уровню глубины
-        const levelGroups = {};
-        let maxLvl = 0;
-        mod.quests.forEach(q => {
-            const lvl = levels[q.id];
-            if (!levelGroups[lvl]) levelGroups[lvl] = [];
-            levelGroups[lvl].push(q);
-            if (lvl > maxLvl) maxLvl = lvl;
+        let maxLayer = 0;
+        const layerGroups = [];
+        quests.forEach(q => {
+            const l = layers[q.id];
+            if (l > maxLayer) maxLayer = l;
+            if (!layerGroups[l]) layerGroups[l] = [];
+            layerGroups[l].push(q.id);
         });
 
-        // 4. Расставляем квесты по оси X (Проход сверху вниз)
-        for (let i = 0; i <= maxLvl; i++) {
-            if (!levelGroups[i]) continue;
+        // 3. Минимизация пересечений (Алгоритм Сугиямы)
+        const order = {}; 
+        layerGroups.forEach(group => group.forEach((id, i) => order[id] = i));
 
-            // Сортируем квесты на одном уровне: те, чьи родители левее, тоже встанут левее
-            levelGroups[i].sort((a, b) => {
-                const getAvg = (node) => {
-                    if (!node.parents || node.parents.length === 0) return 0;
-                    let sum = 0, count = 0;
-                    node.parents.forEach(pId => { if (qMap[pId]) { sum += qMap[pId].x; count++; } });
-                    return count > 0 ? sum / count : 0;
-                };
-                return getAvg(a) - getAvg(b);
-            });
+        const getBarycenter = (id, neighbors) => {
+            if (neighbors.length === 0) return order[id]; 
+            let sum = 0;
+            neighbors.forEach(n => sum += order[n]);
+            return sum / neighbors.length;
+        };
 
-            let currentX = 0;
-            levelGroups[i].forEach(q => {
-                let idealX = currentX;
-                // Пытаемся поставить квест прямо под его родителями
-                if (q.parents && q.parents.length > 0) {
-                    let sum = 0, count = 0;
-                    q.parents.forEach(pId => { if (qMap[pId]) { sum += qMap[pId].x; count++; } });
-                    if (count > 0) {
-                        idealX = Math.round((sum / count) / GRID_X) * GRID_X;
-                    }
+        if (type === 'smart') {
+            for (let sweep = 0; sweep < 5; sweep++) {
+                // Проход вниз
+                for (let i = 1; i <= maxLayer; i++) {
+                    if (!layerGroups[i]) continue;
+                    layerGroups[i].sort((a, b) => {
+                        let diff = getBarycenter(a, parentsMap[a]) - getBarycenter(b, parentsMap[b]);
+                        return diff !== 0 ? diff : order[a] - order[b];
+                    });
+                    layerGroups[i].forEach((id, idx) => order[id] = idx);
                 }
+                // Проход вверх
+                for (let i = maxLayer - 1; i >= 0; i--) {
+                    if (!layerGroups[i]) continue;
+                    layerGroups[i].sort((a, b) => {
+                        let diff = getBarycenter(a, childrenMap[a]) - getBarycenter(b, childrenMap[b]);
+                        return diff !== 0 ? diff : order[a] - order[b];
+                    });
+                    layerGroups[i].forEach((id, idx) => order[id] = idx);
+                }
+            }
+        } else {
+            // Тип "Дерево": строгая привязка только к родителю
+            for (let i = 1; i <= maxLayer; i++) {
+                if (!layerGroups[i]) continue;
+                layerGroups[i].sort((a, b) => {
+                    const pA = parentsMap[a].length ? parentsMap[a][0] : null;
+                    const pB = parentsMap[b].length ? parentsMap[b][0] : null;
+                    if (pA === pB) return 0;
+                    return order[pA] - order[pB];
+                });
+                layerGroups[i].forEach((id, idx) => order[id] = idx);
+            }
+        }
 
-                // Запрещаем квесту наезжать на предыдущий квест на этом же уровне
-                q.x = Math.max(currentX, idealX);
-                q.y = i * GRID_Y;
-                
-                // Следующий квест на этом уровне должен стоять минимум на GRID_X правее
-                currentX = q.x + GRID_X;
+        // 4. Присвоение абстрактных координат
+        const coords = {};
+        for (let i = 0; i <= maxLayer; i++) {
+            if (!layerGroups[i]) continue;
+            let currentPos = 0;
+            layerGroups[i].forEach(id => {
+                let idealPos = currentPos;
+                if (parentsMap[id].length > 0) {
+                    let sum = 0;
+                    parentsMap[id].forEach(p => sum += coords[p].pos);
+                    idealPos = sum / parentsMap[id].length;
+                }
+                coords[id] = { layer: i, pos: Math.max(currentPos, idealPos) };
+                currentPos = coords[id].pos + 1; // +1 абстрактный юнит (умножится на spaceX)
             });
         }
 
-        // 5. Финальное центрирование всей ветки (чтобы она не улетала далеко в координаты 10000)
+        // Проход снизу вверх: центрируем родителей ровно над детьми (эстетика)
+        for (let i = maxLayer - 1; i >= 0; i--) {
+            if (!layerGroups[i]) continue;
+            layerGroups[i].forEach(id => {
+                if (childrenMap[id].length > 0) {
+                    let sum = 0;
+                    childrenMap[id].forEach(c => sum += coords[c].pos);
+                    let idealPos = sum / childrenMap[id].length;
+                    
+                    if (idealPos > coords[id].pos) {
+                        let maxAllowed = Infinity;
+                        let idxInLayer = order[id];
+                        if (idxInLayer < layerGroups[i].length - 1) {
+                            let nextNode = layerGroups[i][idxInLayer + 1];
+                            maxAllowed = coords[nextNode].pos - 1;
+                        }
+                        coords[id].pos = Math.min(idealPos, maxAllowed);
+                    }
+                }
+            });
+        }
+
+        // 5. Маппинг абстрактных координат в реальные X и Y в зависимости от направления
+        quests.forEach(q => {
+            let absLayer = coords[q.id].layer;
+            let absPos = coords[q.id].pos;
+            let finalX = 0; let finalY = 0;
+
+            if (dir === 'TB') { finalX = absPos * spaceX; finalY = absLayer * spaceY; } 
+            else if (dir === 'BT') { finalX = absPos * spaceX; finalY = (maxLayer - absLayer) * spaceY; } 
+            else if (dir === 'LR') { finalX = absLayer * spaceX; finalY = absPos * spaceY; } 
+            else if (dir === 'RL') { finalX = (maxLayer - absLayer) * spaceX; finalY = absPos * spaceY; }
+
+            q.x = Math.round(finalX);
+            q.y = Math.round(finalY);
+        });
+
+        // 6. Смещение к 0,0, чтобы квесты не улетали за край экрана
         let minX = Infinity, minY = Infinity;
-        mod.quests.forEach(q => {
+        quests.forEach(q => {
             if (q.x < minX) minX = q.x;
             if (q.y < minY) minY = q.y;
         });
-
-        mod.quests.forEach(q => {
+        quests.forEach(q => {
             q.x -= minX;
             q.y -= minY;
         });
 
-        // Сохраняем состояние для Ctrl+Z и рендерим
         editor.triggerAutoSave();
         this.renderCanvas(editor);
         this.centerCanvas(editor);
