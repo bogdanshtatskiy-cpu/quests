@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft Animated Texture Viewer</title>
+    <style>
+        :root {
+            --bg-color: #1e1e1e;
+            --panel-bg: #2d2d2d;
+            --text-color: #d4d4d4;
+            --accent: #0e639c;
+            --success: #2ea043;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+        #viewer-container {
+            flex: 1;
+            position: relative;
+        }
+        #sidebar {
+            width: 450px;
+            background-color: var(--panel-bg);
+            border-left: 1px solid #444;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            box-sizing: border-box;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.5);
+        }
+        h2 { margin-top: 0; font-size: 1.2rem; margin-bottom: 15px; }
+        .control-group {
+            margin-bottom: 20px;
+            background: #252526;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #333;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            color: #ccc;
+        }
+        input[type="file"] {
+            display: block;
+            width: 100%;
+            margin-bottom: 10px;
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+        textarea {
+            width: 100%;
+            flex: 1;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            border: 1px solid #444;
+            padding: 10px;
+            font-family: 'Courier New', Courier, monospace;
+            resize: none;
+            box-sizing: border-box;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        input[type="range"] {
+            width: 100%;
+        }
+        .header-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.85rem;
+            transition: opacity 0.2s;
+        }
+        button:hover { opacity: 0.8; }
+        .btn-download { background-color: var(--success); }
+        .error { color: #f48771; font-size: 0.85rem; margin-top: 5px; display: none;}
+    </style>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="viewer-container"></div>
+
+    <div id="sidebar">
+        <h2>Загрузка файлов</h2>
+        <div class="control-group">
+            <label>1. Текстура (.png)</label>
+            <input type="file" id="upload-png" accept=".png">
+            <label style="margin-top: 10px;">2. Анимация (.mcmeta)</label>
+            <input type="file" id="upload-mcmeta" accept=".mcmeta,.json">
+        </div>
+
+        <div class="control-group" style="display: flex; justify-content: space-between; align-items: center;">
+            <label style="margin: 0;">Цвет фона</label>
+            <input type="color" id="bg-color" value="#1e1e1e">
+        </div>
+
+        <div class="control-group">
+            <label>Базовая скорость (frametime): <span id="speed-val">-</span></label>
+            <input type="range" id="speed-slider" min="1" max="20" value="2" disabled>
+        </div>
+
+        <div class="header-controls">
+            <h2 style="margin: 0;">Редактор .mcmeta</h2>
+            <div class="btn-group">
+                <button id="apply-btn">Применить</button>
+                <button id="download-btn" class="btn-download">Скачать</button>
+            </div>
+        </div>
+        <div id="json-error" class="error">Ошибка в JSON формате!</div>
+        <textarea id="json-editor" placeholder="Загрузите .mcmeta файл или вставьте код сюда..."></textarea>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        let img = null;
+        let frameSize = 16;
+        let totalFramesCount = 1;
+        let sequence = [];
+        let currentSeqIndex = 0;
+        let tickAccumulator = 0;
+        let lastTime = performance.now();
+        const TICK_MS = 50; 
+        
+        // Флаг активности анимации
+        let isAnimationActive = false;
+        let mcmetaObj = {}; // Изначально пустой объект
+
+        // --- Настройка Three.js ---
+        const container = document.getElementById('viewer-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color('#1e1e1e');
+
+        const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+        camera.position.set(2, 2, 2);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+
+        const texCanvas = document.createElement('canvas');
+        const texCtx = texCanvas.getContext('2d', { willReadFrequently: true });
+        texCanvas.width = 16; texCanvas.height = 16;
+
+        const cubeTexture = new THREE.CanvasTexture(texCanvas);
+        cubeTexture.colorSpace = THREE.SRGBColorSpace;
+        cubeTexture.magFilter = THREE.NearestFilter;
+        cubeTexture.minFilter = THREE.NearestFilter;
+
+        const geometry = new THREE.BoxGeometry(1, 1, 1);
+        const material = new THREE.MeshBasicMaterial({ map: cubeTexture, transparent: true });
+        const cube = new THREE.Mesh(geometry, material);
+        scene.add(cube);
+
+        // --- Логика парсинга и анимации ---
+        function parseMcmeta() {
+            sequence = [];
+            if (!mcmetaObj.animation) mcmetaObj.animation = { frametime: 2 };
+            
+            let globalFrametime = mcmetaObj.animation.frametime || 2;
+            let framesDef = mcmetaObj.animation.frames;
+
+            if (framesDef && Array.isArray(framesDef)) {
+                for (let f of framesDef) {
+                    if (typeof f === 'number') {
+                        sequence.push({ index: f, time: globalFrametime });
+                    } else if (typeof f === 'object') {
+                        sequence.push({ 
+                            index: f.index, 
+                            time: f.time !== undefined ? f.time : globalFrametime 
+                        });
+                    }
+                }
+            } else {
+                for (let i = 0; i < totalFramesCount; i++) {
+                    sequence.push({ index: i, time: globalFrametime });
+                }
+            }
+
+            // Разблокируем ползунок и обновляем UI
+            const slider = document.getElementById('speed-slider');
+            slider.disabled = false;
+            slider.value = globalFrametime;
+            document.getElementById('speed-val').innerText = globalFrametime;
+            
+            isAnimationActive = true;
+            tickAccumulator = 0;
+        }
+
+        function updateTextureToFrame(frameIndex) {
+            if (!img) return;
+            if (frameIndex >= totalFramesCount) frameIndex = 0; 
+            
+            texCtx.clearRect(0, 0, frameSize, frameSize);
+            texCtx.drawImage(
+                img, 
+                0, frameIndex * frameSize, frameSize, frameSize,
+                0, 0, frameSize, frameSize
+            );
+            cubeTexture.needsUpdate = true;
+        }
+
+        function updateEditorFromObj() {
+            document.getElementById('json-editor').value = JSON.stringify(mcmetaObj, null, 2);
+        }
+
+        // --- Главный цикл рендера ---
+        function animate(time) {
+            requestAnimationFrame(animate);
+            controls.update();
+
+            // Анимируем только если флаг активен и есть секвенция
+            if (img && isAnimationActive && sequence.length > 0) {
+                let delta = time - lastTime;
+                tickAccumulator += delta;
+                
+                let currentFrameData = sequence[currentSeqIndex];
+                let frameDurationMs = currentFrameData.time * TICK_MS;
+
+                if (tickAccumulator >= frameDurationMs) {
+                    tickAccumulator = 0;
+                    currentSeqIndex = (currentSeqIndex + 1) % sequence.length;
+                    updateTextureToFrame(sequence[currentSeqIndex].index);
+                }
+            }
+            lastTime = time;
+            renderer.render(scene, camera);
+        }
+        animate(performance.now());
+
+        // --- ОБРАБОТЧИКИ СОБЫТИЙ ---
+
+        // Загрузка PNG
+        document.getElementById('upload-png').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const newImg = new Image();
+                newImg.onload = () => {
+                    img = newImg;
+                    frameSize = img.width;
+                    totalFramesCount = Math.floor(img.height / img.width);
+                    texCanvas.width = frameSize;
+                    texCanvas.height = frameSize;
+                    
+                    // Показываем статический 0-й кадр
+                    currentSeqIndex = 0;
+                    updateTextureToFrame(0);
+                    
+                    // Если mcmeta уже был загружен ранее, пересобираем анимацию
+                    if (Object.keys(mcmetaObj).length !== 0) {
+                        parseMcmeta();
+                    }
+                };
+                newImg.src = ev.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // Загрузка .mcmeta
+        document.getElementById('upload-mcmeta').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    mcmetaObj = JSON.parse(ev.target.result);
+                    updateEditorFromObj();
+                    parseMcmeta();
+                    document.getElementById('json-error').style.display = 'none';
+                } catch(err) {
+                    alert("Ошибка чтения JSON из файла .mcmeta");
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        // Цвет фона
+        document.getElementById('bg-color').addEventListener('input', (e) => {
+            scene.background.set(e.target.value);
+        });
+
+        // Ползунок скорости
+        document.getElementById('speed-slider').addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            document.getElementById('speed-val').innerText = val;
+            
+            // Если объекта еще нет, создаем структуру
+            if (!mcmetaObj.animation) mcmetaObj.animation = {};
+            mcmetaObj.animation.frametime = val;
+            
+            updateEditorFromObj();
+            parseMcmeta();
+        });
+
+        // Кнопка применения JSON
+        document.getElementById('apply-btn').addEventListener('click', () => {
+            const text = document.getElementById('json-editor').value;
+            if (!text.trim()) return;
+            
+            try {
+                mcmetaObj = JSON.parse(text);
+                parseMcmeta();
+                document.getElementById('json-error').style.display = 'none';
+            } catch(err) {
+                document.getElementById('json-error').style.display = 'block';
+            }
+        });
+
+        // Кнопка СКАЧАТЬ
+        document.getElementById('download-btn').addEventListener('click', () => {
+            if (Object.keys(mcmetaObj).length === 0) {
+                alert("Нет данных для скачивания. Сначала загрузите .mcmeta или напишите конфиг в редактор.");
+                return;
+            }
+            
+            // Создаем Blob объект с данными в формате JSON
+            const dataStr = JSON.stringify(mcmetaObj, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            
+            // Создаем временную ссылку для скачивания
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "texture.png.mcmeta"; // Имя скачиваемого файла
+            document.body.appendChild(a);
+            a.click();
+            
+            // Подчищаем за собой
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
+        window.addEventListener('resize', () => {
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            renderer.setSize(width, height);
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+        });
+    </script>
+</body>
+</html>
