@@ -3,102 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minecraft Animated Texture Viewer</title>
+    <title>Minecraft Texture & Animation Studio</title>
     <style>
         :root {
-            --bg-color: #1e1e1e;
-            --panel-bg: #2d2d2d;
-            --text-color: #d4d4d4;
+            --bg-dark: #181818;
+            --bg-panel: #252526;
+            --bg-item: #333333;
             --accent: #0e639c;
+            --accent-hover: #1177bb;
+            --text-main: #cccccc;
+            --border: #3e3e42;
             --success: #2ea043;
         }
         body {
-            margin: 0;
-            padding: 0;
-            display: flex;
+            margin: 0; padding: 0;
+            display: grid;
+            grid-template-columns: 250px 1fr 300px;
+            grid-template-rows: 1fr 250px;
             height: 100vh;
-            background-color: var(--bg-color);
-            color: var(--text-color);
+            background-color: var(--bg-dark);
+            color: var(--text-main);
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             overflow: hidden;
         }
-        #viewer-container {
-            flex: 1;
-            position: relative;
-        }
-        #sidebar {
-            width: 450px;
-            background-color: var(--panel-bg);
-            border-left: 1px solid #444;
-            display: flex;
-            flex-direction: column;
-            padding: 20px;
-            box-sizing: border-box;
-            box-shadow: -2px 0 10px rgba(0,0,0,0.5);
-        }
-        h2 { margin-top: 0; font-size: 1.2rem; margin-bottom: 15px; }
-        .control-group {
-            margin-bottom: 20px;
-            background: #252526;
-            padding: 10px;
-            border-radius: 6px;
-            border: 1px solid #333;
-        }
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-size: 0.9rem;
-            color: #ccc;
-        }
-        input[type="file"] {
-            display: block;
-            width: 100%;
-            margin-bottom: 10px;
-            font-size: 0.85rem;
-            color: #aaa;
-        }
-        textarea {
-            width: 100%;
-            flex: 1;
-            background-color: #1e1e1e;
-            color: #d4d4d4;
-            border: 1px solid #444;
-            padding: 10px;
-            font-family: 'Courier New', Courier, monospace;
-            resize: none;
-            box-sizing: border-box;
-            border-radius: 4px;
-            margin-top: 10px;
-        }
-        input[type="range"] {
-            width: 100%;
-        }
-        .header-controls {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 10px;
-        }
-        .btn-group {
-            display: flex;
-            gap: 10px;
-        }
-        button {
-            background-color: var(--accent);
-            color: white;
-            border: none;
-            padding: 8px 14px;
-            cursor: pointer;
-            border-radius: 4px;
-            font-weight: bold;
-            font-size: 0.85rem;
-            transition: opacity 0.2s;
-        }
-        button:hover { opacity: 0.8; }
-        .btn-download { background-color: var(--success); }
-        .error { color: #f48771; font-size: 0.85rem; margin-top: 5px; display: none;}
-    </style>
+        
+        /* Сетки и панели */
+        #left-panel { grid-column: 1; grid-row: 1 / 3; background: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+        #main-view { grid-column: 2; grid-row: 1; position: relative; }
+        #right-panel { grid-column: 3; grid-row: 1 / 3; background: var(--bg-panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; padding: 15px; }
+        #bottom-panel { grid-column: 2; grid-row: 2; background: var(--bg-panel); border-top: 1px solid var(--border); display: flex; flex-direction: column; }
 
+        h3 { margin: 10px 15px; font-size: 1rem; color: #fff; text-transform: uppercase; letter-spacing: 1px; }
+        
+        /* Левая панель - Файлы */
+        .file-upload-btn {
+            margin: 10px 15px; padding: 10px; background: var(--accent); color: #fff; text-align: center; cursor: pointer; border-radius: 4px; font-weight: bold;
+        }
+        .file-upload-btn:hover { background: var(--accent-hover); }
+        input[type="file"] { display: none; }
+        #file-list { flex: 1; overflow-y: auto; padding: 0 10px; }
+        .file-item {
+            padding: 8px 10px; margin-bottom: 5px; background: var(--bg-item); border-radius: 4px; cursor: pointer; font-size: 0.85rem; word-break: break-all; border-left: 3px solid transparent;
+        }
+        .file-item:hover { background: #444; }
+        .file-item.active-png { border-left-color: #f1c40f; background: #3a3a3a; }
+        .file-item.active-mcmeta { border-left-color: #3498db; background: #3a3a3a; }
+        .file-type-badge { font-size: 0.65rem; padding: 2px 4px; border-radius: 3px; background: #555; margin-right: 5px; }
+
+        /* Нижняя панель - 2D Редактор */
+        #toolbar { display: flex; gap: 15px; padding: 10px 15px; background: #1e1e1e; align-items: center; border-bottom: 1px solid var(--border); }
+        .tool-group { display: flex; align-items: center; gap: 5px; font-size: 0.85rem; }
+        select, input[type="color"], input[type="range"] { background: var(--bg-item); color: #fff; border: 1px solid var(--border); padding: 4px; border-radius: 3px; }
+        button.tool-btn { background: var(--bg-item); border: 1px solid var(--border); color: #fff; padding: 5px 10px; cursor: pointer; border-radius: 3px; }
+        button.tool-btn.active { background: var(--accent); border-color: var(--accent); }
+        
+        #editor-workspace { flex: 1; display: flex; align-items: center; justify-content: center; background: #111; overflow: hidden; position: relative; }
+        #canvas-wrapper { position: relative; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        /* Пиксельный рендер для 2D холста */
+        canvas#draw-canvas { image-rendering: pixelated; cursor: crosshair; display: block; background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAOklEQVQYV2NkYGAwYkAD////Z8SgycAKMIIUsWgih2ERJ1kORB/OaEw6GZHFSErD6EYQpZgYihhZBgAgvRIj8iT7eQAAAABJRU5ErkJggg==') repeat; }
+        
+        #frames-container { display: flex; overflow-x: auto; padding: 10px; background: #1a1a1a; gap: 10px; height: 60px; align-items: center; }
+        .frame-btn { background: var(--bg-item); border: 2px solid transparent; color: #fff; width: 40px; height: 40px; cursor: pointer; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .frame-btn.active { border-color: var(--accent); background: #444; }
+
+        /* Правая панель - Mcmeta и Экспорт */
+        textarea { flex: 1; width: 100%; background: #1e1e1e; color: #d4d4d4; border: 1px solid var(--border); padding: 10px; font-family: monospace; resize: none; box-sizing: border-box; border-radius: 4px; margin-bottom: 10px; }
+        button.action-btn { background: var(--accent); color: white; border: none; padding: 10px; cursor: pointer; border-radius: 4px; font-weight: bold; width: 100%; margin-bottom: 10px; }
+        button.action-btn:hover { background: var(--accent-hover); }
+        button.action-btn.dl-all { background: var(--success); }
+        button.action-btn.dl-all:hover { background: #238636; }
+        .info-text { font-size: 0.8rem; color: #aaa; margin-bottom: 15px; }
+
+        /* Три.js контейнер */
+        canvas#webgl-canvas { display: block; width: 100%; height: 100%; }
+    </style>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script type="importmap">
         {
             "imports": {
@@ -110,272 +90,571 @@
 </head>
 <body>
 
-    <div id="viewer-container"></div>
+    <div id="left-panel">
+        <h3>Файлы</h3>
+        <label class="file-upload-btn">
+            Загрузить файлы
+            <input type="file" id="file-input" multiple accept=".png,.mcmeta,.json">
+        </label>
+        <div id="file-list"></div>
+    </div>
 
-    <div id="sidebar">
-        <h2>Загрузка файлов</h2>
-        <div class="control-group">
-            <label>1. Текстура (.png)</label>
-            <input type="file" id="upload-png" accept=".png">
-            <label style="margin-top: 10px;">2. Анимация (.mcmeta)</label>
-            <input type="file" id="upload-mcmeta" accept=".mcmeta,.json">
+    <div id="main-view">
+        <canvas id="webgl-canvas"></canvas>
+    </div>
+
+    <div id="right-panel">
+        <h3>Глобальные настройки</h3>
+        <div style="display: flex; gap: 10px; margin-bottom: 15px; align-items: center; font-size: 0.85rem;">
+            Фон 3D: <input type="color" id="bg-color-3d" value="#181818">
         </div>
+        <button id="btn-dl-all" class="action-btn dl-all">Скачать всё (.zip)</button>
+        <button id="btn-dl-current" class="action-btn">Скачать текущий файл</button>
+        
+        <hr style="border-color: var(--border); width: 100%; margin: 15px 0;">
+        
+        <h3>Редактор .mcmeta</h3>
+        <div class="info-text" id="mcmeta-status">Выберите .mcmeta файл слева для редактирования.</div>
+        <textarea id="json-editor" placeholder="{ ... }" disabled></textarea>
+        <button id="btn-apply-json" class="action-btn" disabled>Применить код</button>
+    </div>
 
-        <div class="control-group" style="display: flex; justify-content: space-between; align-items: center;">
-            <label style="margin: 0;">Цвет фона</label>
-            <input type="color" id="bg-color" value="#1e1e1e">
+    <div id="bottom-panel">
+        <div id="toolbar">
+            <div class="tool-group">
+                <button id="tool-pencil" class="tool-btn active">✏️ Карандаш</button>
+                <button id="tool-picker" class="tool-btn">💧 Пипетка</button>
+            </div>
+            <div class="tool-group" style="margin-left: 15px;">
+                Цвет: <input type="color" id="draw-color" value="#ffffff">
+                Прозрачность: <input type="range" id="draw-opacity" min="0" max="1" step="0.05" value="1" style="width:80px">
+            </div>
+            <div class="tool-group" style="margin-left: 15px;">
+                Размер (px):
+                <select id="brush-size">
+                    <option value="1" selected>1</option>
+                    <option value="2">2</option>
+                    <option value="4">4</option>
+                    <option value="8">8</option>
+                    <option value="16">16</option>
+                    <option value="32">32</option>
+                    <option value="64">64</option>
+                    <option value="128">128</option>
+                    <option value="256">256</option>
+                </select>
+            </div>
+            <div style="flex:1"></div>
+            <div class="tool-group" id="editor-info" style="color:#aaa;">Холст: -</div>
         </div>
-
-        <div class="control-group">
-            <label>Базовая скорость (frametime): <span id="speed-val">-</span></label>
-            <input type="range" id="speed-slider" min="1" max="20" value="2" disabled>
-        </div>
-
-        <div class="header-controls">
-            <h2 style="margin: 0;">Редактор .mcmeta</h2>
-            <div class="btn-group">
-                <button id="apply-btn">Применить</button>
-                <button id="download-btn" class="btn-download">Скачать</button>
+        
+        <div id="editor-workspace">
+            <div id="canvas-wrapper">
+                <canvas id="draw-canvas"></canvas>
             </div>
         </div>
-        <div id="json-error" class="error">Ошибка в JSON формате!</div>
-        <textarea id="json-editor" placeholder="Загрузите .mcmeta файл или вставьте код сюда..."></textarea>
+        
+        <div id="frames-container">
+            <div style="color: #666; font-size: 0.85rem; padding-left: 10px;">Выберите .png файл слева для редактирования.</div>
+        </div>
     </div>
 
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-        let img = null;
-        let frameSize = 16;
-        let totalFramesCount = 1;
-        let sequence = [];
-        let currentSeqIndex = 0;
-        let tickAccumulator = 0;
-        let lastTime = performance.now();
-        const TICK_MS = 50; 
+        // === СОСТОЯНИЕ ПРИЛОЖЕНИЯ ===
+        const AppState = {
+            files: {}, // name -> { type, name, data, img, width, frames, masterCanvas, mcmetaObj, sequence }
+            activePng: null,
+            activeMcmeta: null,
+            activeFrame: 0,
+            drawing: false,
+            currentTool: 'pencil', // pencil | picker
+            tickMs: 50 // 1 Minecraft tick
+        };
+
+        // Кубик маппинг в ThreeJS: [Right, Left, Top, Bottom, Front, Back]
+        const faceMap = {
+            right: 0, left: 1, top: 2, bottom: 3, front: 4, back: 5
+        };
+
+        // Храним 6 холстов для вывода текстур на 3D куб
+        const faceCanvases = Array.from({length: 6}, () => {
+            const c = document.createElement('canvas');
+            c.width = 16; c.height = 16;
+            return c;
+        });
+        const faceCtxs = faceCanvases.map(c => c.getContext('2d', {willReadFrequently: true}));
+        const faceTextures = faceCanvases.map(c => {
+            const tex = new THREE.CanvasTexture(c);
+            tex.colorSpace = THREE.SRGBColorSpace;
+            tex.magFilter = THREE.NearestFilter;
+            tex.minFilter = THREE.NearestFilter;
+            return tex;
+        });
         
-        // Флаг активности анимации
-        let isAnimationActive = false;
-        let mcmetaObj = {}; // Изначально пустой объект
+        // Связь сторон куба с именами файлов (что сейчас натянуто)
+        const faceAssignments = [null, null, null, null, null, null]; // хранит ключи из AppState.files
 
-        // --- Настройка Three.js ---
-        const container = document.getElementById('viewer-container');
+        // Анимационные накопители
+        let lastTime = performance.now();
+        const faceTicks = [0,0,0,0,0,0];
+        const faceSeqIndices = [0,0,0,0,0,0];
+
+        // === ИНИЦИАЛИЗАЦИЯ 3D ===
+        const viewContainer = document.getElementById('main-view');
+        const webglCanvas = document.getElementById('webgl-canvas');
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color('#1e1e1e');
+        scene.background = new THREE.Color('#181818');
 
-        const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+        const camera = new THREE.PerspectiveCamera(45, viewContainer.clientWidth / viewContainer.clientHeight, 0.1, 100);
         camera.position.set(2, 2, 2);
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(container.clientWidth, container.clientHeight);
+        const renderer = new THREE.WebGLRenderer({ canvas: webglCanvas, antialias: true });
+        renderer.setSize(viewContainer.clientWidth, viewContainer.clientHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
-        container.appendChild(renderer.domElement);
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
 
-        const texCanvas = document.createElement('canvas');
-        const texCtx = texCanvas.getContext('2d', { willReadFrequently: true });
-        texCanvas.width = 16; texCanvas.height = 16;
-
-        const cubeTexture = new THREE.CanvasTexture(texCanvas);
-        cubeTexture.colorSpace = THREE.SRGBColorSpace;
-        cubeTexture.magFilter = THREE.NearestFilter;
-        cubeTexture.minFilter = THREE.NearestFilter;
-
         const geometry = new THREE.BoxGeometry(1, 1, 1);
-        const material = new THREE.MeshBasicMaterial({ map: cubeTexture, transparent: true });
-        const cube = new THREE.Mesh(geometry, material);
+        const materials = faceTextures.map(tex => new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+        const cube = new THREE.Mesh(geometry, materials);
         scene.add(cube);
 
-        // --- Логика парсинга и анимации ---
-        function parseMcmeta() {
-            sequence = [];
-            if (!mcmetaObj.animation) mcmetaObj.animation = { frametime: 2 };
+        // Отрисовка дефолтной сетки, чтобы куб было видно до загрузки
+        faceCtxs.forEach(ctx => {
+            ctx.fillStyle = '#ff00ff'; ctx.fillRect(0,0,8,8); ctx.fillRect(8,8,8,8);
+            ctx.fillStyle = '#000000'; ctx.fillRect(8,0,8,8); ctx.fillRect(0,8,8,8);
+        });
+        faceTextures.forEach(t => t.needsUpdate = true);
+
+        // === ИНИЦИАЛИЗАЦИЯ 2D РЕДАКТОРА ===
+        const drawCanvas = document.getElementById('draw-canvas');
+        const drawCtx = drawCanvas.getContext('2d', {willReadFrequently: true});
+        const zoomLevel = 16; // Визуальный масштаб холста
+
+        // === ЛОГИКА ФАЙЛОВ ===
+        document.getElementById('file-input').addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files);
+            for (let f of files) {
+                const name = f.name;
+                const ext = name.includes('.mcmeta') ? '.mcmeta' : (name.endsWith('.png') ? '.png' : '.json');
+                const baseName = name.replace('.mcmeta', '').replace('.json', '').replace('.png', '');
+                
+                if (!AppState.files[baseName]) {
+                    AppState.files[baseName] = { name: baseName, pngFile: null, mcmetaFile: null, mcmetaObj: { animation: { frametime: 2 } } };
+                }
+
+                if (ext === '.png') {
+                    const dataUrl = await readFileDataURL(f);
+                    const img = await loadImage(dataUrl);
+                    const width = img.width;
+                    const framesCount = Math.floor(img.height / img.width) || 1;
+                    
+                    // Создаем мастер-холст со всеми кадрами
+                    const masterCanvas = document.createElement('canvas');
+                    masterCanvas.width = width;
+                    masterCanvas.height = img.height;
+                    const mCtx = masterCanvas.getContext('2d', {willReadFrequently: true});
+                    mCtx.drawImage(img, 0, 0);
+
+                    AppState.files[baseName].pngFile = f;
+                    AppState.files[baseName].img = img;
+                    AppState.files[baseName].width = width;
+                    AppState.files[baseName].frames = framesCount;
+                    AppState.files[baseName].masterCanvas = masterCanvas;
+                    
+                    // Обновляем маппинг на 3D куб
+                    assignToCubeFaces(baseName);
+                } 
+                else if (ext === '.mcmeta' || ext === '.json') {
+                    const text = await readFileText(f);
+                    AppState.files[baseName].mcmetaFile = f;
+                    try {
+                        AppState.files[baseName].mcmetaObj = JSON.parse(text);
+                    } catch(err) { console.error("Bad JSON in", name); }
+                }
+                
+                parseSequence(baseName);
+            }
+            renderFileList();
+            e.target.value = ''; // сброс
+        });
+
+        function assignToCubeFaces(baseName) {
+            const lowerName = baseName.toLowerCase();
+            let assigned = false;
+            if (lowerName.includes('top')) { faceAssignments[faceMap.top] = baseName; assigned = true; }
+            if (lowerName.includes('bottom')) { faceAssignments[faceMap.bottom] = baseName; assigned = true; }
+            if (lowerName.includes('side')) {
+                faceAssignments[faceMap.right] = baseName;
+                faceAssignments[faceMap.left] = baseName;
+                faceAssignments[faceMap.front] = baseName;
+                faceAssignments[faceMap.back] = baseName;
+                assigned = true;
+            }
             
-            let globalFrametime = mcmetaObj.animation.frametime || 2;
-            let framesDef = mcmetaObj.animation.frames;
+            // Если специфичных слов нет, применяем ко всем (или оставшимся пустым)
+            if (!assigned) {
+                for(let i=0; i<6; i++) {
+                    faceAssignments[i] = baseName; // Перекрываем всё
+                }
+            }
+            updateCubeStaticFaces();
+        }
+
+        function parseSequence(baseName) {
+            const fileData = AppState.files[baseName];
+            if (!fileData || !fileData.width) return;
+            
+            const obj = fileData.mcmetaObj;
+            let sequence = [];
+            let globalFrametime = obj.animation?.frametime || 2;
+            let framesDef = obj.animation?.frames;
 
             if (framesDef && Array.isArray(framesDef)) {
                 for (let f of framesDef) {
-                    if (typeof f === 'number') {
-                        sequence.push({ index: f, time: globalFrametime });
-                    } else if (typeof f === 'object') {
-                        sequence.push({ 
-                            index: f.index, 
-                            time: f.time !== undefined ? f.time : globalFrametime 
-                        });
-                    }
+                    if (typeof f === 'number') sequence.push({ index: f, time: globalFrametime });
+                    else if (typeof f === 'object') sequence.push({ index: f.index, time: f.time !== undefined ? f.time : globalFrametime });
                 }
             } else {
-                for (let i = 0; i < totalFramesCount; i++) {
-                    sequence.push({ index: i, time: globalFrametime });
-                }
+                for (let i = 0; i < fileData.frames; i++) sequence.push({ index: i, time: globalFrametime });
             }
-
-            // Разблокируем ползунок и обновляем UI
-            const slider = document.getElementById('speed-slider');
-            slider.disabled = false;
-            slider.value = globalFrametime;
-            document.getElementById('speed-val').innerText = globalFrametime;
-            
-            isAnimationActive = true;
-            tickAccumulator = 0;
+            fileData.sequence = sequence;
         }
 
-        function updateTextureToFrame(frameIndex) {
-            if (!img) return;
-            if (frameIndex >= totalFramesCount) frameIndex = 0; 
+        // Обновляем текущие кадры в 3D
+        function updateCubeStaticFaces() {
+            for(let i=0; i<6; i++) {
+                const baseName = faceAssignments[i];
+                if (!baseName || !AppState.files[baseName]) continue;
+                
+                const fileData = AppState.files[baseName];
+                const seqIdx = faceSeqIndices[i];
+                const frameIdx = (fileData.sequence && fileData.sequence[seqIdx]) ? fileData.sequence[seqIdx].index : 0;
+                
+                renderFrameToFace(i, fileData, frameIdx);
+            }
+        }
+
+        function renderFrameToFace(faceIdx, fileData, frameIdx) {
+            if (frameIdx >= fileData.frames) frameIdx = 0;
+            const w = fileData.width;
+            const ctx = faceCtxs[faceIdx];
+            faceCanvases[faceIdx].width = w;
+            faceCanvases[faceIdx].height = w;
             
-            texCtx.clearRect(0, 0, frameSize, frameSize);
-            texCtx.drawImage(
-                img, 
-                0, frameIndex * frameSize, frameSize, frameSize,
-                0, 0, frameSize, frameSize
+            ctx.clearRect(0, 0, w, w);
+            ctx.drawImage(
+                fileData.masterCanvas,
+                0, frameIdx * w, w, w,
+                0, 0, w, w
             );
-            cubeTexture.needsUpdate = true;
+            faceTextures[faceIdx].needsUpdate = true;
         }
 
-        function updateEditorFromObj() {
-            document.getElementById('json-editor').value = JSON.stringify(mcmetaObj, null, 2);
+        // === UI: СПИСОК ФАЙЛОВ ===
+        function renderFileList() {
+            const container = document.getElementById('file-list');
+            container.innerHTML = '';
+            
+            Object.keys(AppState.files).forEach(baseName => {
+                const fileData = AppState.files[baseName];
+                
+                if (fileData.pngFile) {
+                    const div = document.createElement('div');
+                    div.className = `file-item ${AppState.activePng === baseName ? 'active-png' : ''}`;
+                    div.innerHTML = `<span class="file-type-badge">PNG</span>${baseName}.png`;
+                    div.onclick = () => selectPngFile(baseName);
+                    container.appendChild(div);
+                }
+                
+                if (fileData.mcmetaFile || fileData.pngFile) {
+                    const div = document.createElement('div');
+                    div.className = `file-item ${AppState.activeMcmeta === baseName ? 'active-mcmeta' : ''}`;
+                    div.innerHTML = `<span class="file-type-badge">META</span>${baseName}.png.mcmeta`;
+                    div.onclick = () => selectMcmetaFile(baseName);
+                    container.appendChild(div);
+                }
+            });
         }
 
-        // --- Главный цикл рендера ---
+        // === ВЫБОР И РЕДАКТИРОВАНИЕ Mcmeta ===
+        function selectMcmetaFile(baseName) {
+            AppState.activeMcmeta = baseName;
+            renderFileList();
+            
+            const fileData = AppState.files[baseName];
+            const editor = document.getElementById('json-editor');
+            const btnApply = document.getElementById('btn-apply-json');
+            
+            document.getElementById('mcmeta-status').innerText = `Редактирование: ${baseName}.png.mcmeta`;
+            editor.disabled = false;
+            btnApply.disabled = false;
+            
+            editor.value = JSON.stringify(fileData.mcmetaObj, null, 2);
+        }
+
+        document.getElementById('btn-apply-json').addEventListener('click', () => {
+            if (!AppState.activeMcmeta) return;
+            const text = document.getElementById('json-editor').value;
+            try {
+                AppState.files[AppState.activeMcmeta].mcmetaObj = JSON.parse(text);
+                parseSequence(AppState.activeMcmeta);
+                alert("Конфигурация применена успешно!");
+            } catch(e) {
+                alert("Ошибка в JSON! Проверьте синтаксис.");
+            }
+        });
+
+        // === ВЫБОР И РЕДАКТИРОВАНИЕ PNG (2D) ===
+        function selectPngFile(baseName) {
+            AppState.activePng = baseName;
+            AppState.activeFrame = 0;
+            renderFileList();
+            renderFramesList();
+            setupDrawCanvas();
+        }
+
+        function renderFramesList() {
+            const container = document.getElementById('frames-container');
+            container.innerHTML = '';
+            const fileData = AppState.files[AppState.activePng];
+            if (!fileData) return;
+
+            for (let i = 0; i < fileData.frames; i++) {
+                const btn = document.createElement('div');
+                btn.className = `frame-btn ${AppState.activeFrame === i ? 'active' : ''}`;
+                btn.innerText = i;
+                btn.onclick = () => {
+                    AppState.activeFrame = i;
+                    renderFramesList();
+                    setupDrawCanvas();
+                };
+                container.appendChild(btn);
+            }
+        }
+
+        function setupDrawCanvas() {
+            const fileData = AppState.files[AppState.activePng];
+            if (!fileData) return;
+            
+            const w = fileData.width;
+            drawCanvas.width = w;
+            drawCanvas.height = w;
+            
+            // Задаем визуальный размер (мин 256px для удобства)
+            const cssSize = Math.max(256, w * (16 / (w/16))); // Эвристика масштаба
+            drawCanvas.style.width = `${cssSize}px`;
+            drawCanvas.style.height = `${cssSize}px`;
+            
+            document.getElementById('editor-info').innerText = `Холст: ${w}x${w} | Кадр: ${AppState.activeFrame}`;
+            
+            // Копируем нужный кадр из мастер-холста
+            drawCtx.clearRect(0,0,w,w);
+            drawCtx.drawImage(fileData.masterCanvas, 0, AppState.activeFrame * w, w, w, 0, 0, w, w);
+        }
+
+        // --- ЛОГИКА РИСОВАНИЯ ---
+        document.getElementById('tool-pencil').onclick = (e) => setTool('pencil', e.target);
+        document.getElementById('tool-picker').onclick = (e) => setTool('picker', e.target);
+
+        function setTool(tool, btnElement) {
+            AppState.currentTool = tool;
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+            btnElement.classList.add('active');
+            drawCanvas.style.cursor = tool === 'picker' ? 'help' : 'crosshair';
+        }
+
+        drawCanvas.addEventListener('mousedown', startAction);
+        drawCanvas.addEventListener('mousemove', doAction);
+        window.addEventListener('mouseup', () => { AppState.drawing = false; });
+
+        function getMousePos(e) {
+            const rect = drawCanvas.getBoundingClientRect();
+            const scaleX = drawCanvas.width / rect.width;
+            const scaleY = drawCanvas.height / rect.height;
+            return {
+                x: Math.floor((e.clientX - rect.left) * scaleX),
+                y: Math.floor((e.clientY - rect.top) * scaleY)
+            };
+        }
+
+        function startAction(e) {
+            if (!AppState.activePng) return;
+            const pos = getMousePos(e);
+            
+            if (AppState.currentTool === 'picker') {
+                pickColor(pos.x, pos.y);
+            } else {
+                AppState.drawing = true;
+                drawPixel(pos.x, pos.y);
+            }
+        }
+
+        function doAction(e) {
+            if (!AppState.drawing || AppState.currentTool !== 'pencil' || !AppState.activePng) return;
+            const pos = getMousePos(e);
+            drawPixel(pos.x, pos.y);
+        }
+
+        function drawPixel(x, y) {
+            const size = parseInt(document.getElementById('brush-size').value);
+            const color = document.getElementById('draw-color').value;
+            const alpha = parseFloat(document.getElementById('draw-opacity').value);
+            
+            // Выравниваем координату по размеру кисти (snap to grid)
+            const startX = Math.floor(x / size) * size;
+            const startY = Math.floor(y / size) * size;
+
+            drawCtx.globalAlpha = alpha;
+            
+            // Если мы стираем (заглушка: если альфа 0 или спец. кнопка)
+            // Но мы используем fillRect для цвета. 
+            // Для полного редактора можно добавить инструмент ластика: drawCtx.clearRect(...)
+            
+            drawCtx.fillStyle = color;
+            drawCtx.fillRect(startX, startY, size, size);
+            drawCtx.globalAlpha = 1.0;
+
+            saveEditToMaster();
+        }
+
+        function pickColor(x, y) {
+            const pixel = drawCtx.getImageData(x, y, 1, 1).data;
+            if (pixel[3] === 0) return; // прозрачный
+            const hex = "#" + ("000000" + rgbToHex(pixel[0], pixel[1], pixel[2])).slice(-6);
+            document.getElementById('draw-color').value = hex;
+            setTool('pencil', document.getElementById('tool-pencil')); // Автовозврат на карандаш
+        }
+
+        function rgbToHex(r, g, b) {
+            return ((r << 16) | (g << 8) | b).toString(16);
+        }
+
+        function saveEditToMaster() {
+            const fileData = AppState.files[AppState.activePng];
+            const w = fileData.width;
+            const mCtx = fileData.masterCanvas.getContext('2d');
+            
+            // Переносим отредактированный кадр обратно в мастер-спрайт
+            mCtx.clearRect(0, AppState.activeFrame * w, w, w);
+            mCtx.drawImage(drawCanvas, 0, AppState.activeFrame * w);
+            
+            // Сигнализируем 3D сцене обновить этот кадр, если он сейчас отображается
+            updateCubeStaticFaces(); 
+        }
+
+        // === ГЛАВНЫЙ ЦИКЛ АНИМАЦИИ (3D) ===
         function animate(time) {
             requestAnimationFrame(animate);
             controls.update();
 
-            // Анимируем только если флаг активен и есть секвенция
-            if (img && isAnimationActive && sequence.length > 0) {
-                let delta = time - lastTime;
-                tickAccumulator += delta;
+            let delta = time - lastTime;
+            
+            // Обновляем каждую сторону куба независимо
+            for(let i=0; i<6; i++) {
+                const baseName = faceAssignments[i];
+                if (!baseName) continue;
                 
-                let currentFrameData = sequence[currentSeqIndex];
-                let frameDurationMs = currentFrameData.time * TICK_MS;
+                const fileData = AppState.files[baseName];
+                if (!fileData || !fileData.sequence || fileData.sequence.length === 0) continue;
 
-                if (tickAccumulator >= frameDurationMs) {
-                    tickAccumulator = 0;
-                    currentSeqIndex = (currentSeqIndex + 1) % sequence.length;
-                    updateTextureToFrame(sequence[currentSeqIndex].index);
+                faceTicks[i] += delta;
+                
+                let curSeqData = fileData.sequence[faceSeqIndices[i]];
+                if (!curSeqData) continue; // safety
+
+                let frameDurationMs = curSeqData.time * AppState.tickMs;
+
+                if (faceTicks[i] >= frameDurationMs) {
+                    faceTicks[i] = 0;
+                    faceSeqIndices[i] = (faceSeqIndices[i] + 1) % fileData.sequence.length;
+                    
+                    const nextFrameIdx = fileData.sequence[faceSeqIndices[i]].index;
+                    renderFrameToFace(i, fileData, nextFrameIdx);
                 }
             }
+            
             lastTime = time;
             renderer.render(scene, camera);
         }
         animate(performance.now());
 
-        // --- ОБРАБОТЧИКИ СОБЫТИЙ ---
-
-        // Загрузка PNG
-        document.getElementById('upload-png').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                const newImg = new Image();
-                newImg.onload = () => {
-                    img = newImg;
-                    frameSize = img.width;
-                    totalFramesCount = Math.floor(img.height / img.width);
-                    texCanvas.width = frameSize;
-                    texCanvas.height = frameSize;
-                    
-                    // Показываем статический 0-й кадр
-                    currentSeqIndex = 0;
-                    updateTextureToFrame(0);
-                    
-                    // Если mcmeta уже был загружен ранее, пересобираем анимацию
-                    if (Object.keys(mcmetaObj).length !== 0) {
-                        parseMcmeta();
-                    }
-                };
-                newImg.src = ev.target.result;
-            };
-            reader.readAsDataURL(file);
+        // === ЭКСПОРТ (СКАЧИВАНИЕ) ===
+        document.getElementById('btn-dl-current').addEventListener('click', () => {
+            if (!AppState.activePng && !AppState.activeMcmeta) return alert("Выберите файл слева.");
+            
+            // Скачиваем PNG
+            if (AppState.activePng) {
+                const cvs = AppState.files[AppState.activePng].masterCanvas;
+                const link = document.createElement('a');
+                link.download = `${AppState.activePng}.png`;
+                link.href = cvs.toDataURL('image/png');
+                link.click();
+            }
+            // Скачиваем Mcmeta
+            if (AppState.activeMcmeta) {
+                const obj = AppState.files[AppState.activeMcmeta].mcmetaObj;
+                const blob = new Blob([JSON.stringify(obj, null, 2)], {type: "application/json"});
+                const link = document.createElement('a');
+                link.download = `${AppState.activeMcmeta}.png.mcmeta`;
+                link.href = URL.createObjectURL(blob);
+                link.click();
+            }
         });
 
-        // Загрузка .mcmeta
-        document.getElementById('upload-mcmeta').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                try {
-                    mcmetaObj = JSON.parse(ev.target.result);
-                    updateEditorFromObj();
-                    parseMcmeta();
-                    document.getElementById('json-error').style.display = 'none';
-                } catch(err) {
-                    alert("Ошибка чтения JSON из файла .mcmeta");
+        document.getElementById('btn-dl-all').addEventListener('click', async () => {
+            if (Object.keys(AppState.files).length === 0) return alert("Нет загруженных файлов.");
+            
+            const zip = new JSZip();
+            
+            for (const baseName in AppState.files) {
+                const fd = AppState.files[baseName];
+                
+                if (fd.masterCanvas) {
+                    const dataUrl = fd.masterCanvas.toDataURL('image/png');
+                    const base64Data = dataUrl.replace(/^data:image\/(png|jpg);base64,/, "");
+                    zip.file(`${baseName}.png`, base64Data, {base64: true});
                 }
-            };
-            reader.readAsText(file);
-        });
-
-        // Цвет фона
-        document.getElementById('bg-color').addEventListener('input', (e) => {
-            scene.background.set(e.target.value);
-        });
-
-        // Ползунок скорости
-        document.getElementById('speed-slider').addEventListener('input', (e) => {
-            const val = parseInt(e.target.value);
-            document.getElementById('speed-val').innerText = val;
-            
-            // Если объекта еще нет, создаем структуру
-            if (!mcmetaObj.animation) mcmetaObj.animation = {};
-            mcmetaObj.animation.frametime = val;
-            
-            updateEditorFromObj();
-            parseMcmeta();
-        });
-
-        // Кнопка применения JSON
-        document.getElementById('apply-btn').addEventListener('click', () => {
-            const text = document.getElementById('json-editor').value;
-            if (!text.trim()) return;
-            
-            try {
-                mcmetaObj = JSON.parse(text);
-                parseMcmeta();
-                document.getElementById('json-error').style.display = 'none';
-            } catch(err) {
-                document.getElementById('json-error').style.display = 'block';
-            }
-        });
-
-        // Кнопка СКАЧАТЬ
-        document.getElementById('download-btn').addEventListener('click', () => {
-            if (Object.keys(mcmetaObj).length === 0) {
-                alert("Нет данных для скачивания. Сначала загрузите .mcmeta или напишите конфиг в редактор.");
-                return;
+                
+                if (fd.mcmetaObj && Object.keys(fd.mcmetaObj).length > 0) {
+                    zip.file(`${baseName}.png.mcmeta`, JSON.stringify(fd.mcmetaObj, null, 2));
+                }
             }
             
-            // Создаем Blob объект с данными в формате JSON
-            const dataStr = JSON.stringify(mcmetaObj, null, 2);
-            const blob = new Blob([dataStr], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            
-            // Создаем временную ссылку для скачивания
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = "texture.png.mcmeta"; // Имя скачиваемого файла
-            document.body.appendChild(a);
-            a.click();
-            
-            // Подчищаем за собой
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            const content = await zip.generateAsync({type:"blob"});
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = "texture_pack_export.zip";
+            link.click();
         });
 
+        // Вспомогательные функции
+        function readFileDataURL(file) {
+            return new Promise(r => { const rd = new FileReader(); rd.onload = e => r(e.target.result); rd.readAsDataURL(file); });
+        }
+        function readFileText(file) {
+            return new Promise(r => { const rd = new FileReader(); rd.onload = e => r(e.target.result); rd.readAsText(file); });
+        }
+        function loadImage(src) {
+            return new Promise(r => { const img = new Image(); img.onload = () => r(img); img.src = src; });
+        }
+
+        // Ресайз сцены
         window.addEventListener('resize', () => {
-            const width = container.clientWidth;
-            const height = container.clientHeight;
+            const width = viewContainer.clientWidth;
+            const height = viewContainer.clientHeight;
             renderer.setSize(width, height);
             camera.aspect = width / height;
             camera.updateProjectionMatrix();
         });
+
+        document.getElementById('bg-color-3d').addEventListener('input', (e) => {
+            scene.background.set(e.target.value);
+        });
+
     </script>
 </body>
 </html>
